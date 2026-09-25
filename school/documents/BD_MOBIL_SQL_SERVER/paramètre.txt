@@ -1,0 +1,24 @@
+
+Etablisement
+
+Enseignant
+
+Eleves
+
+Classe
+
+Matière
+
+Enseignement
+
+Discipline
+
+Notes
+
+Annee
+inscription
+historiquehiscription
+Users
+
+
+login parent: six premier lettres du nom + 2 premiers caractères du code etablissement + code année + trois derniers caractère du matricule

@@ -1,0 +1,2 @@
+la table conduite sera remplie avec les absences pendant l'appel
+Les tables Etablissement, Evaluation, Tranche et Annee peuvent avoir un formulaire de saisie pour eviter l'importation

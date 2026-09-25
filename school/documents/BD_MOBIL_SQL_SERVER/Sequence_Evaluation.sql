@@ -1,0 +1,28 @@
+USE [STUDMANBORROMEE]
+GO
+
+/****** Object:  Table [dbo].[T_Evaluation]    Script Date: 09/03/2022 15:34:36 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+SET ANSI_PADDING ON
+GO
+
+CREATE TABLE [dbo].[T_Evaluation](
+	[CodeEvaluation] [char](10) NOT NULL,
+	[LibelleEvaluation] [char](20) NULL,
+ CONSTRAINT [PK_T_Evaluation] PRIMARY KEY CLUSTERED 
+(
+	[CodeEvaluation] ASC
+)WITH (PAD_INDEX  = OFF, STATISTICS_NORECOMPUTE  = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS  = ON, ALLOW_PAGE_LOCKS  = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+SET ANSI_PADDING OFF
+GO
+
+

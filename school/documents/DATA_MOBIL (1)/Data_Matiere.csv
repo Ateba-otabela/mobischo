@@ -1,0 +1,142 @@
+﻿55        ;PATHOLOGIE CHIRUGICALE                            ;55        ;11201     
+56        ;SOINS INFIRMIERS                                  ;56        ;11201     
+57        ;COURRIER                                          ;57        ;11201     
+58        ;LABORATOIRE                                       ;58        ;11201     
+59        ;ANATOMMIE                                         ;59        ;11201     
+60        ;OTC                                               ;60        ;11201     
+61        ;ECONOMIE GENERALE                                 ;61        ;11201     
+62        ;PATHOLOGIE MEDICALE                               ;61        ;11201     
+63        ;SMS                                               ;62        ;11201     
+64        ;STENOGRAPHIE                                      ;63        ;11201     
+65        ;ATA                                               ;63        ;11201     
+66        ;CATECHESE                                         ;64        ;11201     
+67        ;ANALYSE                                           ;65        ;11201     
+68        ;ANALYSE DE FABRICATION                            ;65        ;11201     
+69        ;Atelier                                           ;66        ;11201     
+70        ;S.E.S                                             ;67        ;11201     
+71        ;E.E.A                                             ;69        ;11201     
+72        ;Hygiène                                           ;70        ;11201     
+73        ;Commerce                                          ;71        ;11201     
+74        ;Automatisme                                       ;73        ;11201     
+75        ;T.P de Fabrcation                                 ;75        ;11201     
+76        ;Comptabilité                                      ;74        ;11201     
+77        ;Bureautique                                       ;75        ;11201     
+78        ;Matériel de Bueau                                 ;77        ;11201     
+79        ;Correspondance                                    ;77        ;11201     
+80        ;CLASSEMENT                                        ;78        ;11201     
+81        ;O. T.A / Classement                               ;79        ;11201     
+82        ;Français Médical                                  ;79        ;11201     
+83        ;T.Q.G                                             ;80        ;11201     
+84        ;Mathématiques commerciales                        ;81        ;11201     
+85        ;Gestion Hospitalière                              ;82        ;11201     
+86        ;REDACTION PROF                                    ;82        ;11201     
+87        ;Médécine - Chirurgie                              ;84        ;11201     
+88        ;Français                                          ;4         ;11201     
+89        ;COMPTA GENE                                       ;10        ;11201     
+90        ;COMPTA USUELLE                                    ;11        ;11201     
+91        ;Circuit Analogique                                ;11        ;11201     
+92        ;Circuit Numérique                                 ;12        ;11201     
+93        ;Machines Electriques                              ;14        ;11201     
+94        ;MECA APPLIQUEE                                    ;13        ;11201     
+95        ;MARKETING                                         ;16        ;11201     
+96        ;Droit                                             ;17        ;11201     
+97        ;Mathématiques Commerciale                         ;14        ;11201     
+98        ;Mathematiques Appliquées                          ;15        ;11201     
+99        ;E.V .A                                            ;19        ;11201     
+100       ;L.M.H                                             ;15        ;11201     
+123       ;C.G.A.O                                           ;31        ;11201     
+101       ;F.M                                               ;20        ;11201     
+102       ;Technologie des Matériaux                         ;21        ;11201     
+103       ;TERMINOLOGIE                                      ;20        ;11201     
+104       ;Patronage                                         ;17        ;11201     
+105       ;Travaux Pratiques de Fabrication                  ;10        ;11201     
+106       ;E.O.E                                             ;16        ;11201     
+107       ;O.T                                               ;18        ;11201     
+108       ;T.A.I                                             ;14        ;11201     
+109       ;PRISE DE PAROLE                                   ;21        ;11201     
+110       ;O.C                                               ;22        ;11201     
+111       ;Statistiques                                      ;23        ;11201     
+112       ;Pratiques Professionnelles                        ;23        ;11201     
+113       ;T.C                                               ;17        ;11201     
+114       ;STENO/ O.C                                        ;24        ;11201     
+115       ;Terminologie Médicale                             ;24        ;11201     
+116       ;ANALYSE ET ETUDE CRITIQUE                         ;19        ;11201     
+117       ;Installation                                      ;18        ;11201     
+118       ;Commande Machine                                  ;23        ;11201     
+119       ;Projet                                            ;24        ;11201     
+120       ;Electronique de Puissance                         ;25        ;11201     
+121       ;Organisation du Travail                           ;26        ;11201     
+122       ;Rapport Examen                                    ;25        ;11201     
+124       ;TRAVAUX COMPTABLES                                ;27        ;11201     
+125       ;PRATIQUES COMPTABLES                              ;32        ;11201     
+126       ;B.C                                               ;15        ;11201     
+127       ;ANATOMIE-PHYSIOLOGIE                              ;20        ;11201     
+128       ;SANTE PUBLIQUE                                    ;22        ;11201     
+129       ;ACTION SOCIALE                                    ;17        ;11201     
+130       ;GESTION DES RESSOURCES HUMAINES                   ;18        ;11201     
+131       ;CHIMIE PROF                                       ;16        ;11201     
+132       ;T.P.S                                             ;20        ;11201     
+133       ;M.O.B                                             ;15        ;11201     
+134       ;STATISTIQUES                                      ;16        ;11201     
+135       ;GESTION DE LA SECURITE SOCIALE                    ;16        ;11201     
+136       ;PATHO-MEDICO- CHIRUGICALE                         ;17        ;11201     
+137       ;PIECES                                            ;18        ;11201     
+138       ;Documents Comptables                              ;14        ;11201     
+139       ;Documents Commerciaux                             ;18        ;11201     
+140       ;TECHNIQUES COMPTABLES                             ;8         ;11201     
+141       ;Atelier ELEQ                                      ;18        ;11201     
+142       ;C.M.H                                             ;20        ;11201     
+1         ;Littrature                                        ;5         ;11201     
+10        ;Physique/Chimie                                   ;19        ;11201     
+11        ;Informatique                                      ;20        ;11201     
+12        ;EPS                                               ;21        ;11201     
+13        ;Travail Manuel                                    ;22        ;11201     
+14        ;Orthographe                                       ;2         ;11201     
+15        ;Rédaction                                         ;3         ;11201     
+16        ;Etude de texte                                    ;4         ;11201     
+17        ;PCT                                               ;18        ;11201     
+18        ;Philosophie                                       ;1         ;11201     
+19        ;Physique                                          ;16        ;11201     
+2         ;Langue Française                                  ;6         ;11201     
+20        ;Chimie                                            ;17        ;11201     
+21        ;Latin                                             ;23        ;11201     
+22        ;ESF                                               ;24        ;11201     
+23        ;Législation                                       ;13        ;11201     
+24        ;Technologie                                       ;25        ;11201     
+25        ;Dessin Technique                                  ;27        ;11201     
+26        ;TP                                                ;50        ;11201     
+27        ;Electrotechnique                                  ;49        ;11201     
+28        ;Essais et mesures                                 ;48        ;11201     
+29        ;Schéma                                            ;47        ;11201     
+3         ;Anglais                                           ;7         ;11201     
+30        ;Technologie Moteur                                ;51        ;11201     
+31        ;Technologie Générale                              ;26        ;11201     
+32        ;Technologie de Trans                              ;          ;11201     
+33        ;Dessin Industriel                                 ;46        ;11201     
+34        ;Ajustage                                          ;28        ;11201     
+35        ;Réparation/Métrologie                             ;29        ;11201     
+36        ;Tôlerie/Soudure                                   ;30        ;11201     
+37        ;Electricité Electronique                          ;31        ;11201     
+38        ;Dépannage                                         ;32        ;11201     
+39        ;Dessin de Mode                                    ;45        ;11201     
+4         ;Espagnol                                          ;8         ;11201     
+40        ;Coupe                                             ;34        ;11201     
+41        ;Couture                                           ;35        ;11201     
+42        ;Dessin Art                                        ;33        ;11201     
+43        ;Economique domestique                             ;36        ;11201     
+44        ;Puériculture                                      ;37        ;11201     
+45        ;Nutrition                                         ;38        ;11201     
+46        ;Cuisine                                           ;39        ;11201     
+47        ;Secourisme                                        ;40        ;11201     
+48        ;Psycologie                                        ;41        ;11201     
+49        ;Animation                                         ;42        ;11201     
+5         ;Histoire                                          ;9         ;11201     
+50        ;Histoire - Géographie                             ;11        ;11201     
+51        ;Allemand                                          ;8         ;11201     
+52        ;Technologie Textile                               ;43        ;11201     
+53        ;Technologie Prof.                                 ;44        ;11201     
+6         ;Géographie                                        ;10        ;11201     
+7         ;Education Civique                                 ;12        ;11201     
+8         ;Mathématiques                                     ;14        ;11201     
+9         ;SVT                                               ;15        ;11201     
+54        ;PHYCHO-SOCIOLOGIE                                 ;54        ;11201     

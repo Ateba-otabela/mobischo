@@ -21,6 +21,12 @@ import 'package:mobischo/landing.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
+class PrincipalTabRequest extends Notification {
+  final int index;
+
+  PrincipalTabRequest(this.index);
+}
+
 class CustomMenu extends StatefulWidget {
   final User user;
   final int selectedPage;
@@ -83,6 +89,8 @@ class _CustomMenuState extends State<CustomMenu>
   bool showingInitialBody = true;
   Widget? principalSecondaryBody;
 
+  bool get _isPrincipalShell => widget.principalScreens != null;
+
   @override
   void initState() {
     if (currentIndex != widget.selectedPage) {
@@ -95,13 +103,13 @@ class _CustomMenuState extends State<CustomMenu>
       currentTitle = 'École / Université';
       currentIndex = 0;
       showingInitialBody = true;
+    } else if (_isPrincipalShell) {
+      currentTitle = widget.principalTitles![0];
     } else if (widget.user.admin == '1') {
       currentTitle = admintitleList[0];
     } else {
       if (widget.user.account_type == 'parent') {
         currentTitle = parenttitleList[0];
-      } else if (widget.user.account_type == 'principal_encadreur') {
-        currentTitle = widget.principalTitles![0];
       } else {
         if (widget.user.account_type == 'encardreur') {
           currentTitle = encardreurTitleList[0];
@@ -111,7 +119,7 @@ class _CustomMenuState extends State<CustomMenu>
       }
     }
     _tcontroller = TabController(
-        length: widget.user.account_type == 'principal_encadreur'
+        length: _isPrincipalShell
             ? widget.principalTitles!.length
             : 4,
         vsync: this);
@@ -130,13 +138,13 @@ class _CustomMenuState extends State<CustomMenu>
       }
 
       // get index of active tab & change current appbar title
-      if (widget.user.admin == '1') {
+      if (_isPrincipalShell) {
+        currentTitle = widget.principalTitles![currentIndex];
+      } else if (widget.user.admin == '1') {
         currentTitle = admintitleList[currentIndex];
       } else {
         if (widget.user.account_type == 'parent') {
           currentTitle = parenttitleList[currentIndex];
-        } else if (widget.user.account_type == 'principal_encadreur') {
-          currentTitle = widget.principalTitles![currentIndex];
         } else {
           if (widget.user.account_type == 'encardreur') {
             currentTitle = encardreurTitleList[currentIndex];
@@ -149,7 +157,7 @@ class _CustomMenuState extends State<CustomMenu>
   }
 
   _tabBarIcons() {
-    if (widget.user.account_type == 'principal_encadreur') {
+    if (_isPrincipalShell) {
       return widget.principalIcons!;
     } else if (widget.user.admin == '1') {
       final items = <Widget>[
@@ -253,7 +261,7 @@ class _CustomMenuState extends State<CustomMenu>
   @override
   Widget build(BuildContext context) {
     var screens = [];
-    if (widget.user.account_type == 'principal_encadreur') {
+    if (_isPrincipalShell) {
       screens = widget.principalScreens ?? [];
     } else if (widget.user.admin == '1') {
       setState(() {
@@ -366,9 +374,27 @@ class _CustomMenuState extends State<CustomMenu>
 
         backgroundColor: CustomTheme.grey,
         // bottomNavigationBar: _tabBarIcons(),
-        body: showingInitialBody && widget.initialBody != null
-            ? widget.initialBody!
-            : principalSecondaryBody ?? screens[currentIndex],
+        body: NotificationListener<PrincipalTabRequest>(
+          onNotification: (request) {
+            if (!_isPrincipalShell ||
+                request.index < 0 ||
+                request.index >= screens.length) {
+              return false;
+            }
+
+            setState(() {
+              showingInitialBody = false;
+              principalSecondaryBody = null;
+              currentIndex = request.index;
+              _tcontroller.index = request.index;
+            });
+            changeTitle();
+            return true;
+          },
+          child: showingInitialBody && widget.initialBody != null
+              ? widget.initialBody!
+              : principalSecondaryBody ?? screens[currentIndex],
+        ),
 
         bottomNavigationBar: Theme(
           data: Theme.of(context)

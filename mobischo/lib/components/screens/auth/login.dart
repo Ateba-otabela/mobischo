@@ -11,7 +11,6 @@ import '../../../models/user.dart';
 import '../../../utils/custom_button.dart';
 import '../../../utils/custom_input.dart';
 import '../../../utils/custom_theme.dart';
-import '../principal_encadreur/principal_mock.dart';
 import '../principal_encadreur/principal_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -33,13 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER,
           fontSize: 16.0);
-    } else if (PrincipalMockService.isValidCredentials(
-      _login.text, _password.text)) {
-      Navigator.push(
-        cont,
-        MaterialPageRoute(builder: (_) => const PrincipalShell()),
-      );
-      return;
     } else {
       var url = "https://mobischo.com/login.php";
 
@@ -65,14 +57,22 @@ class _LoginScreenState extends State<LoginScreen> {
           final user = list.first;
           print(user.nom);
 
-          Navigator.push(
-            cont,
-            MaterialPageRoute(
-                builder: (context) => Home(
-                      user: user,
-                      selectedPage: 0,
-                    )),
-          );
+          if (user.admin == '1' && user.CodeEtablissement.trim().isNotEmpty) {
+            Navigator.push(
+              cont,
+              MaterialPageRoute(
+                  builder: (context) => PrincipalShell(user: user)),
+            );
+          } else {
+            Navigator.push(
+              cont,
+              MaterialPageRoute(
+                  builder: (context) => Home(
+                        user: user,
+                        selectedPage: 0,
+                      )),
+            );
+          }
         }
       } else {
         Fluttertoast.showToast(

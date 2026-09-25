@@ -258,6 +258,501 @@ class API extends Controller
             return Classe::all();    
         }
 
+        if ($action == 'GET_PRINCIPAL_DASHBOARD') {
+            $principalContext = $this->resolvePrincipalContext($request);
+            if (!$principalContext['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = (string) $principalContext['school_code'];
+            $classes = Classe::where('CodeEtablissement', '=', $schoolCode)
+                ->orderBy('LibelleClasse')
+                ->get();
+            $classCodes = $classes->pluck('CodeClasse')->all();
+
+            $today = date('Y-m-d');
+            $todayAttendance = Conduite::whereIn('CodeClasse', $classCodes)
+                ->where('DateEnreg', '=', $today)
+                ->get();
+
+            $todayClassOverview = $classes->map(function ($class) use ($today, $schoolCode) {
+                $classStudentCounts = Eleve::where('CodeClasse', '=', $class->CodeClasse)
+                    ->selectRaw(
+                        'COUNT(*) as effectif, SUM(CASE WHEN Sex = ? THEN 1 ELSE 0 END) as garcons, SUM(CASE WHEN Sex = ? THEN 1 ELSE 0 END) as filles',
+                        ['1', '0']
+                    )
+                    ->first();
+                $classAttendance = Conduite::where('CodeClasse', '=', $class->CodeClasse)
+                    ->where('DateEnreg', '=', $today)
+                    ->get();
+
+                $presentToday = $classAttendance->filter(function ($record) {
+                    return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+                })->count();
+
+                $totalToday = $classAttendance->filter(function ($record) {
+                    $status = strtoupper((string) ($record->CodeEtatCond ?? ''));
+                    return in_array($status, ['P', 'A', 'R'], true);
+                })->count();
+
+                $latestAttendanceIds = DB::table('conduites')
+                    ->where('CodeClasse', '=', $class->CodeClasse)
+                    ->selectRaw('MAX(id) as id')
+                    ->groupBy('DateEnreg', 'CodeEleve', 'CodeEnseignement', 'CodeMatiere', 'HeureMatiere');
+                $attendanceTotals = DB::table('conduites')
+                    ->whereIn('id', $latestAttendanceIds)
+                    ->whereIn(DB::raw('UPPER(CodeEtatCond)'), ['P', 'A', 'R'])
+                    ->selectRaw("COUNT(*) as total, SUM(CASE WHEN UPPER(CodeEtatCond) = 'P' THEN 1 ELSE 0 END) as present")
+                    ->first();
+
+                $totalAttendance = (int) ($attendanceTotals->total ?? 0);
+                $presentAttendance = (int) ($attendanceTotals->present ?? 0);
+                $tauxPresence = $totalAttendance > 0
+                    ? round(($presentAttendance / $totalAttendance) * 100)
+                    : null;
+
+                return [
+                    'CodeClasse' => (string) ($class->CodeClasse ?? ''),
+                    'LibelleClasse' => (string) ($class->LibelleClasse ?? ''),
+                    'effectif' => (int) ($classStudentCounts->effectif ?? 0),
+                    'garcons' => (int) ($classStudentCounts->garcons ?? 0),
+                    'filles' => (int) ($classStudentCounts->filles ?? 0),
+                    'total_matieres' => DB::table('enseignements')
+                        ->join('matieres', 'enseignements.CodeMatiere', '=', 'matieres.CodeMatiere')
+                        ->where('enseignements.CodeClasse', '=', $class->CodeClasse)
+                        ->distinct()
+                        ->count('enseignements.CodeMatiere'),
+                    'seances_du_jour' => $classAttendance
+                        ->pluck('CodeEnseignement')
+                        ->filter()
+                        ->unique()
+                        ->count(),
+                    'taux_presence' => $tauxPresence,
+                    'present' => $presentToday,
+                    'total_students' => $totalToday,
+                ];
+            })->values();
+
+            $totalPresentToday = $todayAttendance->filter(function ($record) {
+                return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+            })->count();
+
+            $totalTrackedToday = $todayAttendance->filter(function ($record) {
+                $status = strtoupper((string) ($record->CodeEtatCond ?? ''));
+                return in_array($status, ['P', 'A', 'R'], true);
+            })->count();
+
+            $dashboardAttendance = $totalTrackedToday > 0
+                ? round(($totalPresentToday / $totalTrackedToday) * 100)
+                : null;
+
+            $todaySessions = $todayAttendance
+                ->groupBy(function ($record) {
+                    return $record->DateEnreg . '|' . $record->CodeEnseignement . '|' . $record->HeureMatiere;
+                })
+                ->map(function ($sessionRecords, $key) use ($schoolCode) {
+                    $codeEnseignement = (string) ($sessionRecords->first()->CodeEnseignement ?? '');
+                    $course = $codeEnseignement !== ''
+                        ? Enseignement::where('CodeEnseignement', '=', $codeEnseignement)
+                            ->where('CodeEtablissement', '=', $schoolCode)
+                            ->first()
+                        : null;
+
+                    $present = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+                    })->count();
+
+                    $absent = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'A';
+                    })->count();
+
+                    $late = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'R';
+                    })->count();
+
+                    $totalStudents = $sessionRecords->filter(function ($record) {
+                        $status = strtoupper((string) ($record->CodeEtatCond ?? ''));
+                        return in_array($status, ['P', 'A', 'R'], true);
+                    })->count();
+
+                    $teacherSummary = $this->resolveTeacherSummaryForCourse($course);
+
+                    return [
+                        'date' => (string) ($sessionRecords->first()->DateEnreg ?? $today),
+                        'time' => (string) ($sessionRecords->first()->HeureMatiere ?? ''),
+                        'CodeEnseignement' => $codeEnseignement,
+                        'class' => (string) ($course ? ($course->classe->LibelleClasse ?? '') : ''),
+                        'subject' => (string) ($course && $course->matiere ? ($course->matiere->LibelleMatiere ?? '') : ''),
+                        'teacher' => $teacherSummary['full_name'] ?? '',
+                        'present' => $present,
+                        'absent' => $absent,
+                        'late' => $late,
+                        'student_count' => $totalStudents,
+                        'attendance_percentage' => $totalStudents > 0 ? round(($present / $totalStudents) * 100) : null,
+                    ];
+                })->values();
+
+            return response()->json([
+                'classes' => $classes->count(),
+                'teachers' => User::where('account_type', '=', 'enseignant')
+                    ->where('CodeEtablissement', '=', $schoolCode)
+                    ->count(),
+                'students' => Eleve::whereIn('CodeClasse', $classCodes)->count(),
+                'today_attendance_percentage' => $dashboardAttendance,
+                'class_overview' => $todayClassOverview,
+                'today_sessions' => $todaySessions,
+            ]);
+        }
+
+        if ($action == 'GET_PRINCIPAL_CLASSES') {
+            $principalContext = $this->resolvePrincipalContext($request);
+            if (!$principalContext['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = (string) $principalContext['school_code'];
+            $today = date('Y-m-d');
+            $classes = Classe::where('CodeEtablissement', '=', $schoolCode)
+                ->orderBy('LibelleClasse')
+                ->get();
+
+            $classPayload = $classes->map(function ($class) use ($today, $schoolCode) {
+                $students = Eleve::where('CodeClasse', '=', $class->CodeClasse)->get();
+                $attendanceToday = Conduite::where('CodeClasse', '=', $class->CodeClasse)
+                    ->where('DateEnreg', '=', $today)
+                    ->get();
+
+                $present = $attendanceToday->filter(function ($record) {
+                    return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+                })->count();
+
+                $totalTracked = $attendanceToday->filter(function ($record) {
+                    $status = strtoupper((string) ($record->CodeEtatCond ?? ''));
+                    return in_array($status, ['P', 'A', 'R'], true);
+                })->count();
+
+                $teachers = Enseignement::where('CodeClasse', '=', $class->CodeClasse)
+                    ->where('CodeEtablissement', '=', $schoolCode)
+                    ->with(['enseignant'])
+                    ->get()
+                    ->flatMap(function ($enseignement) {
+                        $entries = [];
+                        $teacherCodes = array_filter([
+                            trim((string) ($enseignement->code ?? '')),
+                            trim((string) ($enseignement->CodeEnseignant2 ?? '')),
+                        ]);
+                        foreach ($teacherCodes as $teacherCode) {
+                            if ($teacherCode === '') {
+                                continue;
+                            }
+                            $teacher = User::where('code', '=', $teacherCode)
+                                ->where('account_type', '=', 'enseignant')
+                                ->first();
+                            if ($teacher) {
+                                $entries[] = [
+                                    'code' => (string) ($teacher->code ?? ''),
+                                    'nom' => (string) ($teacher->nom ?? ''),
+                                    'prenom' => (string) ($teacher->prenom ?? ''),
+                                    'full_name' => trim((string) (($teacher->nom ?? '') . ' ' . ($teacher->prenom ?? ''))),
+                                ];
+                            }
+                        }
+                        return $entries;
+                    })
+                    ->values()
+                    ->unique('code')
+                    ->values();
+
+                $subjects = Enseignement::where('CodeClasse', '=', $class->CodeClasse)
+                    ->where('CodeEtablissement', '=', $schoolCode)
+                    ->with(['matiere'])
+                    ->get()
+                    ->map(function ($enseignement) {
+                        $subject = $enseignement->matiere;
+                        return [
+                            'CodeMatiere' => (string) ($enseignement->CodeMatiere ?? ''),
+                            'LibelleMatiere' => (string) ($subject ? ($subject->LibelleMatiere ?? '') : ''),
+                        ];
+                    })
+                    ->values()
+                    ->unique('CodeMatiere')
+                    ->values();
+
+                $tauxPresence = $totalTracked > 0 ? round(($present / $totalTracked) * 100) : null;
+
+                return [
+                    'CodeClasse' => (string) ($class->CodeClasse ?? ''),
+                    'LibelleClasse' => (string) ($class->LibelleClasse ?? ''),
+                    'effectif' => $students->count(),
+                    'garcons' => $students->filter(function ($student) {
+                        $sex = strtolower(trim((string) ($student->Sex ?? '')));
+                        return in_array($sex, ['m', 'masculin', 'male', 'garcon', 'g'], true);
+                    })->count(),
+                    'filles' => $students->filter(function ($student) {
+                        $sex = strtolower(trim((string) ($student->Sex ?? '')));
+                        return in_array($sex, ['f', 'feminin', 'female', 'fille', 'fe'], true);
+                    })->count(),
+                    'enseignants' => $teachers,
+                    'matieres' => $subjects,
+                    'seances_du_jour' => $attendanceToday
+                        ->pluck('CodeEnseignement')
+                        ->filter()
+                        ->unique()
+                        ->count(),
+                    'taux_presence' => $tauxPresence,
+                ];
+            })->values();
+
+            return response()->json($classPayload);
+        }
+
+        if ($action == 'GET_PRINCIPAL_ATTENDANCE') {
+            $principalContext = $this->resolvePrincipalContext($request);
+            if (!$principalContext['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = (string) $principalContext['school_code'];
+            $classCodes = Classe::where('CodeEtablissement', '=', $schoolCode)
+                ->pluck('CodeClasse')
+                ->all();
+
+            $attendanceQuery = Conduite::whereIn('CodeClasse', $classCodes);
+            if ($request->filled('DateEnreg')) {
+                $attendanceQuery->where('DateEnreg', '=', trim((string) $request->input('DateEnreg')));
+            }
+
+            $attendanceRecords = $attendanceQuery
+                ->orderBy('DateEnreg')
+                ->orderBy('HeureMatiere')
+                ->get();
+
+            $sessions = $attendanceRecords
+                ->groupBy(function ($record) {
+                    return $record->DateEnreg . '|' . $record->CodeEnseignement . '|' . $record->HeureMatiere;
+                })
+                ->map(function ($sessionRecords) use ($schoolCode) {
+                    $first = $sessionRecords->first();
+                    $course = Enseignement::where('CodeEnseignement', '=', $first->CodeEnseignement)
+                        ->where('CodeClasse', '=', $first->CodeClasse)
+                        ->where(function ($query) use ($schoolCode) {
+                            $query->where('CodeEtablissement', '=', $schoolCode)
+                                ->orWhereNull('CodeEtablissement')
+                                ->orWhere('CodeEtablissement', '=', '');
+                        })
+                        ->first();
+                    $class = Classe::where('CodeClasse', '=', $first->CodeClasse)
+                        ->where('CodeEtablissement', '=', $schoolCode)
+                        ->first();
+                    $subject = $course
+                        ? Matiere::where('CodeMatiere', '=', $course->CodeMatiere)->first()
+                        : null;
+                    $teacherSummary = $this->resolveTeacherSummaryForCourse($course);
+                    $students = Eleve::whereIn('CodeEleve', $sessionRecords->pluck('CodeEleve')->unique())
+                        ->where('CodeClasse', '=', $first->CodeClasse)
+                        ->get()
+                        ->keyBy('CodeEleve');
+
+                    $present = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+                    })->count();
+                    $absent = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'A';
+                    })->count();
+                    $late = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'R';
+                    })->count();
+                    $total = $sessionRecords->filter(function ($record) {
+                        return in_array(strtoupper((string) ($record->CodeEtatCond ?? '')), ['P', 'A', 'R'], true);
+                    })->count();
+
+                    return [
+                        'date' => (string) ($first->DateEnreg ?? ''),
+                        'time' => $this->formatAttendanceTime($first->HeureMatiere),
+                        'CodeClasse' => (string) ($first->CodeClasse ?? ''),
+                        'CodeMatiere' => (string) ($first->CodeMatiere ?? ($course->CodeMatiere ?? '')),
+                        'CodeEnseignement' => (string) ($first->CodeEnseignement ?? ''),
+                        'class' => (string) ($class->LibelleClasse ?? ''),
+                        'subject' => (string) ($subject->LibelleMatiere ?? ''),
+                        'teacher' => $teacherSummary['full_name'] ?? '',
+                        'present' => $present,
+                        'absent' => $absent,
+                        'late' => $late,
+                        'student_count' => $total,
+                        'attendance_percentage' => $total > 0 ? round(($present / $total) * 100) : null,
+                        'records' => $sessionRecords->map(function ($record) use ($students) {
+                            $student = $students->get($record->CodeEleve);
+                            return [
+                                'CodeEleve' => (string) ($record->CodeEleve ?? ''),
+                                'student_name' => trim((string) (($student->Nom ?? '') . ' ' . ($student->Prenom ?? ''))),
+                                'status' => strtoupper((string) ($record->CodeEtatCond ?? '')),
+                            ];
+                        })->values(),
+                    ];
+                })->values();
+
+            return response()->json($sessions);
+        }
+
+        if ($action == 'GET_PRINCIPAL_CLASS_DETAILS') {
+            $principalContext = $this->resolvePrincipalContext($request);
+            if (!$principalContext['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = (string) $principalContext['school_code'];
+            $classCode = trim((string) $request->input('CodeClasse', ''));
+            if ($classCode === '') {
+                return response()->json(['error' => 'Missing CodeClasse'], 422);
+            }
+
+            $class = Classe::where('CodeClasse', '=', $classCode)
+                ->where('CodeEtablissement', '=', $schoolCode)
+                ->first();
+
+            if (!$class) {
+                return response()->json(['error' => 'Class not found'], 404);
+            }
+
+            $students = Eleve::where('CodeClasse', '=', $classCode)->get();
+            $teachingRows = Enseignement::where('CodeClasse', '=', $classCode)
+                ->where('CodeEtablissement', '=', $schoolCode)
+                ->with(['matiere', 'enseignant'])
+                ->orderBy('CodeMatiere')
+                ->get();
+
+            $subjectDetails = $teachingRows
+                ->groupBy('CodeMatiere')
+                ->map(function ($rows, $codeMatiere) {
+                    $subject = $rows->first()->matiere;
+                    $teacherSet = [];
+                    foreach ($rows as $row) {
+                        $teacherCodes = array_filter([
+                            trim((string) ($row->code ?? '')),
+                            trim((string) ($row->CodeEnseignant2 ?? '')),
+                        ]);
+                        foreach ($teacherCodes as $teacherCode) {
+                            if ($teacherCode === '') {
+                                continue;
+                            }
+                            $teacher = User::where('code', '=', $teacherCode)
+                                ->where('account_type', '=', 'enseignant')
+                                ->first();
+                            if ($teacher) {
+                                $teacherSet[] = [
+                                    'code' => (string) ($teacher->code ?? ''),
+                                    'nom' => (string) ($teacher->nom ?? ''),
+                                    'prenom' => (string) ($teacher->prenom ?? ''),
+                                    'full_name' => trim((string) (($teacher->nom ?? '') . ' ' . ($teacher->prenom ?? ''))),
+                                ];
+                            }
+                        }
+                    }
+
+                    return [
+                        'CodeMatiere' => (string) $codeMatiere,
+                        'LibelleMatiere' => (string) ($subject ? ($subject->LibelleMatiere ?? '') : ''),
+                        'teachers' => array_values(
+                            collect($teacherSet)->unique('code')->values()->all()
+                        ),
+                    ];
+                })->values();
+
+            $teachers = $teachingRows->flatMap(function ($row) {
+                $teacherCodes = array_filter([
+                    trim((string) ($row->code ?? '')),
+                    trim((string) ($row->CodeEnseignant2 ?? '')),
+                ]);
+
+                $teachers = [];
+                foreach ($teacherCodes as $teacherCode) {
+                    if ($teacherCode === '') {
+                        continue;
+                    }
+                    $teacher = User::where('code', '=', $teacherCode)
+                        ->where('account_type', '=', 'enseignant')
+                        ->first();
+                    if ($teacher) {
+                        $teachers[] = [
+                            'code' => (string) ($teacher->code ?? ''),
+                            'nom' => (string) ($teacher->nom ?? ''),
+                            'prenom' => (string) ($teacher->prenom ?? ''),
+                            'full_name' => trim((string) (($teacher->nom ?? '') . ' ' . ($teacher->prenom ?? ''))),
+                        ];
+                    }
+                }
+                return $teachers;
+            })->unique('code')->values();
+
+            $today = date('Y-m-d');
+            $todayRecords = Conduite::where('CodeClasse', '=', $classCode)
+                ->where('DateEnreg', '=', $today)
+                ->get();
+
+            $todaySessions = $todayRecords
+                ->groupBy(function ($record) {
+                    return $record->DateEnreg . '|' . $record->CodeEnseignement . '|' . $record->HeureMatiere;
+                })
+                ->map(function ($sessionRecords, $groupKey) use ($class, $schoolCode) {
+                    $first = $sessionRecords->first();
+                    $course = $first && !empty($first->CodeEnseignement)
+                        ? Enseignement::where('CodeEnseignement', '=', $first->CodeEnseignement)
+                            ->where('CodeEtablissement', '=', $schoolCode)
+                            ->first()
+                        : null;
+
+                    $present = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'P';
+                    })->count();
+
+                    $absent = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'A';
+                    })->count();
+
+                    $late = $sessionRecords->filter(function ($record) {
+                        return strtoupper((string) ($record->CodeEtatCond ?? '')) === 'R';
+                    })->count();
+
+                    $totalStudents = $sessionRecords->filter(function ($record) {
+                        $status = strtoupper((string) ($record->CodeEtatCond ?? ''));
+                        return in_array($status, ['P', 'A', 'R'], true);
+                    })->count();
+
+                    $teacherSummary = $this->resolveTeacherSummaryForCourse($course);
+
+                    return [
+                        'date' => (string) ($first->DateEnreg ?? $today),
+                        'time' => (string) ($first->HeureMatiere ?? ''),
+                        'CodeEnseignement' => (string) ($first->CodeEnseignement ?? ''),
+                        'class' => (string) ($class->LibelleClasse ?? ''),
+                        'subject' => (string) ($course && $course->matiere ? ($course->matiere->LibelleMatiere ?? '') : ''),
+                        'teacher' => $teacherSummary['full_name'] ?? '',
+                        'student_count' => $totalStudents,
+                        'present' => $present,
+                        'absent' => $absent,
+                        'late' => $late,
+                        'attendance_percentage' => $totalStudents > 0 ? round(($present / $totalStudents) * 100) : null,
+                    ];
+                })->values();
+
+            return response()->json([
+                'CodeClasse' => (string) ($class->CodeClasse ?? ''),
+                'LibelleClasse' => (string) ($class->LibelleClasse ?? ''),
+                'effectif' => $students->count(),
+                'garcons' => $students->filter(function ($student) {
+                    $sex = strtolower(trim((string) ($student->Sex ?? '')));
+                    return in_array($sex, ['m', 'masculin', 'male', 'garcon', 'g'], true);
+                })->count(),
+                'filles' => $students->filter(function ($student) {
+                    $sex = strtolower(trim((string) ($student->Sex ?? '')));
+                    return in_array($sex, ['f', 'feminin', 'female', 'fille', 'fe'], true);
+                })->count(),
+                'subjects' => $subjectDetails,
+                'teachers' => $teachers,
+                'today_sessions' => $todaySessions,
+            ]);
+        }
+
         if($action == 'INSERT_CONVOCATION'){
             $code = trim((string) $request->input('code', ''));
             $codeClasse = trim((string) $request->input('CodeClasse', ''));
@@ -847,6 +1342,78 @@ class API extends Controller
         }
     }
 
+    private function resolvePrincipalContext(Request $request): array
+    {
+        $code = trim((string) $request->input('code', ''));
+
+        if ($code !== '') {
+            $user = User::where('code', '=', $code)->first();
+            if (!$user || !$this->isPrincipalUser($user)) {
+                return ['allowed' => false];
+            }
+
+            $resolvedSchoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            if ($resolvedSchoolCode === '') {
+                return ['allowed' => false];
+            }
+
+            return ['allowed' => true, 'school_code' => $resolvedSchoolCode, 'user' => $user];
+        }
+
+        return ['allowed' => false];
+    }
+
+    private function isPrincipalUser(User $user): bool
+    {
+        $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+        $adminFlag = (bool) $user->admin;
+
+        return $adminFlag || in_array($accountType, ['encadreur', 'principal', 'principal_encadreur', 'administrateur'], true);
+    }
+
+    private function resolveTeacherSummaryForCourse($course): array
+    {
+        if (!$course) {
+            return ['code' => null, 'nom' => '', 'prenom' => '', 'full_name' => ''];
+        }
+
+        $teacherCode = trim((string) ($course->code ?? ''));
+        $secondaryTeacherCode = trim((string) ($course->CodeEnseignant2 ?? ''));
+
+        $teacher = $teacherCode !== ''
+            ? User::where('code', '=', $teacherCode)
+                ->where('account_type', '=', 'enseignant')
+                ->first()
+            : null;
+
+        if (!$teacher && $secondaryTeacherCode !== '') {
+            $teacher = User::where('code', '=', $secondaryTeacherCode)
+                ->where('account_type', '=', 'enseignant')
+                ->first();
+        }
+
+        if (!$teacher) {
+            return ['code' => $teacherCode !== '' ? $teacherCode : $secondaryTeacherCode, 'nom' => '', 'prenom' => '', 'full_name' => ''];
+        }
+
+        return [
+            'code' => (string) ($teacher->code ?? ''),
+            'nom' => (string) ($teacher->nom ?? ''),
+            'prenom' => (string) ($teacher->prenom ?? ''),
+            'full_name' => trim((string) (($teacher->nom ?? '') . ' ' . ($teacher->prenom ?? ''))),
+        ];
+    }
+
+    private function formatAttendanceTime($value): string
+    {
+        $duration = trim((string) ($value ?? ''));
+        if ($duration === '') {
+            return '';
+        }
+
+        return $duration . ((float) $duration === 1.0 ? ' heure' : ' heures');
+    }
+
     private function createAttendanceMessages($course, array $studentCodes, string $attendanceDate): void
     {
         $class = Classe::where('CodeClasse', $course->CodeClasse)->first();
@@ -879,4 +1446,5 @@ class API extends Controller
             );
         }
     }
-}   
+}
+

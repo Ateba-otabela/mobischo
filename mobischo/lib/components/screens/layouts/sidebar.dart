@@ -38,6 +38,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
 
   bool isLoaded = false;
 
+  bool get _isPrincipal => widget.principalScreens != null ||
+      widget.user.account_type == 'principal_encadreur';
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -69,7 +72,6 @@ class _SideBarMenuState extends State<SideBarMenu> {
   }
 
   List<Widget> _accountActions(BuildContext context) {
-    final isPrincipal = widget.user.account_type == 'principal_encadreur';
     return [
       const Divider(height: 2),
       ListTile(
@@ -82,7 +84,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
           navigator.push(MaterialPageRoute(
             builder: (_) => ChangePassword(
               user: widget.user,
-              localOnly: isPrincipal,
+              localOnly: _isPrincipal,
             ),
           ));
         },
@@ -104,7 +106,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.user.account_type == 'principal_encadreur') {
+    if (_isPrincipal) {
       final titles = widget.principalTitles ??
           const [
             'Signalements des parents',

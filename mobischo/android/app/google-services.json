@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "453135274280",
+    "project_id": "mobischo-8f908",
+    "storage_bucket": "mobischo-8f908.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:453135274280:android:d746041d974851ef50c01d",
+        "android_client_info": {
+          "package_name": "com.application.mobischo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO28JKLtXmMK3aIu6AD8Bv3CxMymXf3IU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

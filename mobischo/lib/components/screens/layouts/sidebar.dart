@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/MyAccount.dart';
 import 'package:mobischo/components/screens/changePassword.dart';
+import 'package:mobischo/services/mobile_api_service.dart';
 // ignore: unused_import
 import 'package:mobischo/components/screens/courses/courses_list.dart';
 import 'package:mobischo/components/screens/parent/devoirs_messages.dart';
@@ -94,7 +95,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
         leading: const Icon(Icons.logout, color: CustomTheme.blue),
         title: const Text('DÉCONNEXION'),
         subtitle: const Text('Quitter votre session'),
-        onTap: () {
+        onTap: () async {
+          await MobileApiService.logout();
+          if (!context.mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const Welcome()),
             (route) => false,
@@ -117,6 +120,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
         Icons.message_outlined,
         Icons.warning_amber_outlined,
         Icons.assignment_outlined,
+        Icons.mark_email_unread_outlined,
       ];
       return ListView(
         padding: EdgeInsets.zero,

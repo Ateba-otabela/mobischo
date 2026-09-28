@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Eleve;
 use App\Models\Student;
 use App\Models\Enseignement;
+use App\Models\AiConversation;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -35,6 +36,8 @@ class User extends Authenticatable
         'login',
         'code',
         'account_type',
+        'CodeEtablissement',
+        'admin',
         'text_password',
         'password',
         'address'
@@ -73,6 +76,16 @@ class User extends Authenticatable
     public function enseignements()
     {
         return $this->hasMany(Enseignement::class, 'code');
+    }
+
+    public function encadreurClasses()
+    {
+        return $this->hasMany(EncadreurClasse::class, 'code', 'code');
+    }
+
+    public function aiConversations()
+    {
+        return $this->hasMany(AiConversation::class, 'user_code', 'code');
     }
 
 }

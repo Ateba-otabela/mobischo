@@ -16,11 +16,16 @@ class CreateEncardreurConvocation extends StatefulWidget {
   final User user;
   final List students;
   final Classe classe;
+  final bool embedded;
+  final ValueChanged<BuildContext>? onSaved;
+
   const CreateEncardreurConvocation(
       {Key? key,
       required this.user,
       required this.students,
-      required this.classe})
+      required this.classe,
+      this.embedded = false,
+      this.onSaved})
       : super(key: key);
 
   @override
@@ -70,6 +75,7 @@ class _CreateEncardreurConvocationState
   var course;
   var date = 'Date de convocation';
   var motif;
+  bool _isSaving = false;
 
   List<DropdownMenuItem<String>> ListCourses = [];
   List<DropdownMenuItem<String>> ListMotifs = [];
@@ -126,26 +132,23 @@ class _CreateEncardreurConvocationState
   _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(), // Refer step 1
+      initialDate: DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2025),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
-        date = picked.toString();
-        date = HumanDateFormat(date);
+        date = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
-  }
-
-  String HumanDateFormat(String date) {
-    return DateFormat.yMMMd().format(DateTime.parse(date));
   }
 
   @override
   void initState() {
     super.initState();
-    courses();
+    courses().then((_) {
+      if (mounted) setState(() {});
+    });
     motifs();
   }
 
@@ -159,7 +162,7 @@ class _CreateEncardreurConvocationState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final page = Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
         backgroundColor: CustomTheme.blue,
@@ -260,8 +263,9 @@ class _CreateEncardreurConvocationState
                     ),
                     Padding(
                       padding: EdgeInsets.only(left: 17, right: 17, top: 30),
-                      child: CustomButton(
+                        child: CustomButton(
                           text: "Convoquer",
+                          loading: _isSaving,
                           onPress: () {
                             // print("students : ${widget.students}");
                             print('Motif $motif');
@@ -276,20 +280,7 @@ class _CreateEncardreurConvocationState
                                   gravity: ToastGravity.BOTTOM,
                                   fontSize: 16.0);
                             } else {
-                              for (int i = 0; i < widget.students.length; i++) {
-                                AcademicServices.insertConvocation(
-                                    widget.user.code,
-                                    widget.students[i]['CodeEleve'],
-                                    motif,
-                                    description.text,
-                                    course,
-                                    date);
-                              }
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: ((context) => ConvocationSuccess(
-                                          user: widget.user))));
+                              _saveConvocation(context);
                             }
                           }),
                     )
@@ -301,6 +292,53 @@ class _CreateEncardreurConvocationState
         ],
       ),
     );
+
+    if (!widget.embedded) return page;
+    return Container(color: CustomTheme.grey, child: page.body);
+  }
+
+  Future<void> _saveConvocation(BuildContext context) async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      final studentCodes = widget.students
+          .map<String>((student) => student['CodeEleve'].toString())
+          .toList();
+      final result = await AcademicServices.insertConvocations(
+        widget.user.code,
+        studentCodes,
+        motif.toString(),
+        description.text,
+        course.toString(),
+        date.toString(),
+        codeClasse: widget.classe.CodeClasse,
+      );
+      if (!result.toLowerCase().contains('success')) {
+        throw Exception('Convocation non enregistrée.');
+      }
+
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      if (widget.onSaved != null) {
+        widget.onSaved!(context);
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConvocationSuccess(user: widget.user),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      Fluttertoast.showToast(
+        msg: 'Échec de l’enregistrement. Vérifiez les champs et réessayez.',
+        toastLength: Toast.LENGTH_LONG,
+      );
+    }
   }
 
   Future<void> BottomForm(BuildContext context) {

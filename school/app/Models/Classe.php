@@ -47,4 +47,9 @@ class Classe extends Model
     {
         return $this->hasMany(Enseignement::class, 'CodeClasse');
     }
+
+    public function encadreurClasses()
+    {
+        return $this->hasMany(EncadreurClasse::class, 'CodeClasse', 'CodeClasse');
+    }
 }

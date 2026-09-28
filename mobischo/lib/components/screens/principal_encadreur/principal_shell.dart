@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:mobischo/components/screens/encardreur/chooseStudents.dart';
+import 'package:mobischo/components/screens/encardreur/createConvocation.dart';
 import 'package:mobischo/components/screens/changePassword.dart';
 import 'package:mobischo/components/screens/layouts/customMenu.dart';
+import 'package:mobischo/components/screens/mobischo_ai.dart';
+import 'package:mobischo/components/screens/students/ClassStudents.dart';
+import 'package:mobischo/models/class.dart';
+import 'package:mobischo/models/convocation.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/principal_service.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -18,10 +25,17 @@ class PrincipalShell extends StatefulWidget {
 
 class _PrincipalShellState extends State<PrincipalShell> {
   final titles = const [
-    'Mobischo',
-    'Toutes les classes',
+    'MOBISCHO',
+    'Classes',
     'Présence',
-    'Profil',
+    'AI',
+  ];
+
+  final secondaryTitles = const [
+    'Signalements des parents',
+    'Alertes de présence',
+    'Appels des professeurs',
+    'Convoquer',
   ];
 
   late Future<PrincipalDashboardData> _dashboardFuture;
@@ -53,28 +67,48 @@ class _PrincipalShellState extends State<PrincipalShell> {
         PrincipalClassesPage(
           dashboardFuture: _dashboardFuture,
           onRetryDashboard: _reloadDashboard,
+          onSelectClass: (item) => PrincipalSectionRequest(
+            title: 'Élèves',
+            screen: ClassStudents(
+              user: widget.user,
+              classe: _principalClass(item, widget.user.CodeEtablissement),
+              embedded: true,
+            ),
+          ).dispatch(context),
         ),
         PrincipalAttendancePage(user: widget.user),
-        PrincipalProfilePage(user: widget.user),
+        MobischoAiScreen(user: widget.user),
       ],
       principalIcons: const [
         Icon(Icons.home),
         Icon(Icons.class_outlined),
         Icon(Icons.fact_check_outlined),
-        Icon(Icons.person_outline),
+        Icon(Icons.smart_toy_outlined),
       ],
-      principalSecondaryTitles: const [
-        'Signalements des parents',
-        'Alertes de présence',
-        'Appels des professeurs',
-      ],
-      principalSecondaryScreens: const [
-        PrincipalReportsPage(),
-        PrincipalAlertsPage(),
+      principalSecondaryTitles: secondaryTitles,
+      principalSecondaryScreens: [
+        PrincipalReportsPage(user: widget.user),
+        PrincipalAlertsPage(user: widget.user),
         PrincipalCallsPage(),
+        PrincipalMessagesConvocationsPage(user: widget.user),
       ],
     );
   }
+}
+
+Classe _principalClass(
+  PrincipalDashboardClassOverview overview,
+  String schoolCode,
+) {
+  return Classe(
+    LibelleClasse: overview.name,
+    CodeClasse: overview.codeClasse,
+    CodeTypeClasse: '',
+    CodeCycle: '',
+    CodeSpecialite: '',
+    codetypeinscrip: '',
+    CodeEtablissement: schoolCode,
+  );
 }
 
 class PrincipalDashboardPage extends StatefulWidget {
@@ -100,6 +134,18 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
   void initState() {
     super.initState();
     _attendanceFuture = PrincipalService.getPrincipalAttendance(widget.user);
+  }
+
+  String _sessionSubject(PrincipalAttendanceData session) {
+    final subject = session.subject.trim();
+    if (subject.isNotEmpty) return subject;
+
+    switch (session.codeMatiere.trim().toUpperCase()) {
+      case 'MAH':
+        return 'MATHEMATICS';
+      default:
+        return session.codeMatiere.trim();
+    }
   }
 
   @override
@@ -197,17 +243,73 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           subtitle: 'Toutes les classes',
           icon: Icons.admin_panel_settings_outlined),
       const SizedBox(height: 12),
-      _StatsGrid(items: [
-        _StatItem('Classes', dashboard.classes.toString(), Icons.class_outlined),
-        _StatItem('Professeurs', dashboard.teachers.toString(), Icons.person_outline),
-        _StatItem('Élèves', dashboard.students.toString(), Icons.groups_outlined),
-        _StatItem(
-            'Présence',
-            dashboard.todayAttendancePercentage == null
-                ? 'Aucune donnée'
-                : '${dashboard.todayAttendancePercentage}%',
-            Icons.check_circle_outline)
-      ]),
+      _DashboardActionCard(
+        icon: Icons.class_outlined,
+        title: 'Classes',
+        summary:
+            '${dashboard.classes} classes\n'
+            '${dashboard.classOverview.where((item) => item.sessionsToday > 0).length} avec des séances aujourd’hui',
+        onTap: () => PrincipalTabRequest(1).dispatch(context),
+      ),
+      _DashboardActionCard(
+        icon: Icons.groups_outlined,
+        title: 'Élèves',
+        summary:
+            '${dashboard.students} élèves\n'
+            '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.boys)} garçons • '
+            '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.girls)} filles',
+        onTap: () => PrincipalSectionRequest(
+          title: 'Élèves',
+          screen: PrincipalClassesPage(
+              dashboardFuture: widget.dashboardFuture,
+              onRetryDashboard: widget.onRetryDashboard,
+              headerTitle: 'Choisir une classe',
+              headerSubtitle: 'Sélectionnez une classe pour consulter ses élèves',
+              onSelectClass: (item) {
+                PrincipalSectionRequest(
+                  title: 'Élèves',
+                  screen: ClassStudents(
+                    user: widget.user,
+                    classe: _principalClass(item, widget.user.CodeEtablissement),
+                    embedded: true,
+                  ),
+                ).dispatch(context);
+              },
+            ),
+        ).dispatch(context),
+      ),
+      _DashboardActionCard(
+        icon: Icons.person_outline,
+        title: 'Professeurs',
+        summary:
+            '${dashboard.teachers} professeurs\n'
+            '${dashboard.todaySessions.length} appels enregistrés aujourd’hui',
+        onTap: () => PrincipalSectionRequest(
+          title: 'Professeurs',
+          screen: PrincipalTeacherClassesPage(
+            user: widget.user,
+            onSelectTeacher: (teacherName) {
+              PrincipalSectionRequest(
+                title: teacherName,
+                screen: PrincipalTeacherCallsPage(
+                  teacherName: teacherName,
+                  attendanceFuture: _attendanceFuture,
+                ),
+              ).dispatch(context);
+            },
+          ),
+        ).dispatch(context),
+      ),
+      _DashboardActionCard(
+        icon: Icons.fact_check_outlined,
+        title: 'Présence',
+        summary:
+            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.present)} présents • '
+            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.absent)} absents • '
+            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.late)} retards\n'
+            '${dashboard.todayAttendancePercentage == null ? '—' : '${dashboard.todayAttendancePercentage}%'} aujourd’hui',
+        onTap: () => PrincipalTabRequest(2).dispatch(context),
+      ),
       const SizedBox(height: 14),
       _SectionTitle('Appels du jour'),
       if (dashboard.todaySessions.isEmpty)
@@ -235,44 +337,79 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           ),
         ),
       const SizedBox(height: 8),
-      _SectionTitle('Alertes récentes'),
-      _DashboardActivityCard(
-        assetPath: 'assets/images/landing5.png',
-        title: 'Différence de présence à vérifier',
-        subtitle: 'Aminata Diallo • 24/09/2026',
-        status: 'À vérifier',
-        isAlert: true,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AlertDetailPage()),
-        ),
-      ),
-      const SizedBox(height: 8),
-      _SectionTitle('Signalements des parents'),
-      ...PrincipalMockService.reports.take(2).map((item) =>
-          _DashboardActivityCard(
-              assetPath: 'assets/images/landing2.png',
-              title: item.student.name,
-              subtitle: '${item.reason} • ${item.date}',
-              status: item.status,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => ParentReportDetailPage(report: item))))),
       const SizedBox(height: 8),
       _SectionTitle('Appels récents des professeurs'),
       if (recentSessions.isEmpty)
         const _Card(child: Text('Aucune session de présence enregistrée.'))
       else ...[
-        ...recentSessions.take(3).map((session) => _DashboardActivityCard(
-              assetPath: 'assets/images/landing3.png',
-              title: '${session.className} • ${session.subject}',
-              subtitle:
-                  '${session.date} à ${session.time} • ${session.teacher}',
-              status: session.attendancePercentage == null
-                  ? '—'
-                  : '${session.attendancePercentage}%',
-            )),
+        ...recentSessions.take(3).toList().asMap().entries.map((entry) {
+          final session = entry.value;
+          final percentage = session.attendancePercentage ??
+              session.calculatedAttendancePercentage;
+          debugPrint(
+            'DASHBOARD CARD[${entry.key}]: '
+            '${session.codeEnseignement} / ${session.codeMatiere} / '
+            '${session.className}; present=${session.present}, '
+            'absent=${session.absent}, late=${session.late}, '
+            'studentCount=${session.studentCount}, '
+            'records=${session.records.length}',
+          );
+          return _DashboardActivityCard(
+            assetPath: 'assets/images/landing3.png',
+            title: _sessionSubject(session),
+            subtitle:
+                '${session.className}\n${session.teacher}\n${session.date} • ${session.time}',
+            titleTrailing: percentage == null ? '—' : '$percentage%',
+            onTap: () {
+              debugPrint('=== SELECTED SESSION IDENTITY ===');
+              debugPrint('CodeClasse=${session.codeClasse}');
+              debugPrint('CodeMatiere=${session.codeMatiere}');
+              debugPrint('CodeEnseignement=${session.codeEnseignement}');
+              debugPrint('date=${session.date}');
+              debugPrint('time=${session.time}');
+              debugPrint('=== BEFORE OPENING ATTENDANCE DETAIL ===');
+              debugPrint('class: ${session.className}');
+              debugPrint('subject: ${session.subject}');
+              debugPrint('teacher: ${session.teacher}');
+              debugPrint('codeClasse: ${session.codeClasse}');
+              debugPrint('codeMatiere: ${session.codeMatiere}');
+              debugPrint('codeEnseignement: ${session.codeEnseignement}');
+              debugPrint('date: ${session.date}');
+              debugPrint('time: ${session.time}');
+              debugPrint('present: ${session.present}');
+              debugPrint('absent: ${session.absent}');
+              debugPrint('late: ${session.late}');
+              debugPrint('studentCount: ${session.studentCount}');
+              debugPrint('percentage: ${session.attendancePercentage}');
+              debugPrint('records: ${session.records.length}');
+              debugPrint(
+                'SELECTED SESSION: '
+                '${session.codeEnseignement} / '
+                '${session.codeMatiere} / '
+                '${session.className}',
+              );
+              for (final record in session.records) {
+                debugPrint(
+                  'STUDENT: code=${record.codeEleve}, '
+                  'name=${record.studentName}, '
+                  'status=${record.status}',
+                );
+              }
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PrincipalLiveAttendanceSessionPage(
+                    session: session,
+                    subjectLabel: _sessionSubject(session),
+                    preferApiAttendancePercentage: true,
+                    showRawStatuses: true,
+                  ),
+                ),
+              );
+            },
+          );
+        }),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
@@ -289,11 +426,17 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
 class PrincipalClassesPage extends StatefulWidget {
   final Future<PrincipalDashboardData> dashboardFuture;
   final VoidCallback onRetryDashboard;
+  final ValueChanged<PrincipalDashboardClassOverview>? onSelectClass;
+  final String headerTitle;
+  final String headerSubtitle;
 
   const PrincipalClassesPage({
     Key? key,
     required this.dashboardFuture,
     required this.onRetryDashboard,
+    this.onSelectClass,
+    this.headerTitle = 'Classes',
+    this.headerSubtitle = 'Accès à toutes les classes de l’établissement',
   }) : super(key: key);
 
   @override
@@ -340,9 +483,10 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
           padding: const EdgeInsets.all(14),
           children: [
             _HeaderCard(
-                title: 'Toutes les classes',
-                subtitle: 'Accès à toutes les classes de l’établissement',
-                icon: Icons.class_outlined),
+              title: widget.headerTitle,
+              subtitle: widget.headerSubtitle,
+              icon: Icons.class_outlined,
+            ),
             const SizedBox(height: 12),
             TextField(
               decoration: const InputDecoration(
@@ -360,6 +504,9 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _DashboardClassCard(
                       classOverview: item,
+                      onTap: widget.onSelectClass == null
+                          ? null
+                          : () => widget.onSelectClass!(item),
                     ),
                   )),
           ],
@@ -367,6 +514,320 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
       },
     );
   }
+}
+
+class PrincipalTeacherClassesPage extends StatefulWidget {
+  final User user;
+  final ValueChanged<String>? onSelectTeacher;
+
+  const PrincipalTeacherClassesPage({
+    Key? key,
+    required this.user,
+    this.onSelectTeacher,
+  }) : super(key: key);
+
+  @override
+  State<PrincipalTeacherClassesPage> createState() =>
+      _PrincipalTeacherClassesPageState();
+}
+
+class _PrincipalTeacherClassesPageState
+    extends State<PrincipalTeacherClassesPage> {
+  late Future<List<PrincipalClassSummary>> _classesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _classesFuture = PrincipalService.getPrincipalTeacherClasses(widget.user);
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<PrincipalClassSummary>>(
+        future: _classesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return const Center(child: Text('Impossible de charger les classes.'));
+          }
+
+          final classes = snapshot.data ?? <PrincipalClassSummary>[];
+          return ListView(
+            padding: const EdgeInsets.all(14),
+            children: classes.isEmpty
+                ? [const _Card(child: Text('Aucun professeur disponible.'))]
+                : classes
+                    .map((schoolClass) => _Card(
+                          child: ExpansionTile(
+                            title: Text(schoolClass.name),
+                            subtitle:
+                                Text('${schoolClass.teachers.length} professeurs'),
+                            children: schoolClass.teachers
+                                .map((teacher) => ListTile(
+                                      leading: const Icon(
+                                        Icons.person_outline,
+                                        color: CustomTheme.blue,
+                                      ),
+                                      title: Text(teacher.fullName),
+                                      trailing: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 16,
+                                      ),
+                                      onTap: widget.onSelectTeacher == null
+                                          ? null
+                                          : () => widget.onSelectTeacher!(
+                                              teacher.fullName),
+                                    ))
+                                .toList(),
+                          ),
+                        ))
+                    .toList(),
+          );
+        },
+      );
+}
+
+class PrincipalTeacherCallsPage extends StatelessWidget {
+  final String teacherName;
+  final Future<List<PrincipalAttendanceData>> attendanceFuture;
+
+  const PrincipalTeacherCallsPage({
+    Key? key,
+    required this.teacherName,
+    required this.attendanceFuture,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<PrincipalAttendanceData>>(
+        future: attendanceFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final sessions = (snapshot.data ?? <PrincipalAttendanceData>[])
+              .where((session) => session.teacher == teacherName)
+              .toList()
+            ..sort((first, second) => second.date.compareTo(first.date));
+
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Impossible de charger les appels du professeur.'),
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(14),
+            children: sessions.isEmpty
+                ? [const _Card(child: Text('Aucun appel disponible.'))]
+                : sessions
+                    .map((session) => _DashboardActivityCard(
+                          assetPath: 'assets/images/landing3.png',
+                          title: session.subject.isNotEmpty
+                              ? session.subject
+                              : session.codeMatiere,
+                          subtitle:
+                              '${session.className}\n${session.date} • ${session.time}',
+                          titleTrailing: session.attendancePercentage == null
+                              ? '—'
+                              : '${session.attendancePercentage}%',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PrincipalLiveAttendanceSessionPage(
+                                session: session,
+                                preferApiAttendancePercentage: true,
+                                showRawStatuses: true,
+                              ),
+                            ),
+                          ),
+                        ))
+                    .toList(),
+          );
+        },
+      );
+}
+
+class PrincipalMessagesConvocationsPage extends StatefulWidget {
+  final User user;
+
+  const PrincipalMessagesConvocationsPage({
+    Key? key,
+    required this.user,
+  }) : super(key: key);
+
+  @override
+  State<PrincipalMessagesConvocationsPage> createState() =>
+      _PrincipalMessagesConvocationsPageState();
+}
+
+class _PrincipalMessagesConvocationsPageState
+    extends State<PrincipalMessagesConvocationsPage> {
+  late Future<List<Convocation>> _convocationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _convocationsFuture =
+        AcademicServices.getTeacherConvocation(widget.user.code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+
+    void openClassPicker(BuildContext flowContext) {
+      PrincipalSectionRequest(
+        title: 'Choisir une classe',
+        screen: PrincipalConvocationClassesPage(
+          user: user,
+          onSelectClass: (classContext, schoolClass) {
+            PrincipalSectionRequest(
+              title: 'Convoquer des élèves',
+              screen: ChooseStudents(
+                classe: schoolClass,
+                user: user,
+                embedded: true,
+                onCreate: (createContext, selectedStudents) {
+                  PrincipalSectionRequest(
+                    title: 'Créer une convocation',
+                    screen: CreateEncardreurConvocation(
+                      user: user,
+                      students: selectedStudents,
+                      classe: schoolClass,
+                      embedded: true,
+                      onSaved: (saveContext) {
+                        PrincipalSectionRequest(
+                          title: 'Convocations récentes',
+                          screen: PrincipalMessagesConvocationsPage(user: user),
+                        ).dispatch(saveContext);
+                      },
+                    ),
+                  ).dispatch(createContext);
+                },
+              ),
+            ).dispatch(classContext);
+          },
+        ),
+      ).dispatch(flowContext);
+    }
+
+    return FutureBuilder<List<Convocation>>(
+        future: _convocationsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final convocations = snapshot.data ?? <Convocation>[];
+          return ListView(
+            padding: const EdgeInsets.all(14),
+            children: [
+              const _HeaderCard(
+                title: 'Convocations récentes',
+                subtitle: 'Suivi des convocations envoyées aux élèves',
+                icon: Icons.mark_email_unread_outlined,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Expanded(
+                    child: _SectionTitle('Convocations envoyées'),
+                  ),
+                  IconButton(
+                    tooltip: 'Créer une convocation',
+                    icon: const Icon(Icons.add),
+                    onPressed: () => openClassPicker(context),
+                  ),
+                ],
+              ),
+              if (convocations.isEmpty)
+                const _Card(child: Text('Aucune convocation envoyée.'))
+              else
+                ...convocations.map((item) => _Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.assignment_outlined,
+                            color: CustomTheme.blue),
+                        title: Text(item.motif),
+                        subtitle: Text(
+                          '${item.CodeEleve} • ${item.dateConvocation}\n'
+                          '${item.description}',
+                        ),
+                        isThreeLine: true,
+                        trailing: item.CodeMatiere.isEmpty
+                            ? null
+                            : Text(item.CodeMatiere),
+                      ),
+                    )),
+            ],
+          );
+        },
+      );
+  }
+}
+
+class PrincipalConvocationClassesPage extends StatefulWidget {
+  final User user;
+  final void Function(BuildContext, Classe) onSelectClass;
+
+  const PrincipalConvocationClassesPage({
+    Key? key,
+    required this.user,
+    required this.onSelectClass,
+  }) : super(key: key);
+
+  @override
+  State<PrincipalConvocationClassesPage> createState() =>
+      _PrincipalConvocationClassesPageState();
+}
+
+class _PrincipalConvocationClassesPageState
+    extends State<PrincipalConvocationClassesPage> {
+  late Future<List<PrincipalClassSummary>> _classesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _classesFuture = PrincipalService.getClasses(widget.user);
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<PrincipalClassSummary>>(
+        future: _classesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final classes = snapshot.data ?? <PrincipalClassSummary>[];
+          return ListView.builder(
+              padding: const EdgeInsets.all(14),
+              itemCount: classes.length,
+              itemBuilder: (context, index) {
+                final item = classes[index];
+                return _Card(
+                  child: ListTile(
+                    title: Text(item.name),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      final schoolClass = Classe(
+                        LibelleClasse: item.name,
+                        CodeClasse: item.codeClasse,
+                        CodeTypeClasse: '',
+                        CodeCycle: '',
+                        CodeSpecialite: '',
+                        codetypeinscrip: '',
+                        CodeEtablissement:
+                            widget.user.CodeEtablissement,
+                      );
+                      widget.onSelectClass(context, schoolClass);
+                    },
+                  ),
+                );
+              },
+          );
+        },
+      );
 }
 
 class PrincipalClassDetailPage extends StatelessWidget {
@@ -760,43 +1221,148 @@ class PrincipalAttendanceSessionPage extends StatelessWidget {
       );
 }
 
-class PrincipalReportsPage extends StatelessWidget {
-  const PrincipalReportsPage({Key? key}) : super(key: key);
+class PrincipalReportsPage extends StatefulWidget {
+  final User user;
+
+  const PrincipalReportsPage({Key? key, required this.user}) : super(key: key);
+
+  @override
+  State<PrincipalReportsPage> createState() => _PrincipalReportsPageState();
+}
+
+class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
+  late Future<List<InvestigationAlertData>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getInvestigations(widget.user);
+  }
+
+  void _reload() {
+    setState(() {
+      _future = PrincipalService.getInvestigations(widget.user);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _HeaderCard(
-            title: 'Signalements des parents',
-            subtitle: 'Consultation des signalements reçus',
-            icon: Icons.message_outlined),
-        const SizedBox(height: 12),
-        ...PrincipalMockService.reports.map((report) => _Card(
-              child: ListTile(
-                title: Text(report.student.name),
-                subtitle: Text(
-                    '${report.student.className} • ${report.parent}\n${report.date} • ${report.reason}'),
-                isThreeLine: true,
-                trailing: Text(report.status),
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            ParentReportDetailPage(report: report))),
+    return FutureBuilder<List<InvestigationAlertData>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Impossible de charger les signalements.'),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _reload,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
               ),
-            )),
-      ],
+            ),
+          );
+        }
+
+        final alerts = snapshot.data ?? const <InvestigationAlertData>[];
+
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            _HeaderCard(
+                title: 'Signalements des parents',
+                subtitle: 'Consultation des signalements reçus',
+                icon: Icons.message_outlined),
+            const SizedBox(height: 12),
+            if (alerts.isEmpty)
+              _Card(
+                child: Text('Aucun signalement pour le moment.'),
+              )
+            else
+              ...alerts.map((alert) => _Card(
+                    child: ListTile(
+                      title: Text(alert.studentName.isNotEmpty
+                          ? alert.studentName
+                          : alert.studentCode),
+                      subtitle: Text(
+                          '${alert.codeClasse} • ${alert.dateAbsence}\n${alert.parentStatusLabel} • ${alert.teacherStatusLabel}'),
+                      isThreeLine: true,
+                      trailing: Text(alert.displayStatus),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ParentReportDetailPage(
+                            user: widget.user,
+                            alert: alert,
+                            onUpdated: _reload,
+                          ),
+                        ),
+                      ).then((_) => _reload()),
+                    ),
+                  )),
+          ],
+        );
+      },
     );
   }
 }
 
-class ParentReportDetailPage extends StatelessWidget {
-  final ParentReport report;
-  const ParentReportDetailPage({Key? key, required this.report})
-      : super(key: key);
+class ParentReportDetailPage extends StatefulWidget {
+  final User user;
+  final InvestigationAlertData alert;
+  final VoidCallback onUpdated;
+
+  const ParentReportDetailPage({
+    Key? key,
+    required this.user,
+    required this.alert,
+    required this.onUpdated,
+  }) : super(key: key);
+
+  @override
+  State<ParentReportDetailPage> createState() => _ParentReportDetailPageState();
+}
+
+class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
+  bool _submitting = false;
+
+  Future<void> _submitStatus(String status) async {
+    setState(() => _submitting = true);
+    try {
+      await PrincipalService.updateInvestigationAlert(
+        widget.user,
+        alertId: widget.alert.id?.toString() ?? '',
+        status: status,
+      );
+      if (!mounted) return;
+      widget.onUpdated();
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final alert = widget.alert;
+    final studentName = alert.studentName.isNotEmpty ? alert.studentName : alert.studentCode;
+
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
@@ -806,181 +1372,143 @@ class ParentReportDetailPage extends StatelessWidget {
         _Card(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _Detail('Élève', report.student.name),
-          _Detail('Classe', report.student.className),
-          _Detail('Parent', report.parent),
-          _Detail('Date', report.date),
-          _Detail('Motif', report.reason),
-          _Detail('Message', report.message),
-          _Detail('Statut', report.status),
+          _Detail('Élève', studentName),
+          _Detail('Classe', alert.codeClasse),
+          _Detail('Date d’absence', alert.dateAbsence),
+          _Detail('Statut parent', alert.parentStatusLabel),
+          _Detail('Statut professeur', alert.teacherStatusLabel),
+          _Detail('Status', alert.displayStatus),
+          _Detail('Note', alert.notes.isNotEmpty ? alert.notes : 'Aucune note'),
         ])),
         const SizedBox(height: 14),
         CustomButton(
-            text: 'Vérifier',
-            onPress: () {
-              report.status = 'Vérifiée';
-              Navigator.pop(context);
-            }),
+            text: 'Valider la présence du professeur',
+            loading: _submitting,
+            onPress: () => _submitStatus('validated')),
         const SizedBox(height: 8),
         OutlinedButton(
-            onPressed: () {
-              report.status = 'Rejetée';
-              Navigator.pop(context);
-            },
-            child: const Text('Rejeter')),
+            onPressed: _submitting ? null : () => _submitStatus('rejected'),
+            child: const Text('Rejeter la présence du professeur')),
       ]),
     );
   }
 }
 
-class PrincipalAlertsPage extends StatelessWidget {
-  const PrincipalAlertsPage({Key? key}) : super(key: key);
+class PrincipalAlertsPage extends StatefulWidget {
+  final User user;
+
+  const PrincipalAlertsPage({Key? key, required this.user}) : super(key: key);
+
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _HeaderCard(
-            title: 'Alertes de présence',
-            subtitle:
-                'Consultez ici les présences nécessitant une vérification.',
-            icon: Icons.info_outline),
-        const SizedBox(height: 12),
-        Card(
-          margin: EdgeInsets.zero,
-          color: Colors.red.shade50,
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-            side: BorderSide(color: Colors.red.shade200),
-          ),
-          child: ListTile(
-            leading: Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.red.shade700,
-            ),
-            title: Text(
-              'Présence nécessitant une vérification',
-              style: TextStyle(
-                color: Colors.red.shade700,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'Aminata Diallo • Parent : Absent • Appel professeur : Présent',
-              style: TextStyle(color: Colors.red.shade700),
-            ),
-            trailing: Text(
-              'À vérifier',
-              style: TextStyle(
-                color: Colors.red.shade700,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const AlertDetailPage())),
-          ),
-        ),
-      ],
-    );
-  }
+  State<PrincipalAlertsPage> createState() => _PrincipalAlertsPageState();
 }
 
-class AlertDetailPage extends StatelessWidget {
-  const AlertDetailPage({Key? key}) : super(key: key);
+class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
+  late Future<List<InvestigationAlertData>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getInvestigations(widget.user);
+  }
+
+  void _reload() {
+    setState(() {
+      _future = PrincipalService.getInvestigations(widget.user);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: CustomTheme.grey,
-      appBar: AppBar(
-          title: const Text('Détail de l’alerte'),
-          backgroundColor: CustomTheme.blue),
-      body: ListView(
-        padding: const EdgeInsets.all(14),
-        children: [
-          _SectionTitle('Signalement du parent'),
-          _Card(
+    return FutureBuilder<List<InvestigationAlertData>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                _Detail('Élève', 'Aminata Diallo',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Date', '24/09/2026',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Motif', 'Maladie',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Message', 'Aminata sera absente ce matin.',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-              ])),
-          const SizedBox(height: 12),
-          _SectionTitle('Appel du professeur'),
-          _Card(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                _Detail('Enseignant', 'M. Kouame',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Classe', '6e A',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Matière', 'Mathématiques',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Date', '24/09/2026',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Heure', '08:05',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-                _Detail('Statut enregistré', 'Présent',
-                    labelColor: Colors.grey.shade700,
-                    valueColor: Colors.grey.shade700),
-              ])),
-          const SizedBox(height: 12),
-          _Card(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: Colors.red.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Différence détectée',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Une différence a été détectée entre le signalement du parent et l’appel de présence. Une vérification est nécessaire.',
-                  style: TextStyle(color: Colors.red.shade700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'La présence déclarée par le parent diffère de l’appel du professeur et doit être vérifiée.',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Impossible de charger les alertes.'),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _reload,
+                    child: const Text('Réessayer'),
                   ),
-                ),
-              ])),
-          const SizedBox(height: 12),
-          CustomButton(text: 'Vérifier', onPress: () => Navigator.pop(context)),
-          OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Rejeter')),
-        ],
-      ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final alerts = snapshot.data ?? const <InvestigationAlertData>[];
+        final pendingAlerts = alerts.where((alert) => alert.status == 'pending').toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            _HeaderCard(
+                title: 'Alertes de présence',
+                subtitle:
+                    'Consultez ici les présences nécessitant une vérification.',
+                icon: Icons.info_outline),
+            const SizedBox(height: 12),
+            if (pendingAlerts.isEmpty)
+              _Card(
+                child: Text('Aucune alerte de présence à vérifier.'),
+              )
+            else
+              ...pendingAlerts.map((alert) => Card(
+                    margin: EdgeInsets.zero,
+                    color: Colors.red.shade50,
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(color: Colors.red.shade200),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red.shade700,
+                      ),
+                      title: Text(
+                        '${alert.studentName.isNotEmpty ? alert.studentName : alert.studentCode} • ${alert.codeClasse}',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Parent : ${alert.parentStatusLabel} • Professeur : ${alert.teacherStatusLabel}',
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                      trailing: Text(
+                        'À vérifier',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ParentReportDetailPage(
+                            user: widget.user,
+                            alert: alert,
+                            onUpdated: _reload,
+                          ),
+                        ),
+                      ).then((_) => _reload()),
+                    ),
+                  )),
+          ],
+        );
+      },
     );
   }
 }
@@ -1263,11 +1791,45 @@ class _StatsGrid extends StatelessWidget {
       );
 }
 
+class _DashboardActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String summary;
+  final VoidCallback onTap;
+
+  const _DashboardActionCard({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: CustomTheme.blue, size: 30),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(summary),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          isThreeLine: summary.contains('\n'),
+        ),
+      );
+}
+
 class _DashboardClassCard extends StatelessWidget {
   final PrincipalDashboardClassOverview classOverview;
   final String? teacherName;
+  final VoidCallback? onTap;
 
-  const _DashboardClassCard({required this.classOverview, this.teacherName});
+  const _DashboardClassCard({
+    required this.classOverview,
+    this.teacherName,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1281,7 +1843,7 @@ class _DashboardClassCard extends StatelessWidget {
       MapEntry('Enseignant principal', teacherName ?? 'Non renseigné'),
       MapEntry('Total matières', '${classOverview.subjectCount}'),
       MapEntry('Séances du jour', '${classOverview.sessionsToday}'),
-      MapEntry('Taux de présence', attendanceRate),
+      MapEntry("Présence aujourd'hui", attendanceRate),
     ];
 
     final greyTextStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1293,9 +1855,12 @@ class _DashboardClassCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
       elevation: 10,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15.0),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -1341,7 +1906,7 @@ class _DashboardClassCard extends StatelessWidget {
                             textAlign: TextAlign.right,
                             overflow: TextOverflow.ellipsis,
                             softWrap: true,
-                            style: row.key == 'Taux de présence'
+                            style: row.key == "Présence aujourd'hui"
                                 ? greyTextStyle?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: _attendancePercentageColor(
@@ -1357,6 +1922,7 @@ class _DashboardClassCard extends StatelessWidget {
                   ),
                 )),
           ],
+          ),
         ),
       ),
     );
@@ -1532,14 +2098,16 @@ class _DashboardActivityCard extends StatelessWidget {
   final String assetPath;
   final String title;
   final String subtitle;
-  final String status;
+  final String? status;
+  final String? titleTrailing;
   final bool isAlert;
   final VoidCallback? onTap;
   const _DashboardActivityCard(
       {required this.assetPath,
       required this.title,
       required this.subtitle,
-      required this.status,
+      this.status,
+      this.titleTrailing,
       this.isAlert = false,
       this.onTap});
 
@@ -1547,7 +2115,8 @@ class _DashboardActivityCard extends StatelessWidget {
   Widget build(BuildContext context) => _ParentDashboardCard(
         assetPath: assetPath,
         title: title,
-        subtitle: '$subtitle\n$status',
+        subtitle: status == null ? subtitle : '$subtitle\n$status',
+        titleTrailing: titleTrailing,
         onTap: onTap,
         isAlert: isAlert,
       );
@@ -1558,6 +2127,7 @@ class _ParentDashboardCard extends StatelessWidget {
   final IconData? icon;
   final String title;
   final String subtitle;
+  final String? titleTrailing;
   final VoidCallback? onTap;
   final double height;
   final double iconSize;
@@ -1567,6 +2137,7 @@ class _ParentDashboardCard extends StatelessWidget {
       this.icon,
       required this.title,
       required this.subtitle,
+      this.titleTrailing,
       this.onTap,
       this.height = 140,
       this.iconSize = 36,
@@ -1643,8 +2214,29 @@ class _ParentDashboardCard extends StatelessWidget {
                               : Icon(icon, color: iconColor, size: iconSize),
                     ),
                     ListTile(
-                      title: Text(title,
-                          textAlign: TextAlign.center, style: titleStyle),
+                      title: titleTrailing == null
+                          ? Text(title,
+                              textAlign: TextAlign.center, style: titleStyle)
+                          : Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: titleStyle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  titleTrailing ?? '—',
+                                  style: subtitleStyle?.copyWith(
+                                    color: CustomTheme.blue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                       subtitle: Text(subtitle,
                           textAlign: TextAlign.center, style: subtitleStyle),
                     ),
@@ -1793,10 +2385,16 @@ class _PrincipalAttendanceSessionTile extends StatelessWidget {
 
 class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
   final PrincipalAttendanceData session;
+  final String? subjectLabel;
+  final bool preferApiAttendancePercentage;
+  final bool showRawStatuses;
 
   const PrincipalLiveAttendanceSessionPage({
     Key? key,
     required this.session,
+    this.subjectLabel,
+    this.preferApiAttendancePercentage = false,
+    this.showRawStatuses = false,
   }) : super(key: key);
 
   String _statusLabel(String status) {
@@ -1814,7 +2412,29 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final attendancePercentage = session.calculatedAttendancePercentage;
+    debugPrint('=== DETAIL RECEIVED SESSION IDENTITY ===');
+    debugPrint('CodeClasse=${session.codeClasse}');
+    debugPrint('CodeMatiere=${session.codeMatiere}');
+    debugPrint('CodeEnseignement=${session.codeEnseignement}');
+    debugPrint('date=${session.date}');
+    debugPrint('time=${session.time}');
+    debugPrint(
+      'DETAIL RECEIVED: '
+      'class=${session.className}, present=${session.present}, '
+      'absent=${session.absent}, late=${session.late}, '
+      'studentCount=${session.studentCount}, records=${session.records.length}',
+    );
+    for (final record in session.records) {
+      debugPrint(
+        'DETAIL STUDENT: '
+        'code=${record.codeEleve}, '
+        'name=${record.studentName}, '
+        'status=${record.status}',
+      );
+    }
+    final attendancePercentage = preferApiAttendancePercentage
+        ? session.attendancePercentage ?? session.calculatedAttendancePercentage
+        : session.calculatedAttendancePercentage;
     return Scaffold(
         backgroundColor: CustomTheme.grey,
         appBar: AppBar(
@@ -1831,9 +2451,12 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
                   _Detail('Date', session.date),
                   _Detail('Heure', session.time),
                   _Detail('Classe', session.className),
-                  _Detail('Matière', session.subject),
+                  _Detail('Matière', subjectLabel ?? session.subject),
                   _Detail('Enseignant', session.teacher),
-                  _Detail('Élèves', '${session.studentCount}'),
+                  _Detail(
+                    preferApiAttendancePercentage ? 'Total élèves' : 'Élèves',
+                    '${session.studentCount}',
+                  ),
                   _Detail('Présents', '${session.present}'),
                   _Detail('Absents', '${session.absent}'),
                   _Detail('Retards', '${session.late}'),
@@ -1855,7 +2478,9 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
                         ? record.codeEleve
                         : record.studentName),
                     subtitle: Text(record.codeEleve),
-                    trailing: Text(_statusLabel(record.status)),
+                    trailing: Text(showRawStatuses
+                      ? record.status
+                      : _statusLabel(record.status)),
                   ),
                 )),
           ],

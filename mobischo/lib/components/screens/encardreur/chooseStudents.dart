@@ -11,9 +11,16 @@ import 'package:mobischo/utils/custom_theme.dart';
 class ChooseStudents extends StatefulWidget {
   final Classe classe;
   final User user;
+  final bool embedded;
+  final void Function(BuildContext, List<Map>)? onCreate;
 
-  const ChooseStudents({Key? key, required this.classe, required this.user})
-      : super(key: key);
+  const ChooseStudents({
+    Key? key,
+    required this.classe,
+    required this.user,
+    this.embedded = false,
+    this.onCreate,
+  }) : super(key: key);
 
   @override
   State<ChooseStudents> createState() => _ChooseStudentsState();
@@ -153,6 +160,32 @@ class _ChooseStudentsState extends State<ChooseStudents> {
   // }
 
   bool? checkAll = false;
+
+  void _continueToCreate(BuildContext context) {
+    if (students.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sélectionnez au moins un élève.')),
+      );
+      return;
+    }
+
+    if (widget.onCreate != null) {
+      widget.onCreate!(context, List<Map>.from(students));
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateEncardreurConvocation(
+          user: widget.user,
+          students: students,
+          classe: widget.classe,
+        ),
+      ),
+    );
+  }
+
   void getAllStudents(bool? status) {
     if (status == true) {
       for (var i = 0; i < student_list.length; i++) {
@@ -170,7 +203,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
   @override
   Widget build(BuildContext context) {
     // absence_list();
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         backgroundColor: CustomTheme.blue,
         leading: IconButton(
@@ -285,22 +318,32 @@ class _ChooseStudentsState extends State<ChooseStudents> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // filter_absences
-
-          // insertAbsences();
-
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: ((context) => CreateEncardreurConvocation(
-                      user: widget.user,
-                      students: students,
-                      classe: widget.classe))));
-        },
+        onPressed: () => _continueToCreate(context),
         backgroundColor: CustomTheme.blue,
         child: const Icon(Icons.check),
       ),
+    );
+
+    if (!widget.embedded) return page;
+
+    return Column(
+      children: [
+        Expanded(child: page.body!),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _continueToCreate(context),
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Continuer'),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

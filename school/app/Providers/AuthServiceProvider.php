@@ -25,6 +25,28 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        Gate::define('mobischo:mobile', function ($user) {
+            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+
+            return (bool) $user->admin || in_array($accountType, [
+                'parent',
+                'enseignant',
+                'principal',
+                'encadreur',
+                'principal_encadreur',
+                'administrateur',
+            ], true);
+        });
+
+        Gate::define('ai:chat', function ($user) {
+            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+
+            return (bool) $user->admin || in_array($accountType, [
+                'encadreur',
+                'principal',
+                'principal_encadreur',
+                'administrateur',
+            ], true);
+        });
     }
 }

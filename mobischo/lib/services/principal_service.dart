@@ -299,11 +299,176 @@ class PrincipalDashboardData {
   }
 }
 
+class InvestigationAlertData {
+  final int? id;
+  final String codeEtablissement;
+  final String codeEleve;
+  final String codeClasse;
+  final String codeEnseignement;
+  final String codeMatiere;
+  final String dateAbsence;
+  final String parentStatus;
+  final String teacherStatus;
+  final String status;
+  final String notes;
+  final String studentName;
+  final String studentCode;
+  final String resolvedBy;
+  final String resolvedAt;
+  final String createdAt;
+
+  const InvestigationAlertData({
+    required this.id,
+    required this.codeEtablissement,
+    required this.codeEleve,
+    required this.codeClasse,
+    required this.codeEnseignement,
+    required this.codeMatiere,
+    required this.dateAbsence,
+    required this.parentStatus,
+    required this.teacherStatus,
+    required this.status,
+    required this.notes,
+    required this.studentName,
+    required this.studentCode,
+    required this.resolvedBy,
+    required this.resolvedAt,
+    required this.createdAt,
+  });
+
+  factory InvestigationAlertData.fromJson(Map<String, dynamic> json) {
+    return InvestigationAlertData(
+      id: _toNullableInt(json['id']),
+      codeEtablissement: json['CodeEtablissement']?.toString() ?? '',
+      codeEleve: json['CodeEleve']?.toString() ?? '',
+      codeClasse: json['CodeClasse']?.toString() ?? '',
+      codeEnseignement: json['CodeEnseignement']?.toString() ?? '',
+      codeMatiere: json['CodeMatiere']?.toString() ?? '',
+      dateAbsence: json['date_absence']?.toString() ?? '',
+      parentStatus: json['parent_status']?.toString() ?? '',
+      teacherStatus: json['teacher_status']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      notes: json['notes']?.toString() ?? '',
+      studentName: json['student_name']?.toString() ?? '',
+      studentCode: json['student_code']?.toString() ?? '',
+      resolvedBy: json['resolved_by']?.toString() ?? '',
+      resolvedAt: json['resolved_at']?.toString() ?? '',
+      createdAt: json['created_at']?.toString() ?? '',
+    );
+  }
+
+  String get displayStatus {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'En attente';
+      case 'validated':
+        return 'Validée';
+      case 'rejected':
+        return 'Rejetée';
+      default:
+        return status;
+    }
+  }
+
+  String get teacherStatusLabel {
+    switch (teacherStatus.toUpperCase()) {
+      case 'P':
+        return 'Présent';
+      case 'A':
+        return 'Absent';
+      case 'R':
+        return 'Retard';
+      default:
+        return teacherStatus.isNotEmpty ? teacherStatus : 'Non renseigné';
+    }
+  }
+
+  String get parentStatusLabel {
+    switch (parentStatus.toUpperCase()) {
+      case 'P':
+        return 'Présent';
+      case 'A':
+        return 'Absent';
+      case 'R':
+        return 'Retard';
+      default:
+        return parentStatus.isNotEmpty ? parentStatus : 'Non renseigné';
+    }
+  }
+}
+
 class PrincipalService {
   static const root = 'https://mobischo.com/api/school_manager';
+  static final teacherClassesEndpoint =
+      Uri.parse('https://mobischo.com/api/principal/teacher-classes');
   static const getDashboardAction = 'GET_PRINCIPAL_DASHBOARD';
   static const getClassesAction = 'GET_PRINCIPAL_CLASSES';
   static const getAttendanceAction = 'GET_PRINCIPAL_ATTENDANCE';
+  static const getInvestigationsAction = 'GET_INVESTIGATIONS';
+  static const updateInvestigationAction = 'UPDATE_INVESTIGATION_ALERT';
+
+  static Future<List<InvestigationAlertData>> getInvestigations(
+    User user, {
+    String? codeClasse,
+  }) async {
+    final requestBody = <String, String>{
+      'action': getInvestigationsAction,
+      'code': user.code,
+      'CodeEtablissement': user.CodeEtablissement,
+      if (codeClasse != null && codeClasse.isNotEmpty) 'CodeClasse': codeClasse,
+    };
+
+    final response = await http.post(Uri.parse(root), body: requestBody);
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Impossible de charger les investigations (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw const FormatException('Invalid investigations response');
+    }
+
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(InvestigationAlertData.fromJson)
+        .toList();
+  }
+
+  static Future<InvestigationAlertData> updateInvestigationAlert(
+    User user, {
+    required String alertId,
+    required String status,
+    String? notes,
+  }) async {
+    final response = await http.post(
+      Uri.parse(root),
+      body: {
+        'action': updateInvestigationAction,
+        'code': user.code,
+        'id': alertId,
+        'status': status,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Impossible de mettre à jour l’investigation (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Invalid investigation update response');
+    }
+
+    final alertJson = decoded['alert'];
+    if (alertJson is Map<String, dynamic>) {
+      return InvestigationAlertData.fromJson(alertJson);
+    }
+
+    throw const FormatException('Investigation update response missing alert payload');
+  }
 
   static Future<List<PrincipalAttendanceData>> getPrincipalAttendance(
     User user, {
@@ -327,8 +492,21 @@ class PrincipalService {
       throw const FormatException('Invalid Principal attendance response');
     }
 
-    return decoded
-        .whereType<Map<String, dynamic>>()
+    final sessionMaps = decoded.whereType<Map<String, dynamic>>().toList();
+    for (final rawSession in sessionMaps) {
+      final rawRecords = rawSession['records'];
+      if (rawSession['class'] == 'PREMIERE A4-ESP2' &&
+          rawSession['CodeEnseignement'] == '1059LIT' &&
+          rawRecords is List &&
+          rawRecords.length == 10) {
+        print(
+          '[PrincipalAttendance] RAW BEFORE fromJson: '
+          '${jsonEncode(rawSession)}',
+        );
+      }
+    }
+
+    return sessionMaps
         .map(PrincipalAttendanceData.fromJson)
         .toList();
   }
@@ -350,6 +528,40 @@ class PrincipalService {
     final decoded = jsonDecode(response.body);
     if (decoded is! List) {
       throw const FormatException('Invalid Principal classes response');
+    }
+
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(PrincipalClassSummary.fromJson)
+        .toList();
+  }
+
+  static Future<List<PrincipalClassSummary>> getPrincipalTeacherClasses(
+    User user,
+  ) async {
+    final token = user.aiToken.trim();
+    if (token.isEmpty) {
+      throw Exception('Votre session doit être renouvelée. Veuillez vous reconnecter.');
+    }
+
+    final response = await http.get(
+      teacherClassesEndpoint,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Votre session doit être renouvelée. Veuillez vous reconnecter.');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load Principal teachers (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw const FormatException('Invalid Principal teachers response');
     }
 
     return decoded

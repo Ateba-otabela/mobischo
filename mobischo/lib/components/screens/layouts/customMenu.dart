@@ -6,7 +6,7 @@ import 'package:mobischo/components/screens/encardreur/StudentClassList.dart';
 import 'package:mobischo/components/screens/encardreur/classList.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:mobischo/components/screens/MyAccount.dart';
+import 'package:mobischo/components/screens/mobischo_ai.dart';
 import 'package:mobischo/components/screens/layouts/sidebar.dart';
 import 'package:mobischo/components/screens/parent/MyChildren.dart';
 import 'package:mobischo/components/screens/parent/MyChildrenAbsences.dart';
@@ -25,6 +25,13 @@ class PrincipalTabRequest extends Notification {
   final int index;
 
   PrincipalTabRequest(this.index);
+}
+
+class PrincipalSectionRequest extends Notification {
+  final String title;
+  final Widget screen;
+
+  const PrincipalSectionRequest({required this.title, required this.screen});
 }
 
 class CustomMenu extends StatefulWidget {
@@ -61,7 +68,7 @@ class _CustomMenuState extends State<CustomMenu>
     "MOBISCHO",
     "UTILISATEURS",
     "NOTES",
-    "MON COMPTE"
+    "AI"
   ];
   final List<String> teachertitleList = [
     "MOBISCHO",
@@ -164,7 +171,7 @@ class _CustomMenuState extends State<CustomMenu>
         const Icon(Icons.home),
         const Icon(Icons.person_outlined),
         const Icon(Icons.list_alt),
-        const Icon(Icons.edit),
+        const Icon(Icons.smart_toy_outlined),
       ];
       return items;
     } else {
@@ -271,9 +278,7 @@ class _CustomMenuState extends State<CustomMenu>
           MarkScreen(
             user: widget.user,
           ),
-          MyAccount(
-            user: widget.user,
-          )
+          MobischoAiScreen(user: widget.user),
         ];
       });
     } else {
@@ -374,26 +379,37 @@ class _CustomMenuState extends State<CustomMenu>
 
         backgroundColor: CustomTheme.grey,
         // bottomNavigationBar: _tabBarIcons(),
-        body: NotificationListener<PrincipalTabRequest>(
+        body: NotificationListener<PrincipalSectionRequest>(
           onNotification: (request) {
-            if (!_isPrincipalShell ||
-                request.index < 0 ||
-                request.index >= screens.length) {
-              return false;
-            }
-
+            if (!_isPrincipalShell) return false;
             setState(() {
               showingInitialBody = false;
-              principalSecondaryBody = null;
-              currentIndex = request.index;
-              _tcontroller.index = request.index;
+              principalSecondaryBody = request.screen;
+              currentTitle = request.title;
             });
-            changeTitle();
             return true;
           },
-          child: showingInitialBody && widget.initialBody != null
-              ? widget.initialBody!
-              : principalSecondaryBody ?? screens[currentIndex],
+          child: NotificationListener<PrincipalTabRequest>(
+            onNotification: (request) {
+              if (!_isPrincipalShell ||
+                  request.index < 0 ||
+                  request.index >= screens.length) {
+                return false;
+              }
+
+              setState(() {
+                showingInitialBody = false;
+                principalSecondaryBody = null;
+                currentIndex = request.index;
+                _tcontroller.index = request.index;
+              });
+              changeTitle();
+              return true;
+            },
+            child: showingInitialBody && widget.initialBody != null
+                ? widget.initialBody!
+                : principalSecondaryBody ?? screens[currentIndex],
+          ),
         ),
 
         bottomNavigationBar: Theme(

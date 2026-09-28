@@ -1,10 +1,13 @@
 // ignore_for_file: avoid_unnecessary_containers, unused_field, prefer_final_fields, import_of_legacy_library_into_null_safe, use_build_context_synchronously, unused_local_variable, avoid_print, no_leading_underscores_for_local_identifiers
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
+import 'package:mobischo/services/mobile_api_service.dart';
+import 'package:mobischo/services/notification_service.dart';
 
 import '../../../home.dart';
 import '../../../models/user.dart';
@@ -33,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gravity: ToastGravity.CENTER,
           fontSize: 16.0);
     } else {
-      var url = "https://mobischo.com/login.php";
+      const url = 'https://mobischo.com/api/mobile/login';
 
       var map = <String, dynamic>{};
       map['action'] = 'LOGIN';
@@ -42,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await http.post(Uri.parse(url), body: map);
 
       if (response.body.isNotEmpty) {
-        print(response.body);
         if (json.decode(response.body) == 'Error') {
           Fluttertoast.showToast(
             msg: "Les Logins incorrectes",
@@ -51,19 +53,43 @@ class _LoginScreenState extends State<LoginScreen> {
             fontSize: 16.0,
           );
         } else {
-          var data = json.decode(response.body);
-          data.cast<Map<String, dynamic>>();
-          var list = data.map<User>((json) => User.fromJson(json));
-          final user = list.first;
-          print(user.nom);
+          final data = json.decode(response.body);
+          if (data is! List || data.isEmpty) {
+            Fluttertoast.showToast(
+              msg: 'Erreur de Connextion',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.CENTER,
+            );
+            return;
+          }
 
-          if (user.admin == '1' && user.CodeEtablissement.trim().isNotEmpty) {
+          final user = User.fromJson(data.first as Map<String, dynamic>);
+          if (user.token.isNotEmpty) {
+            await MobileApiService.saveSession(user, user.token);
+            unawaited(_registerDeviceAfterLogin());
+          }
+
+          final accountType = user.account_type.trim().toLowerCase();
+          final shouldUsePrincipalShell = const {
+            'principal',
+            'encadreur',
+            'principal_encadreur',
+            'administrateur',
+          }.contains(accountType);
+
+          if (shouldUsePrincipalShell) {
+            debugPrint(
+              '[MobischoAI] Principal login token present='
+              '${user.aiToken.trim().isNotEmpty}',
+            );
+            if (!mounted) return;
             Navigator.push(
               cont,
               MaterialPageRoute(
                   builder: (context) => PrincipalShell(user: user)),
             );
           } else {
+            if (!mounted) return;
             Navigator.push(
               cont,
               MaterialPageRoute(
@@ -80,6 +106,20 @@ class _LoginScreenState extends State<LoginScreen> {
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER);
       }
+    }
+  }
+
+  Future<void> _registerDeviceAfterLogin() async {
+    try {
+      final fcmToken = await NotificationService.instance.getCurrentToken();
+      if (fcmToken == null || fcmToken.isEmpty) return;
+
+      await MobileApiService.registerDevice(
+        fcmToken,
+        MobileApiService.devicePlatform,
+      );
+    } on Exception catch (error) {
+      debugPrint('Login device registration skipped (${error.runtimeType}).');
     }
   }
 

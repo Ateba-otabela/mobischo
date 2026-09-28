@@ -31,6 +31,7 @@ class _AbsenceJustificationScreenState
   bool _sending = false;
   bool _showForm = false;
   late Future<List<Student>> _students;
+  late Future<List<AbsenceJustification>> _justifications;
 
   final _motifs = const [
     'Maladie',
@@ -40,34 +41,19 @@ class _AbsenceJustificationScreenState
     'Autre',
   ];
 
-  // Temporary UI-only records used when the API has no justifications.
-  final _temporaryMockJustifications = <AbsenceJustification>[
-    AbsenceJustification(
-      id: 'mock-jean',
-      studentCode: 'Jean Dupont',
-      dateAbsence: '20/09/2026',
-      motif: 'Maladie',
-      justification: 'L’élève était absent pour des raisons de santé.',
-      pieceJointe: '',
-      statut: 'En attente',
-      dateEnvoi: '2026-09-20',
-    ),
-    AbsenceJustification(
-      id: 'mock-marie',
-      studentCode: 'Marie Ngono',
-      dateAbsence: '18/09/2026',
-      motif: 'Raisons familiales',
-      justification: 'L’élève devait s’absenter pour une raison familiale.',
-      pieceJointe: '',
-      statut: 'En attente',
-      dateEnvoi: '2026-09-18',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     _students = StudentServices.getParentStudents(widget.user.code);
+    _loadJustifications();
+  }
+
+  void _loadJustifications() {
+    setState(() {
+      _justifications = AbsenceJustificationService.getParentJustifications(
+        widget.user.code,
+      );
+    });
   }
 
   @override
@@ -118,6 +104,7 @@ class _AbsenceJustificationScreenState
         attachment: _attachment,
       );
       if (!mounted) return;
+      _loadJustifications();
       setState(() {
         _sending = false;
         _showForm = false;
@@ -164,16 +151,52 @@ class _AbsenceJustificationScreenState
             ),
       body: FutureBuilder<List<Student>>(
         future: _students,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+        builder: (context, studentSnapshot) {
+          if (studentSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final students = snapshot.data!;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-            children: [
-              if (_showForm) _buildForm(students) else _buildHistory(students),
-            ],
+          if (studentSnapshot.hasError || !studentSnapshot.hasData) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Impossible de charger vos enfants.'),
+              ),
+            );
+          }
+          final students = studentSnapshot.data!;
+          return FutureBuilder<List<AbsenceJustification>>(
+            future: _justifications,
+            builder: (context, justificationSnapshot) {
+              if (justificationSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (justificationSnapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Impossible de charger les justificatifs.'),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _loadJustifications,
+                          child: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final history = justificationSnapshot.data ?? const <AbsenceJustification>[];
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                children: [
+                  if (_showForm) _buildForm(students) else _buildHistory(students, history),
+                ],
+              );
+            },
           );
         },
       ),
@@ -279,19 +302,25 @@ class _AbsenceJustificationScreenState
     );
   }
 
-  Widget _buildHistory(List<Student> students) {
-    final history = [..._temporaryMockJustifications]
+  Widget _buildHistory(List<Student> students, List<AbsenceJustification> history) {
+    final sorted = [...history]
       ..sort((first, second) =>
           _historyDate(second.dateEnvoi).compareTo(
             _historyDate(first.dateEnvoi),
           ));
+
+    if (sorted.isEmpty) {
+      return _card(
+        child: Text('Aucune justification enregistrée pour le moment.'),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Justifications récentes'),
         Column(
-          children: history.map((item) {
+          children: sorted.map((item) {
             final studentName = _studentName(students, item.studentCode);
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),

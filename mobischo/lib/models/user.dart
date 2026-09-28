@@ -15,6 +15,8 @@ class User {
   String address;
   String admin;
   String CodeEtablissement;
+  String aiToken;
+  String token;
 
   User(
       {required this.nom,
@@ -27,24 +29,40 @@ class User {
       required this.account_type,
       required this.text_password,
       required this.address,
-      required this.admin, 
-      required this.CodeEtablissement
-      });
+      required this.admin,
+      required this.CodeEtablissement,
+      this.aiToken = '',
+      this.token = ''});
 
   factory User.fromJson(Map<String, dynamic> json) {
+    String requiredString(String key) {
+      final value = json[key];
+      if (value is! String || value.trim().isEmpty) {
+        throw FormatException('Missing or invalid required user field: $key');
+      }
+      return value;
+    }
+
+    String optionalString(String key, [String fallback = '']) {
+      final value = json[key];
+      return value == null ? fallback : value.toString();
+    }
+
     return User(
-      nom: json['nom'] as String,
-      prenom: json['prenom'] as String,
-      contacts: json['contacts'] as String,
-      sex: json['sex'] as String,
-      email: json['email'] as String,
-      login: json['login'] as String,
-      code: json['code'] as String,
-      account_type: json['account_type'] as String,
-      text_password: json['text_password'] as String,
-      address: json['address'] as String,
-      admin: json['admin'] as String,
-      CodeEtablissement: json['CodeEtablissement'] as String
+      nom: optionalString('nom'),
+      prenom: optionalString('prenom'),
+      contacts: optionalString('contacts'),
+      sex: optionalString('sex'),
+      email: optionalString('email'),
+      login: requiredString('login'),
+      code: requiredString('code'),
+      account_type: requiredString('account_type'),
+      text_password: optionalString('text_password'),
+      address: optionalString('address'),
+      admin: optionalString('admin', '0'),
+      CodeEtablissement: optionalString('CodeEtablissement'),
+      aiToken: optionalString('ai_token'),
+      token: optionalString('token'),
     );
   }
 }

@@ -20,11 +20,26 @@ use App\Models\SequenceEvaluation;
 use Illuminate\Support\Facades\DB;
 use App\Models\HistoriqueInscription;
 use App\Models\AbsenceJustification;
+use App\Models\InvestigationAlert;
+use App\Services\EncadreurClassScope;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class API extends Controller
 {
+    private function isMobileEligibleUser(User $user): bool
+    {
+        $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+
+        return (bool) $user->admin || in_array($accountType, [
+            'parent',
+            'enseignant',
+            'principal',
+            'encadreur',
+            'principal_encadreur',
+            'administrateur',
+        ], true);
+    }
 
     public function mobileLogin(Request $request)
     {
@@ -59,6 +74,19 @@ class API extends Controller
             return response()->json('Error');
         }
 
+        if (!$this->isMobileEligibleUser($user)) {
+            return response()->json('Error');
+        }
+
+        $mobileToken = $user->createToken('mobischo-mobile', ['mobischo:mobile'])
+            ->plainTextToken;
+
+        $aiToken = null;
+        if ($this->isPrincipalUser($user)) {
+            $aiToken = $user->createToken('mobischo-principal-ai', ['ai:chat'])
+                ->plainTextToken;
+        }
+
         $userPayload = [
             'nom' => (string) ($user->nom ?? ''),
             'prenom' => (string) ($user->prenom ?? ''),
@@ -68,13 +96,25 @@ class API extends Controller
             'login' => (string) ($user->login ?? ''),
             'code' => (string) ($user->code ?? ''),
             'account_type' => (string) ($user->account_type ?? ''),
-            'text_password' => (string) ($user->text_password ?? ''),
             'address' => (string) ($user->address ?? ''),
             'admin' => (string) ($user->admin ?? '0'),
             'CodeEtablissement' => (string) ($user->CodeEtablissement ?? ''),
+            'token' => $mobileToken,
+            'ai_token' => $aiToken,
         ];
 
         return response()->json([$userPayload]);
+    }
+
+    public function mobileLogout(Request $request)
+    {
+        $token = $request->user()?->currentAccessToken();
+
+        if ($token) {
+            $token->delete();
+        }
+
+        return response()->json(['success' => true]);
     }
 
     public function school_manager(Request $request)
@@ -259,15 +299,29 @@ class API extends Controller
         }
 
         if ($action == 'GET_PRINCIPAL_DASHBOARD') {
-            $principalContext = $this->resolvePrincipalContext($request);
+            $principalContext = $this->resolveDashboardScope($request);
             if (!$principalContext['allowed']) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
             $schoolCode = (string) $principalContext['school_code'];
+            $classCodes = $principalContext['class_codes'];
             $classes = Classe::where('CodeEtablissement', '=', $schoolCode)
+                ->whereIn('CodeClasse', $classCodes)
                 ->orderBy('LibelleClasse')
                 ->get();
+
+            if ($classes->isEmpty()) {
+                return response()->json([
+                    'classes' => 0,
+                    'teachers' => 0,
+                    'students' => 0,
+                    'today_attendance_percentage' => null,
+                    'class_overview' => [],
+                    'today_sessions' => [],
+                ]);
+            }
+
             $classCodes = $classes->pluck('CodeClasse')->all();
 
             $today = date('Y-m-d');
@@ -405,14 +459,16 @@ class API extends Controller
         }
 
         if ($action == 'GET_PRINCIPAL_CLASSES') {
-            $principalContext = $this->resolvePrincipalContext($request);
+            $principalContext = $this->resolveDashboardScope($request);
             if (!$principalContext['allowed']) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
             $schoolCode = (string) $principalContext['school_code'];
+            $classCodes = $principalContext['class_codes'];
             $today = date('Y-m-d');
             $classes = Classe::where('CodeEtablissement', '=', $schoolCode)
+                ->whereIn('CodeClasse', $classCodes)
                 ->orderBy('LibelleClasse')
                 ->get();
 
@@ -507,15 +563,13 @@ class API extends Controller
         }
 
         if ($action == 'GET_PRINCIPAL_ATTENDANCE') {
-            $principalContext = $this->resolvePrincipalContext($request);
+            $principalContext = $this->resolveDashboardScope($request);
             if (!$principalContext['allowed']) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
             $schoolCode = (string) $principalContext['school_code'];
-            $classCodes = Classe::where('CodeEtablissement', '=', $schoolCode)
-                ->pluck('CodeClasse')
-                ->all();
+            $classCodes = $principalContext['class_codes'];
 
             $attendanceQuery = Conduite::whereIn('CodeClasse', $classCodes);
             if ($request->filled('DateEnreg')) {
@@ -595,7 +649,7 @@ class API extends Controller
         }
 
         if ($action == 'GET_PRINCIPAL_CLASS_DETAILS') {
-            $principalContext = $this->resolvePrincipalContext($request);
+            $principalContext = $this->resolveDashboardScope($request);
             if (!$principalContext['allowed']) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
@@ -604,6 +658,13 @@ class API extends Controller
             $classCode = trim((string) $request->input('CodeClasse', ''));
             if ($classCode === '') {
                 return response()->json(['error' => 'Missing CodeClasse'], 422);
+            }
+
+            if (($principalContext['user']->account_type ?? '') === 'encadreur') {
+                $encadreurScope = new EncadreurClassScope();
+                if (!$encadreurScope->ensureClassAccessForEncadreur($principalContext['user'], $classCode)) {
+                    return response()->json(['error' => 'Unauthorized'], 403);
+                }
             }
 
             $class = Classe::where('CodeClasse', '=', $classCode)
@@ -944,6 +1005,98 @@ class API extends Controller
                 ->get();
         }
 
+        if ($action == 'GET_INVESTIGATIONS') {
+            $code = trim((string) $request->input('code', ''));
+            if ($code === '') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $user = User::where('code', '=', $code)->first();
+            if (!$user) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            if ($schoolCode === '') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $query = InvestigationAlert::query()->where('CodeEtablissement', '=', $schoolCode);
+
+            if (strtolower((string) ($user->account_type ?? '')) === 'encadreur') {
+                $encadreurScope = new EncadreurClassScope();
+                $assignedClassCodes = $encadreurScope->assignedClassCodesForEncadreur($user);
+                if ($assignedClassCodes === []) {
+                    return response()->json([]);
+                }
+                $query->whereIn('CodeClasse', $assignedClassCodes);
+            }
+
+            if ($request->filled('CodeClasse')) {
+                $requestedClass = trim((string) $request->input('CodeClasse', ''));
+                if ($requestedClass !== '') {
+                    if (strtolower((string) ($user->account_type ?? '')) === 'encadreur') {
+                        $encadreurScope = new EncadreurClassScope();
+                        if (!$encadreurScope->ensureClassAccessForEncadreur($user, $requestedClass)) {
+                            return response()->json(['error' => 'Unauthorized'], 403);
+                        }
+                    }
+                    $query->where('CodeClasse', '=', $requestedClass);
+                }
+            }
+
+            $alerts = $query->orderByDesc('date_absence')->orderByDesc('created_at')->get();
+
+            return response()->json($alerts->map(function ($alert) {
+                $student = Eleve::where('CodeEleve', '=', $alert->CodeEleve)->first();
+                $payload = $alert->toArray();
+                $payload['student_name'] = $student ? trim((string) (($student->Nom ?? '') . ' ' . ($student->Prenom ?? ''))) : '';
+                $payload['student_code'] = (string) ($student->CodeEleve ?? '');
+                return $payload;
+            })->values());
+        }
+
+        if ($action == 'UPDATE_INVESTIGATION_ALERT') {
+            $code = trim((string) $request->input('code', ''));
+            $alertId = $request->input('id');
+            $status = trim((string) $request->input('status', ''));
+            $notes = trim((string) $request->input('notes', ''));
+
+            if ($code === '' || $alertId === '' || $status === '') {
+                return response()->json(['error' => 'Missing investigation fields'], 422);
+            }
+
+            $user = User::where('code', '=', $code)->first();
+            if (!$user) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $alert = InvestigationAlert::find($alertId);
+            if (!$alert) {
+                return response()->json(['error' => 'Investigation not found'], 404);
+            }
+
+            $allowedStates = ['pending', 'validated', 'rejected'];
+            if (!in_array($status, $allowedStates, true)) {
+                return response()->json(['error' => 'Invalid investigation status'], 422);
+            }
+
+            if (strtolower((string) ($user->account_type ?? '')) === 'encadreur') {
+                $encadreurScope = new EncadreurClassScope();
+                if (!$encadreurScope->ensureClassAccessForEncadreur($user, (string) $alert->CodeClasse)) {
+                    return response()->json(['error' => 'Unauthorized'], 403);
+                }
+            }
+
+            $alert->status = $status;
+            $alert->notes = $notes !== '' ? $notes : ($alert->notes ?? '');
+            $alert->resolved_by = (string) ($user->code ?? '');
+            $alert->resolved_at = now();
+            $alert->save();
+
+            return response()->json(['status' => 'success', 'alert' => $alert]);
+        }
+
         if ($action == 'GET_TEACHER_DEVOIRS') {
             $teacherCode = trim((string) $request->input('teacher_code', ''));
             $codeEnseignement = trim((string) $request->input('CodeEnseignement', ''));
@@ -1046,8 +1199,26 @@ class API extends Controller
 
         #students
         if($action == 'GET_COURSE_STUDENTS'){
-            $CodeClasse = $request->codeClasse;
-            $students = Eleve::where('CodeClasse','=',$CodeClasse)->orderBy('Nom', 'ASC')->get();
+            $CodeClasse = trim((string) $request->input('codeClasse', ''));
+            $userCode = trim((string) $request->input('code', ''));
+            $user = $userCode !== '' ? User::where('code', '=', $userCode)->first() : null;
+
+            if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
+                $encadreurScope = new EncadreurClassScope();
+                if (!$encadreurScope->ensureClassAccessForEncadreur($user, $CodeClasse)) {
+                    return response()->json(['error' => 'Unauthorized'], 403);
+                }
+            }
+
+            $students = Eleve::where('CodeClasse','=',$CodeClasse)
+                ->where('CodeEtablissement', '=', $user?->CodeEtablissement ?? '')
+                ->orderBy('Nom', 'ASC')
+                ->get();
+
+            if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
+                $students = $encadreurScope->listStudentsForEncadreur($user, $CodeClasse)->get();
+            }
+
             return $students;
         }
         if($action == 'GET_MAIN_STUDENT'){
@@ -1144,7 +1315,7 @@ class API extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            $statuses = json_decode($request->input('statuses', '[]'), true);
+            $statuses = $this->decodeJsonArrayInput($request->input('statuses', '[]'));
             if (!is_array($statuses) || empty($statuses)) {
                 return response()->json(['message' => 'Invalid attendance'], 422);
             }
@@ -1188,6 +1359,13 @@ class API extends Controller
                 (string) $request->DateEnreg
             );
 
+            $this->createInvestigationAlertsForAttendance(
+                $course,
+                $request->DateEnreg,
+                $statuses,
+                $students
+            );
+
             return response()->json(['status' => 'success']);
         }
 
@@ -1206,7 +1384,7 @@ class API extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            $records = json_decode($request->input('records', '[]'), true);
+            $records = $this->decodeJsonArrayInput($request->input('records', '[]'));
             if (!is_array($records) || empty($records) || $date === '') {
                 return response()->json(['message' => 'Invalid attendance'], 422);
             }
@@ -1363,6 +1541,46 @@ class API extends Controller
         return ['allowed' => false];
     }
 
+    private function resolveDashboardScope(Request $request): array
+    {
+        $code = trim((string) $request->input('code', ''));
+        if ($code === '') {
+            return ['allowed' => false];
+        }
+
+        $user = User::where('code', '=', $code)->first();
+        if (!$user) {
+            return ['allowed' => false];
+        }
+
+        $resolvedSchoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+        if ($resolvedSchoolCode === '') {
+            return ['allowed' => false];
+        }
+
+        $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+        $adminFlag = (bool) $user->admin;
+
+        if ($adminFlag || in_array($accountType, ['principal', 'principal_encadreur', 'administrateur'], true)) {
+            $classCodes = Classe::where('CodeEtablissement', '=', $resolvedSchoolCode)
+                ->pluck('CodeClasse')
+                ->map(fn ($value) => (string) $value)
+                ->values()
+                ->all();
+
+            return ['allowed' => true, 'school_code' => $resolvedSchoolCode, 'user' => $user, 'class_codes' => $classCodes];
+        }
+
+        if ($accountType === 'encadreur') {
+            $encadreurScope = new EncadreurClassScope();
+            $classCodes = $encadreurScope->assignedClassCodesForEncadreur($user);
+
+            return ['allowed' => true, 'school_code' => $resolvedSchoolCode, 'user' => $user, 'class_codes' => $classCodes];
+        }
+
+        return ['allowed' => false];
+    }
+
     private function isPrincipalUser(User $user): bool
     {
         $accountType = strtolower(trim((string) ($user->account_type ?? '')));
@@ -1414,6 +1632,21 @@ class API extends Controller
         return $duration . ((float) $duration === 1.0 ? ' heure' : ' heures');
     }
 
+    private function decodeJsonArrayInput(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
     private function createAttendanceMessages($course, array $studentCodes, string $attendanceDate): void
     {
         $class = Classe::where('CodeClasse', $course->CodeClasse)->first();
@@ -1444,6 +1677,68 @@ class API extends Controller
                 ],
                 ['description' => $description]
             );
+        }
+    }
+
+    private function createInvestigationAlertsForAttendance($course, string $attendanceDate, array $statuses, $students): void
+    {
+        if (!$course) {
+            return;
+        }
+
+        $schoolCode = trim((string) ($course->CodeEtablissement ?? ''));
+        if ($schoolCode === '') {
+            return;
+        }
+
+        $statusMap = [];
+        foreach ($statuses as $entry) {
+            if (!isset($entry['CodeEleve']) || !isset($entry['status'])) {
+                continue;
+            }
+            $statusMap[(string) $entry['CodeEleve']] = strtoupper((string) $entry['status']);
+        }
+
+        $studentCodes = [];
+        foreach ($students as $student) {
+            $studentCode = is_object($student)
+                ? (string) ($student->CodeEleve ?? '')
+                : (string) $student;
+            if ($studentCode !== '') {
+                $studentCodes[] = $studentCode;
+            }
+        }
+
+        foreach (array_values(array_unique($studentCodes)) as $studentCode) {
+            $teacherStatus = strtoupper((string) ($statusMap[$studentCode] ?? ''));
+            if ($teacherStatus !== 'P') {
+                continue;
+            }
+
+            $absenceJustification = AbsenceJustification::query()
+                ->where('CodeEleve', '=', $studentCode)
+                ->where('date_absence', '=', $attendanceDate)
+                ->whereIn('statut', ['En attente', 'validée', 'Validee', 'Validée'])
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$absenceJustification) {
+                continue;
+            }
+
+            InvestigationAlert::firstOrCreate([
+                'CodeEtablissement' => $schoolCode,
+                'CodeEleve' => $studentCode,
+                'CodeClasse' => (string) ($course->CodeClasse ?? ''),
+                'CodeEnseignement' => (string) ($course->CodeEnseignement ?? ''),
+                'CodeMatiere' => (string) ($course->CodeMatiere ?? ''),
+                'date_absence' => $attendanceDate,
+            ], [
+                'parent_status' => 'A',
+                'teacher_status' => 'P',
+                'status' => 'pending',
+                'notes' => 'Parent absent / professeur présent',
+            ]);
         }
     }
 }

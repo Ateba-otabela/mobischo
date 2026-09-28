@@ -31,16 +31,22 @@ class _ClassStudentsState extends State<ClassStudents> {
   @override
   void initState() {
     super.initState();
-    _studentsFuture =
-        StudentServices.getCourseStudents(widget.classe.CodeClasse);
+    _studentsFuture = StudentServices.getCourseStudents(
+      widget.classe.CodeClasse,
+      code: widget.user.code,
+      codeEtablissement: widget.user.CodeEtablissement,
+    );
   }
 
   @override
   void didUpdateWidget(covariant ClassStudents oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.classe.CodeClasse != widget.classe.CodeClasse) {
-      _studentsFuture =
-          StudentServices.getCourseStudents(widget.classe.CodeClasse);
+      _studentsFuture = StudentServices.getCourseStudents(
+        widget.classe.CodeClasse,
+        code: widget.user.code,
+        codeEtablissement: widget.user.CodeEtablissement,
+      );
     }
   }
 

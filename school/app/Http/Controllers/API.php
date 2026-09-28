@@ -1201,7 +1201,12 @@ class API extends Controller
         if($action == 'GET_COURSE_STUDENTS'){
             $CodeClasse = trim((string) $request->input('codeClasse', ''));
             $userCode = trim((string) $request->input('code', ''));
+            $schoolCode = trim((string) $request->input('CodeEtablissement', ''));
             $user = $userCode !== '' ? User::where('code', '=', $userCode)->first() : null;
+
+            if ($schoolCode === '' && $user) {
+                $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            }
 
             if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
                 $encadreurScope = new EncadreurClassScope();
@@ -1210,10 +1215,12 @@ class API extends Controller
                 }
             }
 
-            $students = Eleve::where('CodeClasse','=',$CodeClasse)
-                ->where('CodeEtablissement', '=', $user?->CodeEtablissement ?? '')
-                ->orderBy('Nom', 'ASC')
-                ->get();
+            $studentsQuery = Eleve::query()->where('CodeClasse', '=', $CodeClasse);
+            if ($schoolCode !== '') {
+                $studentsQuery->where('CodeEtablissement', '=', $schoolCode);
+            }
+
+            $students = $studentsQuery->orderBy('Nom', 'ASC')->get();
 
             if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
                 $students = $encadreurScope->listStudentsForEncadreur($user, $CodeClasse)->get();

@@ -12,26 +12,31 @@ class StudentServices {
   static const GET_MAIN_STUDENT_ACTION = 'GET_MAIN_STUDENT';
   static const GET_PARENT_STUDENTS_ACTION = 'GET_PARENT_STUDENTS';
 
-  static Future<List<Student>> getCourseStudents(String codeClasse) async {
+  static Future<List<Student>> getCourseStudents(
+    String codeClasse, {
+    String? code,
+    String? codeEtablissement,
+  }) async {
     try {
-      var map = <String, dynamic>{};
-      map['action'] = GET_COURSE_STUDENTS_ACTION;
-      map['codeClasse'] = codeClasse;
-      // print("Code classe $codeClasse");
+      final map = <String, dynamic>{
+        'action': GET_COURSE_STUDENTS_ACTION,
+        'codeClasse': codeClasse,
+        if (code != null && code.isNotEmpty) 'code': code,
+        if (codeEtablissement != null && codeEtablissement.isNotEmpty)
+          'CodeEtablissement': codeEtablissement,
+      };
+
       final response = await http.post(Uri.parse(ROOT), body: map);
-      // print("get course students Response : ${response.body}");
 
       if (200 == response.statusCode) {
         try {
           if (response.body.isNotEmpty) {
-            List<Student> students = parseResponse(response.body);
+            final students = parseResponse(response.body);
             return students;
           } else {
-            print('empty responcse');
             return <Student>[];
           }
         } catch (e) {
-          // print("herer");
           print(e.toString());
           return <Student>[];
         }

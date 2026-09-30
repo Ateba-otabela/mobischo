@@ -83,6 +83,8 @@ class _AbsenceJustificationScreenState
   }
 
   Future<void> _submit() async {
+    if (_sending) return;
+
     if (_selectedStudent == null ||
         _absenceDate == null ||
         _motif == null ||
@@ -104,7 +106,6 @@ class _AbsenceJustificationScreenState
         attachment: _attachment,
       );
       if (!mounted) return;
-      _loadJustifications();
       setState(() {
         _sending = false;
         _showForm = false;
@@ -114,11 +115,19 @@ class _AbsenceJustificationScreenState
         _attachment = null;
         _explanationController.clear();
       });
-    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre justification a été envoyée.')),
+      );
+      _loadJustifications();
+    } catch (error) {
       if (!mounted) return;
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’envoyer la justification.')),
+        SnackBar(
+          content: Text(error is AbsenceJustificationServiceException
+              ? error.userMessage
+              : 'Impossible d’envoyer la justification.'),
+        ),
       );
     }
   }
@@ -171,6 +180,26 @@ class _AbsenceJustificationScreenState
                 return const Center(child: CircularProgressIndicator());
               }
               if (justificationSnapshot.hasError) {
+                if (_showForm) {
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                    children: [
+                      _card(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Historique indisponible pour le moment.'),
+                            TextButton(
+                              onPressed: _loadJustifications,
+                              child: const Text('Réessayer'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _buildForm(students),
+                    ],
+                  );
+                }
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -182,6 +211,10 @@ class _AbsenceJustificationScreenState
                         OutlinedButton(
                           onPressed: _loadJustifications,
                           child: const Text('Réessayer'),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _showForm = true),
+                          child: const Text('Nouvelle justification'),
                         ),
                       ],
                     ),
@@ -311,7 +344,7 @@ class _AbsenceJustificationScreenState
 
     if (sorted.isEmpty) {
       return _card(
-        child: Text('Aucune justification enregistrée pour le moment.'),
+        child: const Text('Aucune justification enregistrée pour le moment.'),
       );
     }
 

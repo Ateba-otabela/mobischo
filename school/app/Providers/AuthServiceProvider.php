@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\PrincipalContextService;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -39,14 +40,8 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         Gate::define('ai:chat', function ($user) {
-            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
-
-            return (bool) $user->admin || in_array($accountType, [
-                'encadreur',
-                'principal',
-                'principal_encadreur',
-                'administrateur',
-            ], true);
+            return $user instanceof \App\Models\User
+                && app(PrincipalContextService::class)->canUseAi($user);
         });
     }
 }

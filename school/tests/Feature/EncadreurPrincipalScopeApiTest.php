@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Classe;
 use App\Models\Eleve;
 use App\Models\EncadreurClasse;
+use App\Models\Enseignement;
+use App\Models\Convocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -197,6 +199,100 @@ class EncadreurPrincipalScopeApiTest extends TestCase
 
         $details->assertOk();
         $this->assertEquals('CL-A', $details->json('CodeClasse'));
+    }
+
+    public function test_principal_can_create_convocation_for_any_class_in_own_school_only(): void
+    {
+        [, $classB, $classOut] = $this->createSchoolClasses();
+
+        User::create([
+            'code' => 'PR-CONV',
+            'nom' => 'Principal',
+            'prenom' => 'Convocation',
+            'sex' => 'M',
+            'login' => 'principalconvocation',
+            'contacts' => '111',
+            'password' => bcrypt('secret'),
+            'account_type' => 'principal',
+            'admin' => false,
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+        User::create([
+            'code' => 'TEACHER-CONV',
+            'nom' => 'Teacher',
+            'prenom' => 'Assigned',
+            'sex' => 'M',
+            'login' => 'teacherconvocation',
+            'contacts' => '222',
+            'password' => bcrypt('secret'),
+            'account_type' => 'enseignant',
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+
+        Enseignement::create([
+            'CodeEnseignement' => 'ENS-B',
+            'CodeMatiere' => 'MAT-B',
+            'code' => 'TEACHER-CONV',
+            'CodeClasse' => $classB->CodeClasse,
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+        Enseignement::create([
+            'CodeEnseignement' => 'ENS-X',
+            'CodeMatiere' => 'MAT-X',
+            'code' => 'TEACHER-CONV',
+            'CodeClasse' => $classOut->CodeClasse,
+            'CodeEtablissement' => 'SCHOOL-2',
+        ]);
+
+        Eleve::create([
+            'CodeEleve' => 'ELE-B',
+            'CodeAnnee' => 'AN-1',
+            'CodeClasse' => $classB->CodeClasse,
+            'dateinscription' => '2024-09-01',
+            'Nom' => 'Student',
+            'Prenom' => 'School One',
+        ]);
+        Eleve::create([
+            'CodeEleve' => 'ELE-X',
+            'CodeAnnee' => 'AN-1',
+            'CodeClasse' => $classOut->CodeClasse,
+            'dateinscription' => '2024-09-01',
+            'Nom' => 'Student',
+            'Prenom' => 'School Two',
+        ]);
+
+        $response = $this->postJson('/api/school_manager', [
+            'action' => 'INSERT_CONVOCATION',
+            'code' => 'PR-CONV',
+            'CodeEleves' => json_encode(['ELE-B']),
+            'CodeClasse' => $classB->CodeClasse,
+            'CodeEnseignement' => 'ENS-B',
+            'motif' => 'Indiscipline',
+            'description' => 'Convocation test',
+            'dateConvocation' => '2026-10-01',
+        ]);
+
+        $response->assertOk()->assertExactJson(['status' => 'success']);
+        $this->assertDatabaseHas('convocations', [
+            'code' => 'PR-CONV',
+            'CodeEleve' => 'ELE-B',
+            'CodeEnseignement' => 'ENS-B',
+            'CodeMatiere' => 'MAT-B',
+        ]);
+
+        $crossSchoolResponse = $this->postJson('/api/school_manager', [
+            'action' => 'INSERT_CONVOCATION',
+            'code' => 'PR-CONV',
+            'CodeEleves' => json_encode(['ELE-X']),
+            'CodeClasse' => $classOut->CodeClasse,
+            'CodeEnseignement' => 'ENS-X',
+            'motif' => 'Indiscipline',
+            'description' => 'Cross-school test',
+            'dateConvocation' => '2026-10-01',
+        ]);
+
+        $crossSchoolResponse->assertForbidden();
+        $this->assertSame(1, Convocation::where('code', 'PR-CONV')->count());
     }
 
     public function test_encadreur_cannot_access_unassigned_class_details_or_cross_school_data(): void

@@ -112,7 +112,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
     if (_isPrincipal) {
       final titles = widget.principalTitles ??
           const [
-            'Signalements des parents',
+            'Rapports des professeurs',
             'Alertes de présence',
             'Appels des professeurs',
           ];

@@ -299,12 +299,23 @@ class _CreateEncardreurConvocationState
 
   Future<void> _saveConvocation(BuildContext context) async {
     if (_isSaving) return;
+
+    final studentCodes = widget.students
+        .map((student) => (student['CodeEleve'] ?? '').toString().trim())
+        .where((code) => code.isNotEmpty)
+        .toSet()
+        .toList();
+    if (studentCodes.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Sélectionnez au moins un élève.',
+        toastLength: Toast.LENGTH_LONG,
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
-      final studentCodes = widget.students
-          .map<String>((student) => student['CodeEleve'].toString())
-          .toList();
       final result = await AcademicServices.insertConvocations(
         widget.user.code,
         studentCodes,

@@ -42,6 +42,7 @@ dependencies:
   flutter_secure_storage: ^8.0.0
   firebase_core: 2.10.0
   firebase_messaging: 14.4.1
+  flutter_local_notifications: ^9.9.1
 
   # dbcrypt: ^1.0.0
 

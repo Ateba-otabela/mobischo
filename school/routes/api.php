@@ -3,9 +3,12 @@
 use Illuminate\Http\Request;
 use App\Http\Controllers\API;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\PrincipalTeacherController;
 use App\Http\Controllers\NotificationDeviceController;
+use App\Services\FcmNotificationService;
+use App\Services\PrincipalContextService;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +35,65 @@ Route::post('/notifications/devices', [NotificationDeviceController::class, 'reg
 
 Route::delete('/notifications/devices', [NotificationDeviceController::class, 'revoke'])
     ->middleware(['auth:sanctum', 'throttle:60,1']);
+
+Route::get('/notification-diagnostic', function (Request $request, FcmNotificationService $fcm) {
+    if (!(new PrincipalContextService())->isPrincipal($request->user())) {
+        return response()->json(['status' => 'forbidden'], 403);
+    }
+
+    try {
+        $result = $fcm->sendToUser(
+            '672320608',
+            'MOBISCHO Test',
+            'This is a direct Firebase notification test.',
+            [
+                'type' => 'diagnostic',
+                'source' => 'manual_test',
+            ]
+        );
+
+        return response()->json([
+            'status' => $result['status'] ?? 'unknown',
+            'attempted' => (int) ($result['attempted'] ?? 0),
+            'succeeded' => (int) ($result['succeeded'] ?? 0),
+            'failed' => (int) ($result['failed'] ?? 0),
+            'invalidated' => (int) ($result['invalidated'] ?? 0),
+            'errors' => array_values(array_map(static fn (array $error) => [
+                'http_status' => $error['http_status'] ?? null,
+                'status' => $error['status'] ?? null,
+                'firebase_status' => $error['firebase_status'] ?? null,
+                'message' => $error['message'] ?? null,
+            ], $result['errors'] ?? [])),
+        ]);
+    } catch (\Throwable $exception) {
+        $message = $exception->getMessage();
+        $message = preg_replace('/Bearer\s+\S+/i', 'Bearer [redacted]', $message) ?? $message;
+        $message = preg_replace('/\bya29\.[A-Za-z0-9._~-]+/', '[redacted]', $message) ?? $message;
+        $message = preg_replace('/-----BEGIN [^-]+-----.*?-----END [^-]+-----/s', '[redacted]', $message) ?? $message;
+        $message = substr($message, 0, 500);
+        $status = str_contains(strtolower($message), 'credential') || str_contains(strtolower($message), 'project id')
+            ? 'configuration_error'
+            : (str_contains(strtolower($message), 'oauth') ? 'oauth_error' : 'send_error');
+
+        Log::error('Temporary FCM diagnostic failed.', [
+            'exception' => get_class($exception),
+            'status' => $status,
+            'message' => $message,
+        ]);
+
+        return response()->json([
+            'status' => $status,
+            'attempted' => 0,
+            'succeeded' => 0,
+            'failed' => 0,
+            'invalidated' => 0,
+            'errors' => [[
+                'status' => $status,
+                'message' => $message,
+            ]],
+        ], 500);
+    }
+})->middleware(['auth:sanctum', 'throttle:5,1']);
 
 Route::post('/ai/chat', [AiChatController::class, 'chat'])
     ->middleware(['auth:sanctum', 'throttle:15,1']);

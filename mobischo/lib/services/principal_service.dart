@@ -32,9 +32,27 @@ class PrincipalDashboardSession {
     return PrincipalDashboardSession(
       date: json['date']?.toString() ?? '',
       time: json['time']?.toString() ?? '',
-      className: json['class']?.toString() ?? '',
-      subject: json['subject']?.toString() ?? '',
-      teacher: json['teacher']?.toString() ?? '',
+      className: _normalizeDisplayText(
+        json['class'],
+        fallback: _normalizeDisplayText(
+          json['LibelleClasse'],
+          fallback: _normalizeDisplayText(json['CodeClasse'], fallback: 'Classe'),
+        ),
+      ),
+      subject: _normalizeDisplayText(
+        json['subject'],
+        fallback: _normalizeDisplayText(
+          json['libelle_matiere'],
+          fallback: _normalizeSubjectFallback(json['CodeMatiere']),
+        ),
+      ),
+      teacher: _normalizeDisplayText(
+        json['teacher'],
+        fallback: _normalizeDisplayText(
+          json['teacher_name'],
+          fallback: _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
+        ),
+      ),
       present: _toInt(json['present']),
       absent: _toInt(json['absent']),
       late: _toInt(json['late']),
@@ -103,15 +121,37 @@ class PrincipalAttendanceData {
     final rawRecords = json['records'];
     final present = _toStrictInt(json['present']);
     final studentCount = _toStrictInt(json['student_count']);
+    final className = _normalizeDisplayText(
+      json['class'],
+      fallback: _normalizeDisplayText(
+        json['LibelleClasse'],
+        fallback: _normalizeDisplayText(json['CodeClasse'], fallback: 'Classe'),
+      ),
+    );
+    final subject = _normalizeDisplayText(
+      json['subject'],
+      fallback: _normalizeDisplayText(
+        json['libelle_matiere'],
+        fallback: _normalizeSubjectFallback(json['CodeMatiere']),
+      ),
+    );
+    final teacher = _normalizeDisplayText(
+      json['teacher'],
+      fallback: _normalizeDisplayText(
+        json['teacher_name'],
+        fallback: _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
+      ),
+    );
+
     return PrincipalAttendanceData(
       date: json['date']?.toString() ?? '',
       time: json['time']?.toString() ?? '',
       codeClasse: json['CodeClasse']?.toString() ?? '',
       codeMatiere: json['CodeMatiere']?.toString() ?? '',
       codeEnseignement: json['CodeEnseignement']?.toString() ?? '',
-      className: json['class']?.toString() ?? '',
-      subject: json['subject']?.toString() ?? '',
-      teacher: json['teacher']?.toString() ?? '',
+      className: className,
+      subject: subject,
+      teacher: teacher,
       present: present ?? 0,
       absent: _toInt(json['absent']),
       late: _toInt(json['late']),
@@ -136,6 +176,41 @@ class PrincipalAttendanceData {
     }
 
     return (present / studentCount * 100).round();
+  }
+}
+
+String _normalizeDisplayText(Object? value, {String fallback = ''}) {
+  final trimmed = value?.toString().trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return fallback;
+  }
+
+  final safeValue = trimmed.replaceAll(RegExp(r'^[.\s]+|[.\s]+$'), '');
+  if (safeValue.isEmpty || safeValue == '.') {
+    return fallback;
+  }
+
+  return safeValue;
+}
+
+String _normalizeSubjectFallback(Object? codeMatiere) {
+  final code = codeMatiere?.toString().trim().toUpperCase() ?? '';
+  if (code.isEmpty) return 'Matière';
+
+  switch (code) {
+    case 'MAH':
+      return 'Mathématiques';
+    case 'FR':
+      return 'Français';
+    case 'ANG':
+      return 'Anglais';
+    case 'SC':
+      return 'Sciences';
+    case 'INFO':
+    case 'INFORMATIQUE':
+      return 'Informatique';
+    default:
+      return code;
   }
 }
 

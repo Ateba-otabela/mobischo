@@ -32,7 +32,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
   ];
 
   final secondaryTitles = const [
-    'Signalements des parents',
+    'Rapports des professeurs',
     'Alertes de présence',
     'Appels des professeurs',
     'Convoquer',
@@ -89,7 +89,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
       principalSecondaryScreens: [
         PrincipalReportsPage(user: widget.user),
         PrincipalAlertsPage(user: widget.user),
-        PrincipalCallsPage(),
+        PrincipalCallsPage(user: widget.user),
         PrincipalMessagesConvocationsPage(user: widget.user),
       ],
     );
@@ -1231,23 +1231,23 @@ class PrincipalReportsPage extends StatefulWidget {
 }
 
 class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
-  late Future<List<InvestigationAlertData>> _future;
+  late Future<List<PrincipalAttendanceData>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = PrincipalService.getInvestigations(widget.user);
+    _future = PrincipalService.getPrincipalAttendance(widget.user);
   }
 
   void _reload() {
     setState(() {
-      _future = PrincipalService.getInvestigations(widget.user);
+      _future = PrincipalService.getPrincipalAttendance(widget.user);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<InvestigationAlertData>>(
+    return FutureBuilder<List<PrincipalAttendanceData>>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1261,7 +1261,7 @@ class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Impossible de charger les signalements.'),
+                  const Text('Impossible de charger les rapports des professeurs.'),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: _reload,
@@ -1273,40 +1273,36 @@ class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
           );
         }
 
-        final alerts = snapshot.data ?? const <InvestigationAlertData>[];
+        final sessions = snapshot.data ?? const <PrincipalAttendanceData>[];
 
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
             _HeaderCard(
-                title: 'Signalements des parents',
-                subtitle: 'Consultation des signalements reçus',
-                icon: Icons.message_outlined),
+                title: 'Rapports des professeurs',
+                subtitle: 'Appels de présence transmis par les enseignants',
+                icon: Icons.assignment_outlined),
             const SizedBox(height: 12),
-            if (alerts.isEmpty)
+            if (sessions.isEmpty)
               _Card(
-                child: Text('Aucun signalement pour le moment.'),
+                child: Text('Aucun rapport de présence pour le moment.'),
               )
             else
-              ...alerts.map((alert) => _Card(
+              ...sessions.map((session) => _Card(
                     child: ListTile(
-                      title: Text(alert.studentName.isNotEmpty
-                          ? alert.studentName
-                          : alert.studentCode),
+                      title: Text('${session.className} • ${session.subject}'),
                       subtitle: Text(
-                          '${alert.codeClasse} • ${alert.dateAbsence}\n${alert.parentStatusLabel} • ${alert.teacherStatusLabel}'),
+                          '${session.date} à ${session.time} • ${session.teacher}\n'
+                          '${session.present} présents • ${session.absent} absents • ${session.late} retards'),
                       isThreeLine: true,
-                      trailing: Text(alert.displayStatus),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ParentReportDetailPage(
-                            user: widget.user,
-                            alert: alert,
-                            onUpdated: _reload,
+                          builder: (_) => PrincipalLiveAttendanceSessionPage(
+                            session: session,
                           ),
                         ),
-                      ).then((_) => _reload()),
+                      ),
                     ),
                   )),
           ],
@@ -1514,90 +1510,123 @@ class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
 }
 
 class PrincipalCallsPage extends StatefulWidget {
-  const PrincipalCallsPage({Key? key}) : super(key: key);
+  final User user;
+
+  const PrincipalCallsPage({Key? key, required this.user}) : super(key: key);
+
   @override
   State<PrincipalCallsPage> createState() => _PrincipalCallsPageState();
 }
 
 class _PrincipalCallsPageState extends State<PrincipalCallsPage> {
   String classFilter = 'Toutes les classes';
-  String teacherFilter = '';
+  String teacherFilter = 'Tous les enseignants';
+  late Future<List<PrincipalAttendanceData>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getPrincipalAttendance(widget.user);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final calls = PrincipalMockService.calls.where((call) {
-      return (classFilter == 'Toutes les classes' ||
-              call.schoolClass.name == classFilter) &&
-          (teacherFilter.isEmpty ||
-              call.teacher.toLowerCase().contains(teacherFilter.toLowerCase()));
-    }).toList();
+    return FutureBuilder<List<PrincipalAttendanceData>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return ListView(padding: const EdgeInsets.all(14), children: [
-      _HeaderCard(
-          title: 'Appels des professeurs',
-          subtitle: 'Suivi des appels de présence',
-          icon: Icons.assignment_outlined),
-      const SizedBox(height: 12),
-      _Card(
-          child: Column(children: [
-        DropdownButtonFormField<String>(
-            value: 'Toutes les classes',
-            decoration: const InputDecoration(labelText: 'Classe'),
-            items: [
-              'Toutes les classes',
-              ...PrincipalMockService.classes.map((item) => item.name)
-            ]
-                .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-                .toList(),
-            onChanged: (value) =>
-                setState(() => classFilter = value ?? classFilter)),
-        TextField(
-            decoration: const InputDecoration(labelText: 'Enseignant'),
-            onChanged: (value) => setState(() => teacherFilter = value))
-      ])),
-      const SizedBox(height: 10),
-      if (calls.isEmpty)
-        const _Card(child: Text('Aucun appel ne correspond aux filtres.'))
-      else
-        ...calls.map((call) => _CallTile(
-            call: call,
-            onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => TeacherCallDetailPage(call: call)))))
-    ]);
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Impossible de charger les appels des professeurs.'),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => setState(() => _future = PrincipalService.getPrincipalAttendance(widget.user)),
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final allSessions = snapshot.data ?? const <PrincipalAttendanceData>[];
+        final allClasses = <String>{'Toutes les classes', ...allSessions.map((item) => item.className)}.toList();
+        final allTeachers = <String>{'Tous les enseignants', ...allSessions.map((item) => item.teacher)}.toList();
+
+        if (!allClasses.contains(classFilter)) {
+          classFilter = 'Toutes les classes';
+        }
+        if (!allTeachers.contains(teacherFilter)) {
+          teacherFilter = 'Tous les enseignants';
+        }
+
+        final calls = allSessions.where((session) {
+          final matchesClass = classFilter == 'Toutes les classes' || session.className == classFilter;
+          final matchesTeacher = teacherFilter == 'Tous les enseignants' ||
+              session.teacher.toLowerCase().contains(teacherFilter.toLowerCase());
+          return matchesClass && matchesTeacher;
+        }).toList();
+
+        return ListView(padding: const EdgeInsets.all(14), children: [
+          _HeaderCard(
+              title: 'Appels des professeurs',
+              subtitle: 'Suivi des appels de présence',
+              icon: Icons.assignment_outlined),
+          const SizedBox(height: 12),
+          _Card(
+              child: Column(children: [
+            DropdownButtonFormField<String>(
+                value: classFilter,
+                decoration: const InputDecoration(labelText: 'Classe'),
+                items: allClasses
+                    .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                    .toList(),
+                onChanged: (value) => setState(() => classFilter = value ?? classFilter)),
+            DropdownButtonFormField<String>(
+                value: teacherFilter,
+                decoration: const InputDecoration(labelText: 'Enseignant'),
+                items: allTeachers
+                    .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                    .toList(),
+                onChanged: (value) => setState(() => teacherFilter = value ?? teacherFilter)),
+          ])),
+          const SizedBox(height: 10),
+          if (calls.isEmpty)
+            const _Card(child: Text('Aucun appel ne correspond aux filtres.'))
+          else
+            ...calls.map((session) => _Card(
+                  child: ListTile(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PrincipalLiveAttendanceSessionPage(session: session),
+                      ),
+                    ),
+                    title: Text('${session.className} • ${session.subject}'),
+                    subtitle: Text(
+                      '${session.date} à ${session.time} • ${session.teacher}\n'
+                      '${session.present} présents • ${session.absent} absents • ${session.late} retards',
+                    ),
+                    isThreeLine: true,
+                    trailing: Text(
+                      session.calculatedAttendancePercentage == null
+                          ? '—'
+                          : '${session.calculatedAttendancePercentage}%',
+                    ),
+                  ),
+                )),
+        ]);
+      },
+    );
   }
-}
-
-class TeacherCallDetailPage extends StatelessWidget {
-  final TeacherCall call;
-  const TeacherCallDetailPage({Key? key, required this.call}) : super(key: key);
-  @override
-  Widget build(BuildContext context) => Scaffold(
-      backgroundColor: CustomTheme.grey,
-      appBar: AppBar(
-          title: const Text('Détail de l’appel'),
-          backgroundColor: CustomTheme.blue),
-      body: ListView(padding: const EdgeInsets.all(14), children: [
-        _Card(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _Detail('Enseignant', call.teacher),
-          _Detail('Classe', call.schoolClass.name),
-          _Detail('Matière', call.subject),
-          _Detail('Date', call.date),
-          _Detail('Heure', call.time),
-          _Detail('Statut', call.status)
-        ])),
-        const SizedBox(height: 12),
-        const _Card(
-            child: Text('Présence physique du professeur : Non vérifiée')),
-        const SizedBox(height: 12),
-        _SectionTitle('Présence des élèves'),
-        ...call.schoolClass.students.map((student) => _StudentTile(
-            student: student,
-            status: student.absent > 0 ? 'Absent' : 'Présent'))
-      ]));
 }
 
 class PrincipalProfilePage extends StatelessWidget {
@@ -2264,24 +2293,6 @@ class _StudentTile extends StatelessWidget {
           title: Text(student.name),
           subtitle: Text(subtitle ?? '${student.code} • ${student.className}'),
           trailing: status == null ? null : Text(status!)));
-}
-
-class _CallTile extends StatelessWidget {
-  final TeacherCall call;
-  final VoidCallback? onTap;
-  const _CallTile({required this.call, this.onTap});
-  @override
-  Widget build(BuildContext context) => _Card(
-      child: ListTile(
-          onTap: onTap,
-          contentPadding: EdgeInsets.zero,
-          leading:
-              const Icon(Icons.assignment_outlined, color: CustomTheme.blue),
-          title: Text('${call.schoolClass.name} • ${call.subject}'),
-          subtitle: Text(
-              '${call.date} à ${call.time} • ${call.teacher}\n${call.schoolClass.students.length} élèves'),
-          isThreeLine: true,
-          trailing: const Text('Appel effectué')));
 }
 
 class _DashboardSessionTile extends StatelessWidget {

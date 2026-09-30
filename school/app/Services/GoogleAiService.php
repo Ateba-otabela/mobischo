@@ -25,7 +25,8 @@ class GoogleAiService
         string $message,
         array $conversation,
         ?callable $toolExecutor = null,
-        array $functionDeclarations = []
+        array $functionDeclarations = [],
+        array $applicationKnowledge = []
     ): string
     {
         $apiKey = trim((string) config('services.google_ai.api_key', ''));
@@ -60,6 +61,12 @@ class GoogleAiService
             . ':generateContent';
 
         $toolsEnabled = $toolExecutor !== null && !empty($functionDeclarations);
+        $systemInstruction = self::SYSTEM_INSTRUCTION;
+        if (!empty($applicationKnowledge)) {
+            $systemInstruction .= "\nVerified Mobischo navigation context (JSON): "
+                . json_encode($applicationKnowledge, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                . "\nUse only these confirmed role-specific labels and paths. If a path is not documented here, say it could not be confirmed. Navigation-only questions do not need a data tool. For combined navigation and live-data questions, answer both parts and use an authorized read-only tool for the live value.";
+        }
         $registeredFunctionNames = [];
         foreach ($functionDeclarations as $declaration) {
             if (is_array($declaration) && isset($declaration['name']) && is_string($declaration['name'])) {
@@ -72,7 +79,7 @@ class GoogleAiService
         while (true) {
             $payload = [
                 'systemInstruction' => [
-                    'parts' => [['text' => self::SYSTEM_INSTRUCTION]],
+                    'parts' => [['text' => $systemInstruction]],
                 ],
                 'contents' => $contents,
                 'generationConfig' => [

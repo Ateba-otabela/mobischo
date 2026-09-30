@@ -74,7 +74,8 @@ class _CustomMenuState extends State<CustomMenu>
     "MOBISCHO",
     "REGISTRE D'APPEL",
     "NOTES",
-    "MATIERES"
+    "MATIERES",
+    "AI",
   ];
 
   final List<String> parenttitleList = [
@@ -82,6 +83,7 @@ class _CustomMenuState extends State<CustomMenu>
     "ABSENCES",
     "MES ENFANTS",
     "NOTES",
+    "AI",
   ];
 
   final List<String> encardreurTitleList = [
@@ -128,7 +130,13 @@ class _CustomMenuState extends State<CustomMenu>
     _tcontroller = TabController(
         length: _isPrincipalShell
             ? widget.principalTitles!.length
-            : 4,
+        : widget.user.admin == '1'
+          ? admintitleList.length
+          : widget.user.account_type == 'parent'
+            ? parenttitleList.length
+            : widget.user.account_type == 'encardreur'
+              ? encardreurTitleList.length
+              : teachertitleList.length,
         vsync: this);
     _tcontroller.addListener(changeTitle);
     // Registering listener
@@ -181,6 +189,7 @@ class _CustomMenuState extends State<CustomMenu>
           const Icon(Icons.timer),
           const Icon(Icons.person),
           const Icon(Icons.note_add_rounded),
+          const Icon(Icons.smart_toy_outlined),
         ];
         return items;
       } else {
@@ -198,6 +207,7 @@ class _CustomMenuState extends State<CustomMenu>
             const Icon(Icons.timer),
             const Icon(Icons.note_add_outlined),
             const Icon(Icons.menu_book),
+            const Icon(Icons.smart_toy_outlined),
           ];
           return items;
         }
@@ -295,6 +305,7 @@ class _CustomMenuState extends State<CustomMenu>
             MyChildrenNotes(
               user: widget.user,
             ),
+            MobischoAiScreen(user: widget.user),
           ];
         });
       } else {
@@ -317,7 +328,8 @@ class _CustomMenuState extends State<CustomMenu>
               MarkScreen(
                 user: widget.user,
               ),
-              CoursesScreen(user: widget.user)
+              CoursesScreen(user: widget.user),
+              MobischoAiScreen(user: widget.user),
             ];
           });
         }

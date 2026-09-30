@@ -4,7 +4,18 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+// ---------------------------------------------------------------------------
+// Android notification channel used for foreground FCM display.
+// ---------------------------------------------------------------------------
+const String _kChannelId = 'mobischo_notifications';
+const String _kChannelName = 'MOBISCHO Notifications';
+const String _kChannelDesc = 'General MOBISCHO push notifications.';
+
+// ---------------------------------------------------------------------------
+// Background handler — must be a top-level function.
+// ---------------------------------------------------------------------------
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -20,6 +31,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   _logMessageMetadata('Background message', message);
 }
 
+// ---------------------------------------------------------------------------
+// NotificationService
+// ---------------------------------------------------------------------------
 class NotificationService {
   NotificationService._();
 
@@ -31,20 +45,57 @@ class NotificationService {
   String? _currentToken;
   bool _initialized = false;
 
+  // Local notifications plugin — used only for foreground display.
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  // Monotonically increasing ID so each foreground notification is distinct.
+  int _notificationId = 0;
+
   Stream<String> get tokenRefreshes => _tokenRefreshController.stream;
 
   Future<void> initialize() async {
     if (_initialized) return;
 
+    // ------------------------------------------------------------------
+    // 1. Initialise flutter_local_notifications with the Android channel.
+    // ------------------------------------------------------------------
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+
+    await _localNotifications.initialize(initSettings);
+
+    // Create / register the high-importance notification channel on Android.
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      _kChannelId,
+      _kChannelName,
+      description: _kChannelDesc,
+      importance: Importance.high,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    // ------------------------------------------------------------------
+    // 2. Register FCM handlers (unchanged from original).
+    // ------------------------------------------------------------------
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
     FirebaseMessaging.onMessage.listen(
-      (message) => _logMessageMetadata('Foreground message', message),
+      _handleForegroundMessage,
       onError: _handleStreamError,
     );
+
     FirebaseMessaging.onMessageOpenedApp.listen(
       _handleNotificationTap,
       onError: _handleStreamError,
     );
+
     _messaging.onTokenRefresh.listen(
       (token) {
         _currentToken = token;
@@ -52,8 +103,12 @@ class NotificationService {
       },
       onError: _handleStreamError,
     );
+
     _initialized = true;
 
+    // ------------------------------------------------------------------
+    // 3. Request permission (unchanged).
+    // ------------------------------------------------------------------
     try {
       final settings = await _messaging.requestPermission();
       if (kDebugMode) {
@@ -67,6 +122,9 @@ class NotificationService {
       _logPluginFailure('Notification permission request', error);
     }
 
+    // ------------------------------------------------------------------
+    // 4. FCM token retrieval (unchanged).
+    // ------------------------------------------------------------------
     try {
       _currentToken = await _messaging.getToken();
     } on FirebaseException catch (error) {
@@ -75,6 +133,9 @@ class NotificationService {
       _logPluginFailure('FCM token retrieval', error);
     }
 
+    // ------------------------------------------------------------------
+    // 5. Handle notification that launched the app (unchanged).
+    // ------------------------------------------------------------------
     try {
       final initialMessage = await _messaging.getInitialMessage();
       if (initialMessage != null) {
@@ -88,6 +149,45 @@ class NotificationService {
   }
 
   Future<String?> getCurrentToken() async => _currentToken;
+
+  // ------------------------------------------------------------------
+  // Foreground message handler:
+  //   • logs metadata (existing behaviour)
+  //   • displays a local notification banner (new behaviour)
+  // ------------------------------------------------------------------
+  void _handleForegroundMessage(RemoteMessage message) {
+    _logMessageMetadata('Foreground message', message);
+
+    final title = message.notification?.title;
+    final body = message.notification?.body;
+
+    // Only display a banner when the FCM message carries a notification
+    // payload (which the backend always includes per the diagnostic report).
+    if (title == null && body == null) return;
+
+    try {
+      final androidDetails = AndroidNotificationDetails(
+        _kChannelId,
+        _kChannelName,
+        channelDescription: _kChannelDesc,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+
+      final notificationDetails = NotificationDetails(android: androidDetails);
+
+      _localNotifications.show(
+        _notificationId++,
+        title,
+        body,
+        notificationDetails,
+      );
+    } on PlatformException catch (error) {
+      _logPluginFailure('Foreground local notification display', error);
+    } catch (error, stackTrace) {
+      Zone.current.handleUncaughtError(error, stackTrace);
+    }
+  }
 
   void _handleNotificationTap(RemoteMessage message) {
     _logMessageMetadata('Notification opened', message);

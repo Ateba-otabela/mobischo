@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AiReadOnlyToolService;
 use App\Services\GoogleAiService;
 use App\Services\GoogleAiServiceException;
+use App\Services\MobischoNavigationKnowledgeService;
 use App\Services\PrincipalContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,10 +20,15 @@ use Throwable;
 class AiChatController extends Controller
 {
     private $principalContext;
+    private $navigationKnowledge;
 
-    public function __construct(PrincipalContextService $principalContext)
+    public function __construct(
+        PrincipalContextService $principalContext,
+        MobischoNavigationKnowledgeService $navigationKnowledge
+    )
     {
         $this->principalContext = $principalContext;
+        $this->navigationKnowledge = $navigationKnowledge;
     }
 
     public function chat(
@@ -70,14 +76,18 @@ class AiChatController extends Controller
             $message = (string) $request->input('message');
             $this->storeUserMessage($conversation, $message);
 
-            $reply = $googleAi->generateReply(
-                $message,
-                $conversationContext,
-                function ($toolName, array $arguments) use ($user, $aiTools) {
-                    return $aiTools->execute($user, (string) $toolName, $arguments);
-                },
-                $aiTools->functionDeclarations()
-            );
+            $reply = $this->navigationKnowledge->answerNavigationQuestion($user, $message);
+            if ($reply === null) {
+                $reply = $googleAi->generateReply(
+                    $message,
+                    $conversationContext,
+                    function ($toolName, array $arguments) use ($user, $aiTools) {
+                        return $aiTools->execute($user, (string) $toolName, $arguments);
+                    },
+                    $aiTools->functionDeclarations($user),
+                    $this->navigationKnowledge->forUser($user)
+                );
+            }
 
             $this->storeAssistantMessage($conversation, $reply);
 

@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\EncadreurClassScope;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -108,12 +110,12 @@ class AiReadOnlyToolService
         $this->principalContext = $principalContext;
     }
 
-    public function functionDeclarations(): array
+    public function functionDeclarations(User $user): array
     {
         $string = ['type' => 'STRING'];
         $date = ['type' => 'STRING', 'description' => 'ISO date in YYYY-MM-DD format.'];
 
-        return [
+        $principalTools = [
             $this->declaration('searchStudents', 'Search the authenticated Principal school student directory. Returns only student code, name, class code, and class name.', [
                 'classCode' => $string,
                 'query' => $string,
@@ -154,6 +156,86 @@ class AiReadOnlyToolService
                 'date' => $date,
             ], ['date']),
         ];
+
+        $parentTools = [
+            $this->declaration('get_my_children', 'List only children linked to the authenticated parent account.', []),
+            $this->declaration('get_child_notes', 'Get a limited notes summary for one of the authenticated parent’s linked children.', [
+                'childCode' => $string,
+            ], ['childCode']),
+            $this->declaration('get_child_absences', 'Get absence and late counts for one of the authenticated parent’s linked children over a bounded date range.', [
+                'childCode' => $string,
+                'dateFrom' => $date,
+                'dateTo' => $date,
+            ], ['childCode', 'dateFrom', 'dateTo']),
+            $this->declaration('get_child_attendance', 'Get attendance counts for one of the authenticated parent’s linked children over a bounded date range.', [
+                'childCode' => $string,
+                'dateFrom' => $date,
+                'dateTo' => $date,
+            ], ['childCode', 'dateFrom', 'dateTo']),
+            $this->declaration('get_child_convocations', 'Get convocations for one of the authenticated parent’s linked children.', [
+                'childCode' => $string,
+            ], ['childCode']),
+            $this->declaration('get_child_messages', 'Read the parent Messages screen, which currently displays that linked child’s convocation records.', [
+                'childCode' => $string,
+            ], ['childCode']),
+            $this->declaration('get_child_homework', 'Get homework for the class of one of the authenticated parent’s linked children.', [
+                'childCode' => $string,
+            ], ['childCode']),
+        ];
+
+        $teacherTools = [
+            $this->declaration('get_my_classes', 'List only classes connected to the authenticated teacher through existing Enseignement assignments.', []),
+            $this->declaration('get_my_teaching_assignments', 'List the authenticated teacher’s existing teaching assignments and subjects.', []),
+            $this->declaration('get_class_students', 'Get a limited roster only for a class where the authenticated teacher has an Enseignement assignment.', [
+                'classCode' => $string,
+            ], ['classCode']),
+            $this->declaration('get_class_attendance', 'Get bounded-date attendance totals and sessions for a class assigned to the authenticated teacher.', [
+                'classCode' => $string,
+                'dateFrom' => $date,
+                'dateTo' => $date,
+            ], ['classCode', 'dateFrom', 'dateTo']),
+            $this->declaration('get_class_information', 'Get a school-scoped summary only for a class where the authenticated teacher has an Enseignement assignment.', [
+                'classCode' => $string,
+            ], ['classCode']),
+        ];
+
+        $encadreurTools = [
+            $this->declaration('get_my_classes', 'List only classes assigned to the authenticated Encadreur by encadreur_classes.', []),
+            $this->declaration('get_class_students', 'Get a limited roster only for a class assigned to the authenticated Encadreur.', [
+                'classCode' => $string,
+            ], ['classCode']),
+            $this->declaration('get_class_attendance', 'Get bounded-date attendance only for a class assigned to the authenticated Encadreur.', [
+                'classCode' => $string,
+                'dateFrom' => $date,
+                'dateTo' => $date,
+            ], ['classCode', 'dateFrom', 'dateTo']),
+            $this->declaration('get_class_information', 'Get a class summary only for a class assigned to the authenticated Encadreur.', [
+                'classCode' => $string,
+            ], ['classCode']),
+        ];
+
+        $context = $this->principalContext->resolveForAi($user);
+        if ($context === null) {
+            return [];
+        }
+
+        if ($context['role'] === 'parent') {
+            return $parentTools;
+        }
+
+        if ($context['role'] === 'enseignant') {
+            return $teacherTools;
+        }
+
+        if ($context['role'] === 'encadreur') {
+            return $encadreurTools;
+        }
+
+        if (in_array($context['role'], ['principal', 'principal_encadreur', 'administrateur', 'admin'], true)) {
+            return $principalTools;
+        }
+
+        return [];
     }
 
     public function fieldAllowlist(): array
@@ -167,6 +249,18 @@ class AiReadOnlyToolService
     }
 
     public function execute(User $user, string $toolName, array $arguments): array
+    {
+        try {
+            $result = $this->executeAuthorized($user, $toolName, $arguments);
+            $this->logToolCall($user, $toolName, true);
+            return $result;
+        } catch (\Throwable $exception) {
+            $this->logToolCall($user, $toolName, false);
+            throw $exception;
+        }
+    }
+
+    private function executeAuthorized(User $user, string $toolName, array $arguments): array
     {
         $context = $this->principalContext->resolveForAi($user);
         if ($context === null) {
@@ -185,11 +279,75 @@ class AiReadOnlyToolService
             'getTeacherAttendanceHistory' => 'getTeacherAttendanceHistory',
             'getSchoolDashboardSummary' => 'getSchoolDashboardSummary',
         ];
+        $parentMethods = [
+            'get_my_children' => 'getMyChildren',
+            'get_child_notes' => 'getChildNotes',
+            'get_child_absences' => 'getChildAbsences',
+            'get_child_attendance' => 'getChildAttendance',
+            'get_child_convocations' => 'getChildConvocations',
+            'get_child_messages' => 'getChildConvocations',
+            'get_child_homework' => 'getChildHomework',
+        ];
+        $teacherMethods = [
+            'get_my_classes' => 'getMyClasses',
+            'get_my_teaching_assignments' => 'getMyTeachingAssignments',
+            'get_class_students' => 'getTeacherClassStudents',
+            'get_class_attendance' => 'getTeacherClassAttendance',
+            'get_class_information' => 'getTeacherClassInformation',
+        ];
+        $encadreurMethods = [
+            'get_my_classes' => 'getMyClasses',
+            'get_class_students' => 'getTeacherClassStudents',
+            'get_class_attendance' => 'getTeacherClassAttendance',
+            'get_class_information' => 'getTeacherClassInformation',
+        ];
+        if (isset($parentMethods[$toolName])) {
+            if ($context['role'] !== 'parent') {
+                throw new InvalidArgumentException('This AI tool is not authorized for this account.');
+            }
+
+            return $this->{$parentMethods[$toolName]}($context, $arguments);
+        }
+
+        if ($context['role'] === 'encadreur' && isset($encadreurMethods[$toolName])) {
+            return $this->{$encadreurMethods[$toolName]}($context, $arguments);
+        }
+
+        if (isset($teacherMethods[$toolName])) {
+            if ($context['role'] !== 'enseignant') {
+                throw new InvalidArgumentException('This AI tool is not authorized for this account.');
+            }
+
+            return $this->{$teacherMethods[$toolName]}($context, $arguments);
+        }
+
         if (!isset($methods[$toolName])) {
             throw new InvalidArgumentException('Unsupported AI tool.');
         }
 
+        if (!in_array($context['role'], ['principal', 'principal_encadreur', 'administrateur', 'admin'], true)) {
+            throw new InvalidArgumentException('This AI tool is not authorized for this account.');
+        }
+
         return $this->{$methods[$toolName]}($context['school_code'], $arguments);
+    }
+
+    private function logToolCall(User $user, string $toolName, bool $success): void
+    {
+        $context = [
+            'user_code' => (string) $user->code,
+            'account_type' => (string) ($user->account_type ?? ''),
+            'tool_name' => $toolName,
+            'timestamp' => now()->toIso8601String(),
+            'success' => $success,
+        ];
+
+        if ($success) {
+            Log::info('Mobischo AI read-only tool completed.', $context);
+            return;
+        }
+
+        Log::warning('Mobischo AI read-only tool failed.', $context);
     }
 
     private function declaration(string $name, string $description, array $properties, array $required = []): array
@@ -626,6 +784,395 @@ class AiReadOnlyToolService
             'daily_sessions' => array_slice($dailySessions, 0, self::MAX_SESSIONS),
             'daily_sessions_truncated' => count($dailySessions) > self::MAX_SESSIONS,
         ];
+    }
+
+    private function getMyChildren(array $context, array $arguments): array
+    {
+        $this->validateArguments($arguments, []);
+        $rows = DB::table('eleves as e')
+            ->leftJoin('classes as cl', 'cl.CodeClasse', '=', 'e.CodeClasse')
+            ->where('e.code', $context['parent_code'])
+            ->select('e.CodeEleve', 'e.Nom', 'e.Prenom', 'e.CodeClasse', 'cl.LibelleClasse')
+            ->orderBy('e.Nom')
+            ->orderBy('e.Prenom')
+            ->limit(self::MAX_STUDENTS + 1)
+            ->get();
+
+        return [
+            'children' => $rows->take(self::MAX_STUDENTS)->map(fn ($row) => [
+                'CodeEleve' => (string) $row->CodeEleve,
+                'name' => trim((string) ($row->Nom ?? '').' '.(string) ($row->Prenom ?? '')),
+                'CodeClasse' => (string) ($row->CodeClasse ?? ''),
+                'className' => (string) ($row->LibelleClasse ?? ''),
+            ])->values()->all(),
+            'returned' => min($rows->count(), self::MAX_STUDENTS),
+            'truncated' => $rows->count() > self::MAX_STUDENTS,
+        ];
+    }
+
+    private function getChildNotes(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
+        $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
+        if (!$child) {
+            return ['found' => false];
+        }
+
+        $rows = DB::table('notes as n')
+            ->join('enseignements as en', function ($join) use ($child) {
+                $join->on('en.CodeEnseignement', '=', 'n.CodeEnseignement')
+                    ->where('en.CodeClasse', '=', $child->CodeClasse)
+                    ->where('en.CodeEtablissement', '=', $child->schoolCode);
+            })
+            ->leftJoin('matieres as m', function ($join) use ($child) {
+                $join->on('m.CodeMatiere', '=', 'en.CodeMatiere')
+                    ->where('m.CodeEtablissement', '=', $child->schoolCode);
+            })
+            ->where('n.CodeEleve', $child->CodeEleve)
+            ->select('n.CodeEvaluation', 'n.valeur', 'n.coef', 'n.Total', 'n.Dateeng', 'n.CodeAnnee', 'en.CodeMatiere', 'm.LibelleMatiere')
+            ->orderByDesc('n.Dateeng')
+            ->limit(101)
+            ->get();
+
+        return [
+            'found' => true,
+            'child' => $this->parentChildProjection($child),
+            'notes' => $rows->take(100)->map(fn ($row) => [
+                'evaluation_code' => (string) $row->CodeEvaluation,
+                'subject' => (string) ($row->LibelleMatiere ?? $row->CodeMatiere ?? ''),
+                'value' => $row->valeur,
+                'coefficient' => $row->coef,
+                'total' => $row->Total,
+                'date' => $row->Dateeng,
+                'school_year' => $row->CodeAnnee,
+            ])->values()->all(),
+            'returned' => min($rows->count(), 100),
+            'truncated' => $rows->count() > 100,
+        ];
+    }
+
+    private function getChildAttendance(array $context, array $arguments): array
+    {
+        $args = $this->parentAttendanceArguments($arguments);
+        $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
+        if (!$child) {
+            return ['found' => false];
+        }
+
+        return $this->getStudentAttendanceSummary($child->schoolCode, [
+            'studentCode' => (string) $child->CodeEleve,
+            'dateFrom' => $args['dateFrom'],
+            'dateTo' => $args['dateTo'],
+        ]);
+    }
+
+    private function getChildAbsences(array $context, array $arguments): array
+    {
+        $attendance = $this->getChildAttendance($context, $arguments);
+        if (!($attendance['found'] ?? false)) {
+            return ['found' => false];
+        }
+
+        $absenceDays = array_values(array_filter($attendance['by_date'], function ($day) {
+            return $day['absent'] > 0 || $day['late'] > 0;
+        }));
+
+        return [
+            'found' => true,
+            'student' => $attendance['student'],
+            'date_from' => $attendance['date_from'],
+            'date_to' => $attendance['date_to'],
+            'totals' => [
+                'absent' => $attendance['attendance']['absent'],
+                'late' => $attendance['attendance']['late'],
+            ],
+            'by_date' => $absenceDays,
+        ];
+    }
+
+    private function getChildConvocations(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
+        $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
+        if (!$child) {
+            return ['found' => false];
+        }
+
+        $rows = DB::table('convocations as cv')
+            ->leftJoin('enseignements as en', function ($join) use ($child) {
+                $join->on('en.CodeEnseignement', '=', 'cv.CodeEnseignement')
+                    ->where('en.CodeClasse', '=', $child->CodeClasse)
+                    ->where('en.CodeEtablissement', '=', $child->schoolCode);
+            })
+            ->leftJoin('matieres as m', function ($join) use ($child) {
+                $join->on('m.CodeMatiere', '=', 'en.CodeMatiere')
+                    ->where('m.CodeEtablissement', '=', $child->schoolCode);
+            })
+            ->where('cv.CodeEleve', $child->CodeEleve)
+            ->select('cv.motif', 'cv.description', 'cv.dateConvocation', 'en.CodeMatiere', 'm.LibelleMatiere')
+            ->orderByDesc('cv.dateConvocation')
+            ->limit(101)
+            ->get();
+
+        return [
+            'found' => true,
+            'child' => $this->parentChildProjection($child),
+            'convocations' => $rows->take(100)->map(fn ($row) => [
+                'reason' => $row->motif,
+                'description' => $row->description,
+                'date' => $row->dateConvocation,
+                'subject' => (string) ($row->LibelleMatiere ?? $row->CodeMatiere ?? ''),
+            ])->values()->all(),
+            'returned' => min($rows->count(), 100),
+            'truncated' => $rows->count() > 100,
+        ];
+    }
+
+    private function getChildHomework(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
+        $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
+        if (!$child) {
+            return ['found' => false];
+        }
+
+        $rows = DB::table('devoirs as d')
+            ->leftJoin('matieres as m', function ($join) use ($child) {
+                $join->on('m.CodeMatiere', '=', 'd.CodeMatiere')
+                    ->where('m.CodeEtablissement', '=', $child->schoolCode);
+            })
+            ->where('d.CodeClasse', $child->CodeClasse)
+            ->where(function ($query) use ($child) {
+                $query->where('d.CodeEtablissement', $child->schoolCode)
+                    ->orWhereNull('d.CodeEtablissement')
+                    ->orWhere('d.CodeEtablissement', '');
+            })
+            ->select('d.titre', 'd.description', 'd.dateDuDevoir', 'd.CodeMatiere', 'm.LibelleMatiere')
+            ->orderByDesc('d.dateDuDevoir')
+            ->limit(101)
+            ->get();
+
+        return [
+            'found' => true,
+            'child' => $this->parentChildProjection($child),
+            'homework' => $rows->take(100)->map(fn ($row) => [
+                'title' => $row->titre,
+                'description' => $row->description,
+                'date' => $row->dateDuDevoir,
+                'subject' => (string) ($row->LibelleMatiere ?? $row->CodeMatiere ?? ''),
+            ])->values()->all(),
+            'returned' => min($rows->count(), 100),
+            'truncated' => $rows->count() > 100,
+        ];
+    }
+
+    private function parentAttendanceArguments(array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, [
+            'childCode' => 'required|string|max:80',
+            'dateFrom' => 'required|date_format:Y-m-d',
+            'dateTo' => 'required|date_format:Y-m-d|after_or_equal:dateFrom',
+        ]);
+        $this->validateDateRange($args['dateFrom'], $args['dateTo']);
+
+        return $args;
+    }
+
+    private function parentOwnedChild(string $parentCode, string $childCode)
+    {
+        return DB::table('eleves as e')
+            ->join('classes as cl', 'cl.CodeClasse', '=', 'e.CodeClasse')
+            ->where('e.code', $parentCode)
+            ->where('e.CodeEleve', $childCode)
+            ->select('e.CodeEleve', 'e.Nom', 'e.Prenom', 'e.CodeClasse', 'cl.LibelleClasse', 'cl.CodeEtablissement as schoolCode')
+            ->first();
+    }
+
+    private function parentChildProjection($child): array
+    {
+        return [
+            'CodeEleve' => (string) $child->CodeEleve,
+            'name' => trim((string) ($child->Nom ?? '').' '.(string) ($child->Prenom ?? '')),
+            'CodeClasse' => (string) $child->CodeClasse,
+            'className' => (string) ($child->LibelleClasse ?? ''),
+        ];
+    }
+
+    private function getMyClasses(array $context, array $arguments): array
+    {
+        $this->validateArguments($arguments, []);
+        if ($context['role'] === 'encadreur') {
+            $classCodes = app(EncadreurClassScope::class)
+                ->assignedClassCodesForEncadreur($context['user']);
+            $rows = empty($classCodes)
+                ? collect()
+                : DB::table('classes')
+                    ->where('CodeEtablissement', $context['school_code'])
+                    ->whereIn('CodeClasse', $classCodes)
+                    ->select('CodeClasse', 'LibelleClasse')
+                    ->orderBy('LibelleClasse')
+                    ->limit(101)
+                    ->get();
+
+            return [
+                'classes' => $rows->take(100)->map(fn ($row) => [
+                    'CodeClasse' => (string) $row->CodeClasse,
+                    'LibelleClasse' => (string) $row->LibelleClasse,
+                ])->values()->all(),
+                'returned' => min($rows->count(), 100),
+                'truncated' => $rows->count() > 100,
+            ];
+        }
+
+        $rows = DB::table('enseignements as en')
+            ->join('classes as cl', function ($join) {
+                $join->on('cl.CodeClasse', '=', 'en.CodeClasse')
+                    ->on('cl.CodeEtablissement', '=', 'en.CodeEtablissement');
+            })
+            ->where('en.CodeEtablissement', $context['school_code'])
+            ->where(function ($query) use ($context) {
+                $query->where('en.code', $context['teacher_code'])
+                    ->orWhere('en.CodeEnseignant2', $context['teacher_code']);
+            })
+            ->select('cl.CodeClasse', 'cl.LibelleClasse')
+            ->distinct()
+            ->orderBy('cl.LibelleClasse')
+            ->limit(101)
+            ->get();
+
+        return [
+            'classes' => $rows->take(100)->map(fn ($row) => [
+                'CodeClasse' => (string) $row->CodeClasse,
+                'LibelleClasse' => (string) $row->LibelleClasse,
+            ])->values()->all(),
+            'returned' => min($rows->count(), 100),
+            'truncated' => $rows->count() > 100,
+        ];
+    }
+
+    private function getMyTeachingAssignments(array $context, array $arguments): array
+    {
+        $this->validateArguments($arguments, []);
+        $rows = DB::table('enseignements as en')
+            ->join('classes as cl', function ($join) {
+                $join->on('cl.CodeClasse', '=', 'en.CodeClasse')
+                    ->on('cl.CodeEtablissement', '=', 'en.CodeEtablissement');
+            })
+            ->leftJoin('matieres as m', function ($join) {
+                $join->on('m.CodeMatiere', '=', 'en.CodeMatiere')
+                    ->on('m.CodeEtablissement', '=', 'en.CodeEtablissement');
+            })
+            ->where('en.CodeEtablissement', $context['school_code'])
+            ->where(function ($query) use ($context) {
+                $query->where('en.code', $context['teacher_code'])
+                    ->orWhere('en.CodeEnseignant2', $context['teacher_code']);
+            })
+            ->select('en.CodeEnseignement', 'en.CodeClasse', 'cl.LibelleClasse', 'en.CodeMatiere', 'm.LibelleMatiere')
+            ->orderBy('cl.LibelleClasse')
+            ->orderBy('m.LibelleMatiere')
+            ->limit(101)
+            ->get();
+
+        return [
+            'assignments' => $rows->take(100)->map(fn ($row) => [
+                'CodeEnseignement' => (string) $row->CodeEnseignement,
+                'CodeClasse' => (string) $row->CodeClasse,
+                'className' => (string) $row->LibelleClasse,
+                'CodeMatiere' => (string) $row->CodeMatiere,
+                'subject' => (string) ($row->LibelleMatiere ?? ''),
+            ])->values()->all(),
+            'returned' => min($rows->count(), 100),
+            'truncated' => $rows->count() > 100,
+        ];
+    }
+
+    private function getTeacherClassStudents(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, ['classCode' => 'required|string|max:80']);
+        $class = $this->requireAssignedClass($context, $args['classCode']);
+        $rows = $this->studentQuery($context['school_code'])
+            ->where('e.CodeClasse', $class->CodeClasse)
+            ->orderBy('e.Nom')
+            ->orderBy('e.Prenom')
+            ->limit(self::MAX_ROSTER + 1)
+            ->get();
+
+        return [
+            'class' => ['CodeClasse' => $class->CodeClasse, 'LibelleClasse' => $class->LibelleClasse],
+            'students' => $rows->take(self::MAX_ROSTER)->map(fn ($row) => $this->studentProjection($row))->values()->all(),
+            'returned' => min($rows->count(), self::MAX_ROSTER),
+            'truncated' => $rows->count() > self::MAX_ROSTER,
+        ];
+    }
+
+    private function getTeacherClassAttendance(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, [
+            'classCode' => 'required|string|max:80',
+            'dateFrom' => 'required|date_format:Y-m-d',
+            'dateTo' => 'required|date_format:Y-m-d|after_or_equal:dateFrom',
+        ]);
+        $this->validateDateRange($args['dateFrom'], $args['dateTo']);
+        $class = $this->requireAssignedClass($context, $args['classCode']);
+        $filters = ['classCode' => $class->CodeClasse];
+        if ($context['role'] === 'enseignant') {
+            $filters['teacherCode'] = $context['teacher_code'];
+        }
+        $latestIds = $this->latestAttendanceIds(
+            $context['school_code'],
+            $args['dateFrom'],
+            $args['dateTo'],
+            $filters
+        );
+        $sessions = $this->attendanceSessionRows(
+            $context['school_code'],
+            $args['dateFrom'],
+            $args['dateTo'],
+            $filters,
+            self::MAX_SESSIONS + 1
+        );
+
+        return [
+            'class' => ['CodeClasse' => $class->CodeClasse, 'LibelleClasse' => $class->LibelleClasse],
+            'date_from' => $args['dateFrom'],
+            'date_to' => $args['dateTo'],
+            'attendance' => $this->attendanceTotals($latestIds),
+            'sessions' => array_slice($sessions, 0, self::MAX_SESSIONS),
+            'sessions_truncated' => count($sessions) > self::MAX_SESSIONS,
+        ];
+    }
+
+    private function getTeacherClassInformation(array $context, array $arguments): array
+    {
+        $args = $this->validateArguments($arguments, ['classCode' => 'required|string|max:80']);
+        $class = $this->requireAssignedClass($context, $args['classCode']);
+
+        return $this->getClassSummary($context['school_code'], ['classCode' => $class->CodeClasse]);
+    }
+
+    private function requireAssignedClass(array $context, string $classCode)
+    {
+        if ($context['role'] === 'encadreur') {
+            $assigned = app(EncadreurClassScope::class)
+                ->ensureClassAccessForEncadreur($context['user'], $classCode);
+        } else {
+            $assigned = DB::table('enseignements')
+                ->where('CodeClasse', $classCode)
+                ->where('CodeEtablissement', $context['school_code'])
+                ->where(function ($query) use ($context) {
+                    $query->where('code', $context['teacher_code'])
+                        ->orWhere('CodeEnseignant2', $context['teacher_code']);
+                })
+                ->exists();
+        }
+
+        if (!$assigned) {
+            throw ValidationException::withMessages([
+                'classCode' => 'Class is outside the authenticated teacher assignments.',
+            ]);
+        }
+
+        return $this->requireClass($context['school_code'], $classCode);
     }
 
     private function studentQuery(string $schoolCode): Builder

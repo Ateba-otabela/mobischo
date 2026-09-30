@@ -105,7 +105,9 @@ class MobileAuthTest extends TestCase
 
         $this->assertNotNull($storedToken);
         $this->assertTrue($storedToken->can('mobischo:mobile'));
-        $this->assertFalse($storedToken->can('ai:chat'));
+        $aiToken = PersonalAccessToken::findToken($payload[0]['ai_token']);
+        $this->assertNotNull($aiToken);
+        $this->assertTrue($aiToken->can('ai:chat'));
 
         $this->assertDatabaseHas('personal_access_tokens', [
             'name' => 'mobischo-mobile',
@@ -140,6 +142,14 @@ class MobileAuthTest extends TestCase
             'password' => bcrypt('secret-admin'),
             'CodeEtablissement' => 'school-a',
         ]);
+        $this->createUser([
+            'code' => 'encadreur-001',
+            'login' => 'encadreur.demo',
+            'account_type' => 'encadreur',
+            'text_password' => 'secret-encadreur',
+            'password' => bcrypt('secret-encadreur'),
+            'CodeEtablissement' => 'school-a',
+        ]);
 
         $teacherResponse = $this->postJson('/api/mobile/login', [
             'action' => 'LOGIN',
@@ -150,6 +160,9 @@ class MobileAuthTest extends TestCase
         $teacherToken = PersonalAccessToken::findToken($teacherResponse->json('0.token'));
         $this->assertNotNull($teacherToken);
         $this->assertTrue($teacherToken->can('mobischo:mobile'));
+        $teacherAiToken = PersonalAccessToken::findToken($teacherResponse->json('0.ai_token'));
+        $this->assertNotNull($teacherAiToken);
+        $this->assertTrue($teacherAiToken->can('ai:chat'));
 
         $principalResponse = $this->postJson('/api/mobile/login', [
             'action' => 'LOGIN',
@@ -173,6 +186,42 @@ class MobileAuthTest extends TestCase
         $adminToken = PersonalAccessToken::findToken($adminResponse->json('0.token'));
         $this->assertNotNull($adminToken);
         $this->assertTrue($adminToken->can('mobischo:mobile'));
+        $adminAiToken = PersonalAccessToken::findToken($adminResponse->json('0.ai_token'));
+        $this->assertNotNull($adminAiToken);
+        $this->assertTrue($adminAiToken->can('ai:chat'));
+
+        $encadreurResponse = $this->postJson('/api/mobile/login', [
+            'action' => 'LOGIN',
+            'login' => 'encadreur.demo',
+            'text_password' => 'secret-encadreur',
+        ]);
+        $encadreurResponse->assertOk();
+        $encadreurAiToken = PersonalAccessToken::findToken($encadreurResponse->json('0.ai_token'));
+        $this->assertNotNull($encadreurAiToken);
+        $this->assertTrue($encadreurAiToken->can('ai:chat'));
+    }
+
+    public function test_legacy_admin_flag_gets_only_school_scoped_ai_token(): void
+    {
+        $this->createUser([
+            'code' => 'legacy-admin-001',
+            'login' => 'legacy.admin',
+            'account_type' => 'parent',
+            'admin' => true,
+            'text_password' => 'secret-admin-flag',
+            'password' => bcrypt('secret-admin-flag'),
+            'CodeEtablissement' => 'school-a',
+        ]);
+
+        $response = $this->postJson('/api/mobile/login', [
+            'action' => 'LOGIN',
+            'login' => 'legacy.admin',
+            'text_password' => 'secret-admin-flag',
+        ])->assertOk();
+
+        $aiToken = PersonalAccessToken::findToken($response->json('0.ai_token'));
+        $this->assertNotNull($aiToken);
+        $this->assertTrue($aiToken->can('ai:chat'));
     }
 
     public function test_logout_revokes_current_token_and_requires_authentication(): void

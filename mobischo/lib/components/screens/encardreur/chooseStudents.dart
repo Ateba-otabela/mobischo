@@ -162,7 +162,12 @@ class _ChooseStudentsState extends State<ChooseStudents> {
   bool? checkAll = false;
 
   void _continueToCreate(BuildContext context) {
-    if (students.isEmpty) {
+    final selectedStudents = student_list
+        .where((student) => student['isSelected'] == true)
+        .map((student) => Map<String, dynamic>.from(student))
+        .toList();
+
+    if (selectedStudents.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sélectionnez au moins un élève.')),
       );
@@ -170,7 +175,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
     }
 
     if (widget.onCreate != null) {
-      widget.onCreate!(context, List<Map>.from(students));
+      widget.onCreate!(context, selectedStudents);
       return;
     }
 
@@ -179,7 +184,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
       MaterialPageRoute(
         builder: (_) => CreateEncardreurConvocation(
           user: widget.user,
-          students: students,
+          students: selectedStudents,
           classe: widget.classe,
         ),
       ),

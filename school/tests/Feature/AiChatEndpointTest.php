@@ -77,10 +77,79 @@ class AiChatEndpointTest extends TestCase
         $this->deleteJson('/api/ai/conversations/1')->assertUnauthorized();
     }
 
-    public function test_non_principal_users_cannot_use_the_ai_gateway(): void
+    public function test_parent_and_teacher_can_use_the_ai_gateway(): void
     {
-        $user = $this->principal('test-parent')->forceFill([
+        config([
+            'services.google_ai.api_key' => 'test-only-key',
+            'services.google_ai.model' => 'test-model',
+        ]);
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => 'Bonjour']]],
+                ]],
+            ], 200),
+        ]);
+
+        foreach ([['parent', 'test-parent'], ['enseignant', 'test-teacher']] as [$role, $code]) {
+            $user = $this->principal($code)->forceFill(['account_type' => $role]);
+            Sanctum::actingAs($user, ['ai:chat']);
+
+            $this->postJson('/api/ai/chat', ['message' => 'Bonjour'])
+                ->assertOk()
+                ->assertJson(['success' => true, 'message' => 'Bonjour']);
+        }
+    }
+
+    public function test_navigation_only_question_uses_confirmed_parent_path_without_calling_gemini(): void
+    {
+        $parent = $this->principal('test-parent-navigation')->forceFill([
             'account_type' => 'parent',
+        ]);
+        Sanctum::actingAs($parent, ['ai:chat']);
+        Http::fake();
+
+        $this->postJson('/api/ai/chat', [
+            'message' => 'Où voir les absences de mon enfant ?',
+        ])->assertOk()->assertJson([
+            'success' => true,
+            'message' => 'Depuis le tableau de bord parent, ouvrez RETARD ET ABSENCE.',
+        ]);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_navigation_answers_are_role_specific_for_parent_teacher_encadreur_principal_and_admin(): void
+    {
+        Http::fake();
+        $cases = [
+            ['parent', '0', 'Où trouver les notes de mon enfant ?', 'Ouvrez NOTES depuis le tableau de bord parent'],
+            ['enseignant', '0', 'Where can I see attendance?', "Ouvrez REGISTRE D'APPEL"],
+            ['encadreur', '0', 'Where do I find class information?', 'Ouvrez Classes dans la navigation principale'],
+            ['principal', '0', 'Where can I find my classes?', 'Ouvrez Classes dans la navigation principale'],
+            ['parent', '1', 'Where do I find users?', 'Ouvrez UTILISATEURS'],
+        ];
+
+        foreach ($cases as $index => [$role, $admin, $question, $expected]) {
+            $user = $this->principal('navigation-user-'.$index)->forceFill([
+                'account_type' => $role,
+                'admin' => $admin,
+            ]);
+            Sanctum::actingAs($user, ['ai:chat']);
+
+            $response = $this->postJson('/api/ai/chat', ['message' => $question]);
+            $this->assertSame(200, $response->status(), $role.' admin='.$admin.' response='.$response->getContent());
+            $response->assertJsonPath('success', true);
+            $this->assertStringContainsString($expected, $response->json('message'));
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_unknown_account_type_cannot_use_the_ai_gateway(): void
+    {
+        $user = $this->principal('test-unknown')->forceFill([
+            'account_type' => 'surveillant_general',
         ]);
         Sanctum::actingAs($user, ['ai:chat']);
         Http::fake();

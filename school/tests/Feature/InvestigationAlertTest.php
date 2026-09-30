@@ -24,6 +24,165 @@ class InvestigationAlertTest extends TestCase
         $this->artisan('migrate:fresh', ['--seed' => false]);
     }
 
+    private function createJustificationParent(string $parentCode, string $login): User
+    {
+        return User::create([
+            'code' => $parentCode,
+            'nom' => 'Parent',
+            'prenom' => $parentCode,
+            'sex' => 'F',
+            'login' => $login,
+            'contacts' => '222',
+            'password' => bcrypt('secret'),
+            'account_type' => 'parent',
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+    }
+
+    private function createJustificationStudent(string $studentCode, string $parentCode, string $classCode = 'CL-JUST'): Eleve
+    {
+        Classe::firstOrCreate([
+            'CodeClasse' => $classCode,
+        ], [
+            'CodeTypeClasse' => 'TYPE',
+            'LibelleClasse' => 'Classe Justification',
+            'CodeCycle' => 'CYCLE',
+            'CodeSpecialite' => 'SPEC',
+            'codetypeinscrip' => 'INS',
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+
+        return Eleve::create([
+            'CodeEleve' => $studentCode,
+            'CodeAnnee' => 'AN-1',
+            'CodeClasse' => $classCode,
+            'dateinscription' => '2024-09-01',
+            'Nom' => 'Student',
+            'Prenom' => $studentCode,
+            'Sex' => 'F',
+            'code' => $parentCode,
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+    }
+
+    private function submitJustification(string $parentCode, string $studentCode, array $overrides = [])
+    {
+        return $this->postJson('/api/school_manager', array_merge([
+            'action' => 'SUBMIT_ABSENCE_JUSTIFICATION',
+            'code' => $parentCode,
+            'CodeEleve' => $studentCode,
+            'date_absence' => '2026-09-30',
+            'motif' => 'Maladie',
+            'justification' => 'Le parent signale une absence.',
+            'piece_jointe' => '',
+        ], $overrides));
+    }
+
+    public function test_parent_can_submit_justification_for_own_child_and_default_status_is_pending(): void
+    {
+        $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
+
+        $response = $this->submitJustification('P-JUST-1', 'E-JUST-1');
+
+        $response->assertOk()->assertJsonPath('status', 'success');
+        $justificationId = $response->json('id');
+        $this->assertNotNull($justificationId);
+        $this->assertDatabaseHas('absence_justifications', [
+            'id' => $justificationId,
+            'parent_code' => 'P-JUST-1',
+            'CodeEleve' => 'E-JUST-1',
+            'date_absence' => '2026-09-30',
+            'motif' => 'Maladie',
+            'justification' => 'Le parent signale une absence.',
+            'statut' => 'En attente',
+        ]);
+    }
+
+    public function test_parent_cannot_submit_justification_for_another_parents_child(): void
+    {
+        $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationParent('P-JUST-2', 'parent-just-2');
+        $this->createJustificationStudent('E-JUST-2', 'P-JUST-2');
+
+        $this->submitJustification('P-JUST-1', 'E-JUST-2')
+            ->assertForbidden()
+            ->assertJson(['error' => 'Élève non autorisé.']);
+
+        $this->assertDatabaseCount('absence_justifications', 0);
+    }
+
+    public function test_parent_justification_rejects_invalid_date_and_missing_required_fields(): void
+    {
+        $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
+
+        $this->submitJustification('P-JUST-1', 'E-JUST-1', [
+            'date_absence' => '30/09/2026',
+        ])->assertUnprocessable()->assertJson([
+            'error' => 'La date d’absence est invalide.',
+        ]);
+
+        $this->submitJustification('P-JUST-1', 'E-JUST-1', [
+            'motif' => '',
+        ])->assertUnprocessable()->assertJson([
+            'error' => 'Les champs de justification sont obligatoires.',
+        ]);
+
+        $this->assertDatabaseCount('absence_justifications', 0);
+    }
+
+    public function test_parent_history_contains_own_existing_and_new_submissions_only(): void
+    {
+        $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationParent('P-JUST-2', 'parent-just-2');
+        $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
+        $this->createJustificationStudent('E-JUST-2', 'P-JUST-2');
+
+        AbsenceJustification::create([
+            'parent_code' => 'P-JUST-1',
+            'CodeEleve' => 'E-JUST-1',
+            'date_absence' => '2026-09-29',
+            'motif' => 'Rendez-vous',
+            'justification' => 'Ancienne justification.',
+            'statut' => 'validée',
+        ]);
+        AbsenceJustification::create([
+            'parent_code' => 'P-JUST-2',
+            'CodeEleve' => 'E-JUST-2',
+            'date_absence' => '2026-09-30',
+            'motif' => 'Maladie',
+            'justification' => 'Autre parent.',
+            'statut' => 'En attente',
+        ]);
+        AbsenceJustification::create([
+            'parent_code' => 'P-JUST-2',
+            'CodeEleve' => 'E-JUST-1',
+            'date_absence' => '2026-09-28',
+            'motif' => 'Maladie',
+            'justification' => 'Ancien parent lié à cet enfant.',
+            'statut' => 'En attente',
+        ]);
+
+        $submitted = $this->submitJustification('P-JUST-1', 'E-JUST-1');
+        $submitted->assertOk()->assertJsonPath('status', 'success');
+
+        $history = $this->postJson('/api/school_manager', [
+            'action' => 'GET_PARENT_ABSENCE_JUSTIFICATIONS',
+            'code' => 'P-JUST-1',
+        ])->assertOk();
+
+        $this->assertCount(2, $history->json());
+        $this->assertSame(
+            ['E-JUST-1', 'E-JUST-1'],
+            array_column($history->json(), 'CodeEleve')
+        );
+        $this->assertSame(
+            ['En attente', 'validée'],
+            array_column($history->json(), 'statut')
+        );
+    }
+
     public function test_parent_absent_and_teacher_present_creates_investigation_alert(): void
     {
         $teacher = User::create([

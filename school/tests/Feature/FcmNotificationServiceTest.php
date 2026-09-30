@@ -274,6 +274,10 @@ class FcmNotificationServiceTest extends TestCase
         $this->assertSame(1, $summary['succeeded']);
         $this->assertSame(1, $summary['failed']);
         $this->assertSame(1, $summary['invalidated']);
+        $this->assertSame('partial', $summary['status']);
+        $this->assertSame('invalid_token', $summary['errors'][0]['status']);
+        $this->assertSame('INVALID_ARGUMENT', $summary['errors'][0]['firebase_status']);
+        $this->assertStringNotContainsString('invalid-token-2', $summary['errors'][0]['message']);
 
         $this->assertDatabaseHas('user_devices', [
             'user_code' => 'student-001',
@@ -286,6 +290,57 @@ class FcmNotificationServiceTest extends TestCase
     {
         $this->postJson('/api/notifications/test', ['user_code' => '672320608'])
             ->assertUnauthorized();
+    }
+
+    public function test_notification_diagnostic_route_returns_sanitized_delivery_result(): void
+    {
+        $user = User::forceCreate([
+            'code' => 'diagnostic-admin',
+            'account_type' => 'administrateur',
+            'admin' => true,
+            'nom' => 'Diagnostic',
+            'prenom' => 'Admin',
+        ]);
+
+        UserDevice::query()->create([
+            'user_code' => '672320608',
+            'fcm_token' => 'diagnostic-device-token',
+            'token_hash' => hash('sha256', 'diagnostic-device-token'),
+            'platform' => 'android',
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'access-token-123',
+                'token_type' => 'Bearer',
+                'expires_in' => 3600,
+            ], 200),
+            'https://fcm.googleapis.com/v1/projects/mobischo-8f908/messages:send' => Http::response([
+                'error' => [
+                    'status' => 'INVALID_ARGUMENT',
+                    'message' => 'The registration token is not valid.',
+                ],
+            ], 400),
+        ]);
+
+        Sanctum::actingAs($user, ['mobischo:mobile']);
+
+        $response = $this->getJson('/api/notification-diagnostic')
+            ->assertOk()
+            ->assertJsonPath('status', 'rejected')
+            ->assertJsonPath('attempted', 1)
+            ->assertJsonPath('succeeded', 0)
+            ->assertJsonPath('failed', 1)
+            ->assertJsonPath('invalidated', 1)
+            ->assertJsonPath('errors.0.firebase_status', 'INVALID_ARGUMENT');
+
+        $this->assertSame(
+            ['status', 'attempted', 'succeeded', 'failed', 'invalidated', 'errors'],
+            array_keys($response->json())
+        );
+        $this->assertStringNotContainsString('diagnostic-device-token', $response->getContent());
+        $this->assertStringNotContainsString('access-token-123', $response->getContent());
     }
 
     public function test_protected_test_endpoint_sends_notice_to_target_user_code(): void

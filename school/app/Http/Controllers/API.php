@@ -22,6 +22,7 @@ use App\Models\HistoriqueInscription;
 use App\Models\AbsenceJustification;
 use App\Models\InvestigationAlert;
 use App\Services\EncadreurClassScope;
+use App\Services\NotificationDispatchService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
@@ -82,7 +83,7 @@ class API extends Controller
             ->plainTextToken;
 
         $aiToken = null;
-        if ($this->isPrincipalUser($user)) {
+        if ((new \App\Services\PrincipalContextService())->canUseAi($user)) {
             $aiToken = $user->createToken('mobischo-principal-ai', ['ai:chat'])
                 ->plainTextToken;
         }
@@ -157,13 +158,21 @@ class API extends Controller
                 'statut' => 'En attente',
             ]);
 
+            $student = Eleve::query()->where('CodeEleve', $studentCode)->first();
+            if ($student) {
+                $schoolCode = trim((string) ((User::where('code', '=', $parentCode)->value('CodeEtablissement')) ?? ''));
+                $dispatcher = new NotificationDispatchService();
+                $dispatcher->dispatchAbsenceJustificationNotification($studentCode, $parentCode, ['school_code' => $schoolCode]);
+            }
+
             return response()->json(['status' => 'success', 'id' => $justification->id]);
         }
 
         if ($action == 'GET_PARENT_ABSENCE_JUSTIFICATIONS') {
             $parentCode = trim((string) $request->input('code', ''));
             $studentCodes = Eleve::where('code', $parentCode)->pluck('CodeEleve');
-            return AbsenceJustification::whereIn('CodeEleve', $studentCodes)
+            return AbsenceJustification::where('parent_code', '=', $parentCode)
+                ->whereIn('CodeEleve', $studentCodes)
                 ->orderBy('date_absence', 'DESC')
                 ->orderBy('created_at', 'DESC')
                 ->get();
@@ -845,27 +854,54 @@ class API extends Controller
                 return response()->json(['error' => 'La date de convocation est invalide.'], 422);
             }
 
-            $teacher = User::where('code', '=', $code)
-                ->where('account_type', '=', 'enseignant')
-                ->first();
-            if (!$teacher) {
+            $creator = User::where('code', '=', $code)->first();
+            $accountType = strtolower(trim((string) ($creator->account_type ?? '')));
+            $isTeacher = $creator && $accountType === 'enseignant';
+            $hasSchoolWideConvocationAccess = $creator && (
+                (bool) $creator->admin
+                || in_array($accountType, ['principal', 'principal_encadreur', 'administrateur'], true)
+            );
+
+            if (!$isTeacher && !$hasSchoolWideConvocationAccess) {
                 return response()->json(['error' => 'Enseignant non autorisé.'], 403);
             }
 
-            $enseignement = Enseignement::where('CodeEnseignement', '=', $codeEnseignement)
-                ->where(function ($query) use ($code) {
+            $schoolCode = trim((string) ($creator->CodeEtablissement ?? ''));
+            $enseignementQuery = Enseignement::where('CodeEnseignement', '=', $codeEnseignement);
+            if ($isTeacher) {
+                $enseignementQuery->where(function ($query) use ($code) {
                     $query->where('code', '=', $code)
                         ->orWhere('CodeEnseignant2', '=', $code);
-                })
-                ->first();
+                });
+            } else {
+                if ($schoolCode === '') {
+                    return response()->json(['error' => 'Établissement non autorisé.'], 403);
+                }
+
+                $enseignementQuery->where('CodeEtablissement', '=', $schoolCode);
+                if ($codeClasse !== '') {
+                    $enseignementQuery->where('CodeClasse', '=', $codeClasse);
+                }
+            }
+            $enseignement = $enseignementQuery->first();
             if (!$enseignement) {
-                return response()->json(['error' => 'Cette matière ne fait pas partie de vos classes.'], 403);
+                return response()->json([
+                    'error' => $isTeacher
+                        ? 'Cette matière ne fait pas partie de vos classes.'
+                        : 'Cette matière n’appartient pas à votre établissement.',
+                ], 403);
             }
 
             if ($codeClasse === '') {
                 $codeClasse = (string) $enseignement->CodeClasse;
             }
             if ((string) $enseignement->CodeClasse !== $codeClasse) {
+                return response()->json(['error' => 'La classe sélectionnée n’est pas autorisée.'], 403);
+            }
+
+            if (!$isTeacher && !Classe::where('CodeClasse', '=', $codeClasse)
+                ->where('CodeEtablissement', '=', $schoolCode)
+                ->exists()) {
                 return response()->json(['error' => 'La classe sélectionnée n’est pas autorisée.'], 403);
             }
 
@@ -899,6 +935,14 @@ class API extends Controller
                 }
                 return $created;
             });
+
+            $schoolCode = trim((string) (($creator->CodeEtablissement ?? '') ?: ($enseignement->CodeEtablissement ?? '')));
+            $dispatcher = new NotificationDispatchService();
+            $dispatcher->dispatchConvocationNotification(
+                array_map(fn ($student) => (string) $student->CodeEleve, $students->all()),
+                $code,
+                ['school_code' => $schoolCode, 'class_code' => $codeClasse]
+            );
 
             return response()->json(['status' => 'success']);
         }
@@ -1183,6 +1227,17 @@ class API extends Controller
                 'CodeEtablissement' => $course->CodeEtablissement,
             ]);
 
+            $subjectLabel = trim((string) (($course->matiere?->LibelleMatiere ?? $course->CodeMatiere ?? '')));
+            $dispatcher = new NotificationDispatchService();
+            $dispatcher->dispatchHomeworkNotification(
+                (string) $course->CodeClasse,
+                $subjectLabel,
+                $teacherCode,
+                (string) ($course->CodeEtablissement ?? ''),
+                (string) $devoir->id,
+                $titre
+            );
+
             return response()->json($devoir, 201);
         }
 
@@ -1208,6 +1263,20 @@ class API extends Controller
                 $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
             }
 
+            if ($CodeClasse === '') {
+                return response()->json([], 200);
+            }
+
+            $classMatch = Classe::query()->where('CodeClasse', '=', $CodeClasse);
+            if ($schoolCode !== '') {
+                $classMatch->where('CodeEtablissement', '=', $schoolCode);
+            }
+
+            $classForSchool = $classMatch->first();
+            if (!$classForSchool) {
+                return response()->json([], 200);
+            }
+
             if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
                 $encadreurScope = new EncadreurClassScope();
                 if (!$encadreurScope->ensureClassAccessForEncadreur($user, $CodeClasse)) {
@@ -1216,10 +1285,6 @@ class API extends Controller
             }
 
             $studentsQuery = Eleve::query()->where('CodeClasse', '=', $CodeClasse);
-            if ($schoolCode !== '') {
-                $studentsQuery->where('CodeEtablissement', '=', $schoolCode);
-            }
-
             $students = $studentsQuery->orderBy('Nom', 'ASC')->get();
 
             if ($user && strtolower(trim((string) ($user->account_type ?? ''))) === 'encadreur') {
@@ -1366,6 +1431,22 @@ class API extends Controller
                 (string) $request->DateEnreg
             );
 
+            $dispatcher = new NotificationDispatchService();
+            foreach ($statuses as $statusEntry) {
+                $studentCode = (string) ($statusEntry['CodeEleve'] ?? '');
+                $status = (string) ($statusEntry['status'] ?? '');
+                if ($studentCode === '' || $status === '') {
+                    continue;
+                }
+                $dispatcher->dispatchAttendanceNotification(
+                    $studentCode,
+                    (string) $request->DateEnreg,
+                    $status,
+                    (string) $teacherCode,
+                    ['school_code' => (string) ($course->CodeEtablissement ?? ''), 'class_code' => (string) $course->CodeClasse]
+                );
+            }
+
             $this->createInvestigationAlertsForAttendance(
                 $course,
                 $request->DateEnreg,
@@ -1428,6 +1509,22 @@ class API extends Controller
                 $attendanceRecords->pluck('CodeEleve')->all(),
                 $date
             );
+
+            $dispatcher = new NotificationDispatchService();
+            foreach ($records as $record) {
+                $studentCode = (string) ($attendanceRecords->firstWhere('id', (int) ($record['id'] ?? 0))?->CodeEleve ?? '');
+                $status = (string) ($record['status'] ?? '');
+                if ($studentCode === '' || $status === '') {
+                    continue;
+                }
+                $dispatcher->dispatchAttendanceNotification(
+                    $studentCode,
+                    $date,
+                    $status,
+                    (string) $teacherCode,
+                    ['school_code' => (string) ($course->CodeEtablissement ?? ''), 'class_code' => (string) $course->CodeClasse]
+                );
+            }
 
             return response()->json(['status' => 'success']);
         }

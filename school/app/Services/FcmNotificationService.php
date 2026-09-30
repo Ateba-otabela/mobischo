@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\UserDevice;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class FcmNotificationService
 {
@@ -21,22 +23,37 @@ class FcmNotificationService
             ->post($this->getSendUrl(), $payload);
 
         if ($response->successful()) {
+            Log::info('FCM HTTP send succeeded.', [
+                'http_status' => $response->status(),
+                'message_id' => $response->json('name'),
+            ]);
+
             return [
                 'success' => true,
                 'message_id' => $response->json('name'),
                 'status' => 'success',
+                'http_status' => $response->status(),
             ];
         }
 
-        $status = $response->json('error.status') ?? $response->status();
-        $message = (string) ($response->json('error.message') ?? $response->body() ?? 'FCM request failed.');
+        $errorStatus = $response->json('error.status');
+        $status = $errorStatus ?? $response->status();
+        $message = (string) ($response->json('error.message') ?? 'FCM request failed.');
+        $message = $this->sanitizeErrorMessage($message, $fcmToken);
         $invalidToken = $this->isInvalidRegistrationTokenError($status, $message, $response->json('error'));
+
+        Log::warning('FCM HTTP send failed.', [
+            'http_status' => $response->status(),
+            'fcm_error_status' => $errorStatus,
+            'fcm_error_message' => $response->json('error.message'),
+        ]);
 
         return [
             'success' => false,
             'status' => $invalidToken ? 'invalid_token' : 'error',
             'error' => $message,
             'http_status' => $response->status(),
+            'fcm_error_status' => $errorStatus,
         ];
     }
 
@@ -46,6 +63,24 @@ class FcmNotificationService
         string $body,
         array $data = []
     ): array {
+        if (!Schema::hasTable('user_devices')) {
+            Log::warning('FCM delivery skipped because user_devices is unavailable.', [
+                'user_code' => $userCode,
+            ]);
+
+            return [
+                'status' => 'device_registry_unavailable',
+                'attempted' => 0,
+                'succeeded' => 0,
+                'failed' => 0,
+                'invalidated' => 0,
+                'errors' => [[
+                    'status' => 'device_registry_unavailable',
+                    'message' => 'The FCM device registry is unavailable.',
+                ]],
+            ];
+        }
+
         $devices = UserDevice::query()
             ->where('user_code', $userCode)
             ->where('is_active', true)
@@ -56,12 +91,38 @@ class FcmNotificationService
         $succeeded = 0;
         $failed = 0;
         $invalidated = 0;
+        $errors = [];
+
+        Log::info('FCM active devices resolved.', [
+            'user_code' => $userCode,
+            'active_device_count' => $devices->count(),
+        ]);
 
         foreach ($devices as $device) {
             $attempted++;
             $token = (string) $device->fcm_token;
 
-            $result = $this->sendToToken($token, $title, $body, $data);
+            try {
+                $result = $this->sendToToken($token, $title, $body, $data);
+            } catch (\Throwable $exception) {
+                $safeMessage = $this->sanitizeErrorMessage($exception->getMessage(), $token);
+                Log::error('FCM device send threw an exception.', [
+                    'user_code' => $userCode,
+                    'exception' => get_class($exception),
+                    'error' => $safeMessage,
+                ]);
+
+                throw new \RuntimeException($safeMessage, (int) $exception->getCode(), $exception);
+            }
+
+            Log::info('FCM device send result.', [
+                'user_code' => $userCode,
+                'http_status' => $result['http_status'] ?? null,
+                'fcm_status' => $result['fcm_error_status'] ?? $result['status'] ?? null,
+                'fcm_error_message' => isset($result['error']) ? $this->sanitizeErrorMessage((string) $result['error'], $token) : null,
+                'success' => (bool) ($result['success'] ?? false),
+                'message_id' => $result['message_id'] ?? null,
+            ]);
 
             if (($result['success'] ?? false) === true) {
                 $succeeded++;
@@ -69,6 +130,12 @@ class FcmNotificationService
             }
 
             $failed++;
+            $errors[] = [
+                'http_status' => $result['http_status'] ?? null,
+                'status' => $result['status'] ?? 'error',
+                'firebase_status' => $result['fcm_error_status'] ?? null,
+                'message' => $this->sanitizeErrorMessage((string) ($result['error'] ?? 'FCM request failed.'), $token),
+            ];
 
             if (($result['status'] ?? null) === 'invalid_token') {
                 $device->is_active = false;
@@ -78,11 +145,17 @@ class FcmNotificationService
             }
         }
 
+        $status = $attempted === 0
+            ? 'no_active_device'
+            : ($failed === 0 ? 'accepted' : ($succeeded > 0 ? 'partial' : 'rejected'));
+
         return [
+            'status' => $status,
             'attempted' => $attempted,
             'succeeded' => $succeeded,
             'failed' => $failed,
             'invalidated' => $invalidated,
+            'errors' => $errors,
         ];
     }
 
@@ -115,8 +188,15 @@ class FcmNotificationService
             'assertion' => $jwtAssertion,
         ]);
 
+        Log::info('FCM OAuth token response received.', [
+            'http_status' => $response->status(),
+            'success' => $response->successful(),
+            'oauth_error' => $response->json('error'),
+            'oauth_error_description' => $response->json('error_description'),
+        ]);
+
         if ($response->failed()) {
-            $errorMessage = (string) ($response->json('error_description') ?? $response->json('error') ?? $response->body() ?? 'Google OAuth token request failed.');
+            $errorMessage = (string) ($response->json('error_description') ?? $response->json('error') ?? 'Google OAuth token request failed.');
             throw new \RuntimeException('FCM OAuth request failed: ' . $errorMessage);
         }
 
@@ -200,6 +280,16 @@ class FcmNotificationService
             || str_contains($combined, 'registration token is not valid')
             || str_contains($combined, 'unregistered device')
             || str_contains($combined, 'not registered');
+    }
+
+    protected function sanitizeErrorMessage(string $message, string $fcmToken): string
+    {
+        $message = str_replace($fcmToken, '[redacted]', $message);
+        $message = preg_replace('/Bearer\s+\S+/i', 'Bearer [redacted]', $message) ?? $message;
+        $message = preg_replace('/\bya29\.[A-Za-z0-9._~-]+/', '[redacted]', $message) ?? $message;
+        $message = preg_replace('/-----BEGIN [^-]+-----.*?-----END [^-]+-----/s', '[redacted]', $message) ?? $message;
+
+        return substr($message, 0, 500);
     }
 
     protected function getSendUrl(): string

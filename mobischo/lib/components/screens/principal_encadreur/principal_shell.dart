@@ -13,6 +13,7 @@ import 'package:mobischo/services/principal_service.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/welcome.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'principal_mock.dart';
 
 class PrincipalShell extends StatefulWidget {
@@ -33,7 +34,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
 
   final secondaryTitles = const [
     'Rapports des professeurs',
-    'Alertes de présence',
+    'Alertes d’investigation',
     'Appels des professeurs',
     'Convoquer',
   ];
@@ -315,17 +316,16 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
       _DashboardRecentAlerts(
         user: widget.user,
         onViewAll: () => PrincipalSectionRequest(
-          title: 'Alertes de présence',
+          title: 'Alertes d’investigation',
           screen: PrincipalAlertsPage(user: widget.user),
         ).dispatch(context),
       ),
       const SizedBox(height: 14),
       const _SectionTitle('Justifications récentes'),
       _DashboardRecentJustifications(
-        user: widget.user,
         onViewAll: () => PrincipalSectionRequest(
           title: 'Justifications récentes',
-          screen: DashboardJustificationsPage(user: widget.user),
+          screen: const DashboardJustificationsPage(),
         ).dispatch(context),
       ),
       const SizedBox(height: 14),
@@ -1322,7 +1322,8 @@ class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
                       title: Text('${session.className} • ${session.subject}'),
                       subtitle: Text(
                           '${session.date} à ${session.time} • ${session.teacher}\n'
-                          '${session.present} présents • ${session.absent} absents • ${session.late} retards'),
+                          '${session.present} présents • ${session.absent} absents • ${session.late} retards\n'
+                          'Présence enseignant : ${session.teacherPresenceLabel}'),
                       isThreeLine: true,
                       onTap: () => Navigator.push(
                         context,
@@ -1370,7 +1371,7 @@ class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
       );
       if (!mounted) return;
       widget.onUpdated();
-      Navigator.pop(context, true);
+      Navigator.pop(context, status);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1395,11 +1396,26 @@ class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
           title: const Text('Détail du signalement'),
           backgroundColor: CustomTheme.blue),
       body: ListView(padding: const EdgeInsets.all(14), children: [
+        if (alert.eventType == 'investigation') ...[
+          _InvestigationAlertCard(
+            alert: alert,
+            onTap: null,
+            showChevron: false,
+          ),
+          const SizedBox(height: 14),
+        ],
         _Card(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _Detail('Élève', studentName),
-          _Detail('Classe', alert.codeClasse),
+          _Detail(
+            'Classe',
+            alert.className.isNotEmpty ? alert.className : alert.codeClasse,
+          ),
+          if (alert.codeMatiere.isNotEmpty)
+            _Detail('Matière', alert.codeMatiere),
+          if (alert.codeEnseignement.isNotEmpty)
+            _Detail('Enseignement', alert.codeEnseignement),
           _Detail('Date d’absence', alert.dateAbsence),
           _Detail('Statut parent', alert.parentStatusLabel),
           _Detail('Statut professeur', alert.teacherStatusLabel),
@@ -1416,6 +1432,96 @@ class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
             onPressed: _submitting ? null : () => _submitStatus('rejected'),
             child: const Text('Rejeter la présence du professeur')),
       ]),
+    );
+  }
+}
+
+class _InvestigationAlertCard extends StatelessWidget {
+  final InvestigationAlertData alert;
+  final VoidCallback? onTap;
+  final bool showChevron;
+
+  const _InvestigationAlertCard({
+    required this.alert,
+    required this.onTap,
+    this.showChevron = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final studentName =
+        alert.studentName.isNotEmpty ? alert.studentName : alert.studentCode;
+    final className =
+        alert.className.isNotEmpty ? alert.className : alert.codeClasse;
+    final subjectDetails = [
+      if (alert.codeMatiere.isNotEmpty) 'Matière ${alert.codeMatiere}',
+      if (alert.codeEnseignement.isNotEmpty)
+        'Enseignement ${alert.codeEnseignement}',
+    ].join(' • ');
+    final explanation = alert.notes.isNotEmpty
+        ? alert.notes
+        : 'Le parent a signalé une absence, mais l’élève a été marqué présent.';
+    final isPending = alert.status.toLowerCase() == 'pending';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: Colors.red.shade50,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: Colors.red.shade300),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        isThreeLine: true,
+        leading: Icon(
+          Icons.warning_rounded,
+          color: Colors.red.shade800,
+          size: 30,
+        ),
+        title: Text(
+          'Alerte d’investigation',
+          style: TextStyle(
+            color: Colors.red.shade900,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            [
+              if (studentName.isNotEmpty) studentName,
+              if (className.isNotEmpty) 'Classe : $className',
+              if (subjectDetails.isNotEmpty) subjectDetails,
+              'Date : ${alert.dateAbsence}',
+              explanation,
+            ].join('\n'),
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.red.shade900),
+          ),
+        ),
+        trailing: SizedBox(
+          width: showChevron ? 82 : 76,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  isPending ? 'À traiter' : alert.displayStatus,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: Colors.red.shade800,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (showChevron)
+                Icon(Icons.chevron_right, color: Colors.red.shade800),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1468,7 +1574,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
           return _Card(
             child: Column(
               children: [
-                const Text('Impossible de charger les alertes pour le moment.'),
+                Text(snapshot.error.toString().replaceFirst('Exception: ', '')),
                 TextButton.icon(
                   onPressed: _reload,
                   icon: const Icon(Icons.refresh),
@@ -1479,7 +1585,9 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
           );
         }
 
-        final events = snapshot.data ?? const <InvestigationAlertData>[];
+        final events = (snapshot.data ?? const <InvestigationAlertData>[])
+            .where((event) => event.eventType == 'investigation')
+            .toList();
         if (events.isEmpty) {
           return _Card(
             child: Column(
@@ -1488,7 +1596,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                   contentPadding: EdgeInsets.zero,
                   leading:
                       Icon(Icons.notifications_none, color: CustomTheme.blue),
-                  title: Text('Aucune alerte récente.'),
+                  title: Text('Aucune alerte d’investigation récente.'),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -1505,56 +1613,32 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
 
         return Column(
           children: [
-            ...events.take(3).map((event) {
-              final isInvestigation = event.eventType == 'investigation';
-              final studentName = event.studentName.isNotEmpty
-                  ? event.studentName
-                  : event.studentCode;
-              final className = event.className.isNotEmpty
-                  ? event.className
-                  : event.codeClasse;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: Icon(
-                    isInvestigation
-                        ? Icons.warning_amber_rounded
-                        : Icons.fact_check_outlined,
-                    color:
-                        isInvestigation ? Colors.deepOrange : CustomTheme.blue,
-                  ),
-                  title: Text(
-                    '$studentName • $className',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    isInvestigation
-                        ? 'À vérifier • ${event.dateAbsence}'
-                        : '${event.teacherStatusLabel} • ${event.dateAbsence}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    if (!isInvestigation) {
-                      await _showAttendanceEventDetails(context, event);
-                      return;
-                    }
-
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute<bool>(
-                        builder: (_) => ParentReportDetailPage(
-                          user: widget.user,
-                          alert: event,
-                          onUpdated: _reload,
+            ...events.take(3).map(
+                  (event) => _InvestigationAlertCard(
+                    alert: event,
+                    onTap: () async {
+                      final result = await Navigator.of(context).push<String>(
+                        MaterialPageRoute<String>(
+                          builder: (_) => ParentReportDetailPage(
+                            user: widget.user,
+                            alert: event,
+                            onUpdated: _reload,
+                          ),
                         ),
-                      ),
-                    );
-                    if (mounted) _reload();
-                  },
+                      );
+                      if (!mounted || result == null) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result == 'validated'
+                                ? 'Investigation validée et présence confirmée.'
+                                : 'Investigation mise à jour.',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              );
-            }),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -1566,7 +1650,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                 TextButton.icon(
                   onPressed: widget.onViewAll,
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Voir toutes les alertes'),
+                  label: const Text('Voir les alertes d’investigation'),
                 ),
               ],
             ),
@@ -1578,13 +1662,9 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
 }
 
 class _DashboardRecentJustifications extends StatefulWidget {
-  final User user;
   final VoidCallback onViewAll;
 
-  const _DashboardRecentJustifications({
-    required this.user,
-    required this.onViewAll,
-  });
+  const _DashboardRecentJustifications({required this.onViewAll});
 
   @override
   State<_DashboardRecentJustifications> createState() =>
@@ -1627,8 +1707,8 @@ class _DashboardRecentJustificationsState
           return _Card(
             child: Column(
               children: [
-                const Text(
-                  'Impossible de charger les justifications pour le moment.',
+                Text(
+                  snapshot.error.toString().replaceFirst('Exception: ', ''),
                 ),
                 TextButton.icon(
                   onPressed: _reload,
@@ -1640,23 +1720,33 @@ class _DashboardRecentJustificationsState
           );
         }
 
-        final justifications =
-            snapshot.data?.justifications ?? const <DashboardJustificationData>[];
+        final justifications = snapshot.data?.justifications ??
+            const <DashboardJustificationData>[];
         return Column(
           children: [
             if (justifications.isEmpty)
               const _Card(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.event_note_outlined,
-                      color: CustomTheme.blue),
+                  leading:
+                      Icon(Icons.event_note_outlined, color: CustomTheme.blue),
                   title: Text('Aucune justification récente.'),
                 ),
               )
             else
-              ...justifications
-                  .take(3)
-                  .map((item) => _DashboardJustificationTile(item: item)),
+              ...justifications.take(3).map(
+                    (item) => _DashboardJustificationTile(
+                      item: item,
+                      onTap: () async {
+                        final validated =
+                            await _openDashboardJustificationDetail(
+                          context,
+                          item,
+                        );
+                        if (validated == true && mounted) _reload();
+                      },
+                    ),
+                  ),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -1673,10 +1763,7 @@ class _DashboardRecentJustificationsState
 }
 
 class DashboardJustificationsPage extends StatefulWidget {
-  final User user;
-
-  const DashboardJustificationsPage({Key? key, required this.user})
-      : super(key: key);
+  const DashboardJustificationsPage({Key? key}) : super(key: key);
 
   @override
   State<DashboardJustificationsPage> createState() =>
@@ -1773,7 +1860,7 @@ class _DashboardJustificationsPageState
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
-            _HeaderCard(
+            const _HeaderCard(
               title: 'Justifications récentes',
               subtitle: 'Demandes transmises pour vérification',
               icon: Icons.event_note_outlined,
@@ -1783,14 +1870,23 @@ class _DashboardJustificationsPageState
               const _Card(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.event_note_outlined,
-                      color: CustomTheme.blue),
+                  leading:
+                      Icon(Icons.event_note_outlined, color: CustomTheme.blue),
                   title: Text('Aucune justification récente.'),
                 ),
               )
             else
               ...page.justifications.map(
-                (item) => _DashboardJustificationTile(item: item),
+                (item) => _DashboardJustificationTile(
+                  item: item,
+                  onTap: () async {
+                    final validated = await _openDashboardJustificationDetail(
+                      context,
+                      item,
+                    );
+                    if (validated == true && mounted) _reload();
+                  },
+                ),
               ),
             if (page.currentPage < page.lastPage) ...[
               if (_loadMoreError != null)
@@ -1803,8 +1899,7 @@ class _DashboardJustificationsPageState
                 ),
               Center(
                 child: TextButton.icon(
-                  onPressed:
-                      _loadingMore ? null : () => _loadMore(page),
+                  onPressed: _loadingMore ? null : () => _loadMore(page),
                   icon: _loadingMore
                       ? const SizedBox(
                           width: 16,
@@ -1827,8 +1922,12 @@ class _DashboardJustificationsPageState
 
 class _DashboardJustificationTile extends StatelessWidget {
   final DashboardJustificationData item;
+  final VoidCallback onTap;
 
-  const _DashboardJustificationTile({required this.item});
+  const _DashboardJustificationTile({
+    required this.item,
+    required this.onTap,
+  });
 
   String _displayDate(String value) {
     final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(value);
@@ -1839,9 +1938,11 @@ class _DashboardJustificationTile extends StatelessWidget {
   String _displayStatus(String value) {
     switch (value.toLowerCase()) {
       case 'pending':
+      case 'en attente':
         return 'En attente';
       case 'validated':
-        return 'Validée';
+      case 'validée':
+        return 'Absence validée';
       case 'rejected':
         return 'Rejetée';
       default:
@@ -1851,8 +1952,7 @@ class _DashboardJustificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final studentName =
-        item.studentName.isEmpty ? 'Élève' : item.studentName;
+    final studentName = item.studentName.isEmpty ? 'Élève' : item.studentName;
     final className = item.className.isNotEmpty
         ? item.className
         : (item.classCode.isEmpty ? 'Classe non renseignée' : item.classCode);
@@ -1860,6 +1960,7 @@ class _DashboardJustificationTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: onTap,
         leading: const Icon(Icons.event_note_outlined, color: CustomTheme.blue),
         title: Text(
           studentName,
@@ -1878,6 +1979,234 @@ class _DashboardJustificationTile extends StatelessWidget {
             color: CustomTheme.blue,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<bool?> _openDashboardJustificationDetail(
+  BuildContext context,
+  DashboardJustificationData item,
+) {
+  return Navigator.of(context, rootNavigator: true).push<bool>(
+    MaterialPageRoute(
+      builder: (_) => _DashboardJustificationDetailPage(
+        justificationId: item.id,
+      ),
+    ),
+  );
+}
+
+class _DashboardJustificationDetailPage extends StatefulWidget {
+  final int justificationId;
+
+  const _DashboardJustificationDetailPage({required this.justificationId});
+
+  @override
+  State<_DashboardJustificationDetailPage> createState() =>
+      _DashboardJustificationDetailPageState();
+}
+
+class _DashboardJustificationDetailPageState
+    extends State<_DashboardJustificationDetailPage> {
+  late Future<DashboardJustificationData> _future;
+  bool _validating = false;
+  bool _wasValidated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getDashboardJustificationDetail(
+      widget.justificationId,
+    );
+  }
+
+  Future<void> _validate() async {
+    setState(() => _validating = true);
+    try {
+      final updated = await PrincipalService.validateDashboardJustification(
+        widget.justificationId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _future = Future.value(updated);
+        _validating = false;
+        _wasValidated = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Absence validée')),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() => _validating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _openDocument(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !['http', 'https'].contains(uri.scheme)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document indisponible.')),
+      );
+      return;
+    }
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!mounted) return;
+    if (!launched) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’ouvrir le document.')),
+      );
+    }
+  }
+
+  String _workflowLabel(String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'pending':
+      case 'en attente':
+        return 'En attente';
+      case 'validated':
+      case 'validée':
+        return 'Absence validée';
+      case 'approved':
+        return 'Approuvée';
+      case 'rejected':
+        return 'Rejetée';
+      default:
+        return status.isEmpty ? 'Non renseigné' : status;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(_wasValidated);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Détail de la justification'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(_wasValidated),
+          ),
+        ),
+        body: FutureBuilder<DashboardJustificationData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    snapshot.error.toString().replaceFirst('Exception: ', ''),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
+
+            final item = snapshot.data!;
+            final pending = ['pending', 'en attente']
+                .contains(item.status.trim().toLowerCase());
+            final studentName =
+                item.studentName.isEmpty ? item.studentCode : item.studentName;
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _HeaderCard(
+                  title: studentName.isEmpty ? 'Élève' : studentName,
+                  subtitle: 'Déclaration du parent : Absent',
+                  icon: Icons.event_note_outlined,
+                ),
+                const SizedBox(height: 12),
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Detail('Code élève', item.studentCode),
+                      _Detail(
+                        'Classe',
+                        item.className.isEmpty
+                            ? item.classCode
+                            : '${item.className} (${item.classCode})',
+                      ),
+                      _Detail(
+                        'Établissement',
+                        item.schoolName.isEmpty
+                            ? item.schoolCode
+                            : item.schoolName,
+                      ),
+                      _Detail('Date d’absence', item.absenceDate),
+                      _Detail(
+                        'Motif',
+                        item.reason.isEmpty ? 'Non renseigné' : item.reason,
+                      ),
+                      _Detail(
+                        'Description',
+                        item.explanation.isEmpty
+                            ? 'Non renseignée'
+                            : item.explanation,
+                      ),
+                      if (item.parentName.isNotEmpty)
+                        _Detail('Parent', item.parentName),
+                      if (item.parentCode.isNotEmpty)
+                        _Detail('Code parent', item.parentCode),
+                      if (item.parentContacts.isNotEmpty)
+                        _Detail('Contact parent', item.parentContacts),
+                      _Detail('Statut', _workflowLabel(item.status)),
+                      _Detail(
+                        'Date de soumission',
+                        item.createdAt.isEmpty
+                            ? 'Non renseignée'
+                            : item.createdAt,
+                      ),
+                      if (item.documentUrl.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => _openDocument(item.documentUrl),
+                            icon: const Icon(Icons.attach_file),
+                            label: const Text('Ouvrir le document joint'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (pending) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _validating ? null : _validate,
+                      icon: _validating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.verified_outlined),
+                      label: Text(_validating ? 'Validation…' : 'Valider'),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1966,101 +2295,50 @@ class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
           );
         }
 
-        final alerts = snapshot.data ?? const <InvestigationAlertData>[];
+        final alerts = (snapshot.data ?? const <InvestigationAlertData>[])
+            .where((alert) => alert.eventType == 'investigation')
+            .toList();
 
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
             _HeaderCard(
-                title: 'Alertes de présence',
+                title: 'Alertes d’investigation',
                 subtitle:
                     'Consultez ici les présences nécessitant une vérification.',
                 icon: Icons.info_outline),
             const SizedBox(height: 12),
             if (alerts.isEmpty)
               _Card(
-                child: const Text('Aucune alerte de présence à vérifier.'),
+                child: const Text('Aucune alerte d’investigation à traiter.'),
               )
             else
-              ...alerts.map((alert) {
-                final isInvestigation = alert.eventType == 'investigation';
-                final studentName = alert.studentName.isNotEmpty
-                    ? alert.studentName
-                    : alert.studentCode;
-                final className = alert.className.isNotEmpty
-                    ? alert.className
-                    : alert.codeClasse;
-
-                return Card(
-                  margin: EdgeInsets.zero,
-                  color: isInvestigation ? Colors.red.shade50 : Colors.white,
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    side: BorderSide(
-                      color: isInvestigation
-                          ? Colors.red.shade200
-                          : Colors.transparent,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      isInvestigation
-                          ? Icons.warning_amber_rounded
-                          : Icons.fact_check_outlined,
-                      color: isInvestigation
-                          ? Colors.red.shade700
-                          : CustomTheme.blue,
-                    ),
-                    title: Text(
-                      '$studentName • $className',
-                      style: TextStyle(
-                        color: isInvestigation
-                            ? Colors.red.shade700
-                            : CustomTheme.dark,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: Text(
-                      isInvestigation
-                          ? 'Parent : ${alert.parentStatusLabel} • Professeur : ${alert.teacherStatusLabel}'
-                          : '${alert.teacherStatusLabel} • ${alert.dateAbsence}',
-                      style: TextStyle(
-                        color: isInvestigation
-                            ? Colors.red.shade700
-                            : Colors.black54,
-                      ),
-                    ),
-                    trailing: Text(
-                      isInvestigation
-                          ? alert.displayStatus
-                          : alert.teacherStatusLabel,
-                      style: TextStyle(
-                        color: isInvestigation
-                            ? Colors.red.shade700
-                            : CustomTheme.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onTap: () {
-                      if (!isInvestigation) {
-                        _showAttendanceEventDetails(context, alert);
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ParentReportDetailPage(
-                            user: widget.user,
-                            alert: alert,
-                            onUpdated: _reload,
-                          ),
+              ...alerts.map(
+                (alert) => _InvestigationAlertCard(
+                  alert: alert,
+                  onTap: () async {
+                    final result = await Navigator.of(context).push<String>(
+                      MaterialPageRoute<String>(
+                        builder: (_) => ParentReportDetailPage(
+                          user: widget.user,
+                          alert: alert,
+                          onUpdated: _reload,
                         ),
-                      ).then((_) => _reload());
-                    },
-                  ),
-                );
-              }),
+                      ),
+                    );
+                    if (!mounted || result == null) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result == 'validated'
+                              ? 'Investigation validée et présence confirmée.'
+                              : 'Investigation mise à jour.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         );
       },
@@ -3038,6 +3316,7 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
                 _Detail('Classe', session.className),
                 _Detail('Matière', subjectLabel ?? session.subject),
                 _Detail('Enseignant', session.teacher),
+                _Detail('Présence enseignant', session.teacherPresenceLabel),
                 _Detail(
                   preferApiAttendancePercentage ? 'Total élèves' : 'Élèves',
                   '${session.studentCount}',

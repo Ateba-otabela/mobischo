@@ -4,12 +4,29 @@ import 'package:http/http.dart' as http;
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/mobile_api_service.dart';
 
+String _safeDashboardErrorBody(String body) {
+  return body
+      .replaceAll(
+        RegExp(
+          r'(["\x27]?(?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|password(?:[_-]?confirmation)?|authorization|secret|api[_-]?key|credential)["\x27]?\s*[:=]\s*["\x27]?)[^"\x27,\s}]+',
+          caseSensitive: false,
+        ),
+        r'$1[REDACTED]',
+      )
+      .replaceAll(
+        RegExp(r'Bearer\s+[A-Za-z0-9._~+/=-]+', caseSensitive: false),
+        'Bearer [REDACTED]',
+      );
+}
+
 class PrincipalDashboardSession {
   final String date;
   final String time;
   final String className;
   final String subject;
   final String teacher;
+  final String teacherCode;
+  final String teacherPresenceStatus;
   final int present;
   final int absent;
   final int late;
@@ -22,6 +39,8 @@ class PrincipalDashboardSession {
     required this.className,
     required this.subject,
     required this.teacher,
+    required this.teacherCode,
+    required this.teacherPresenceStatus,
     required this.present,
     required this.absent,
     required this.late,
@@ -156,6 +175,8 @@ class PrincipalAttendanceData {
       className: className,
       subject: subject,
       teacher: teacher,
+      teacherCode: json['teacher_code']?.toString() ?? '',
+      teacherPresenceStatus: json['teacher_presence_status']?.toString() ?? '',
       present: present ?? 0,
       absent: _toInt(json['absent']),
       late: _toInt(json['late']),
@@ -169,6 +190,19 @@ class PrincipalAttendanceData {
               .toList()
           : <PrincipalAttendanceRecordData>[],
     );
+  }
+
+  String get teacherPresenceLabel {
+    switch (teacherPresenceStatus.toLowerCase()) {
+      case 'present':
+        return 'Présent';
+      case 'absent':
+        return 'Absent';
+      case 'late':
+        return 'En retard';
+      default:
+        return 'Non renseignée';
+    }
   }
 
   int? get calculatedAttendancePercentage {
@@ -484,23 +518,39 @@ class InvestigationAlertData {
 class DashboardJustificationData {
   final int id;
   final String studentName;
+  final String studentCode;
   final String className;
   final String classCode;
+  final String schoolName;
+  final String schoolCode;
   final String reason;
   final String absenceDate;
   final String status;
   final String explanation;
+  final String parentCode;
+  final String parentName;
+  final String parentContacts;
+  final String documentUrl;
+  final String parentAttendanceStatus;
   final String createdAt;
 
   const DashboardJustificationData({
     required this.id,
     required this.studentName,
+    required this.studentCode,
     required this.className,
     required this.classCode,
+    required this.schoolName,
+    required this.schoolCode,
     required this.reason,
     required this.absenceDate,
     required this.status,
     required this.explanation,
+    required this.parentCode,
+    required this.parentName,
+    required this.parentContacts,
+    required this.documentUrl,
+    required this.parentAttendanceStatus,
     required this.createdAt,
   });
 
@@ -508,12 +558,22 @@ class DashboardJustificationData {
     return DashboardJustificationData(
       id: _toInt(json['id']),
       studentName: json['student_name']?.toString().trim() ?? '',
+      studentCode: json['CodeEleve']?.toString().trim() ?? '',
       className: json['class_name']?.toString().trim() ?? '',
       classCode: json['CodeClasse']?.toString().trim() ?? '',
+      schoolName: json['school_name']?.toString().trim() ?? '',
+      schoolCode: json['CodeEtablissement']?.toString().trim() ?? '',
       reason: json['reason']?.toString().trim() ?? '',
-      absenceDate: (json['absence_date'] ?? json['date_absence'] ?? json['absence_date'])?.toString() ?? '',
+      absenceDate:
+          (json['absence_date'] ?? json['date_absence'])?.toString() ?? '',
       status: (json['status'] ?? json['statut'])?.toString().trim() ?? '',
       explanation: json['justification']?.toString().trim() ?? '',
+      parentCode: json['parent_code']?.toString().trim() ?? '',
+      parentName: json['parent_name']?.toString().trim() ?? '',
+      parentContacts: json['parent_contacts']?.toString().trim() ?? '',
+      documentUrl: json['document_url']?.toString().trim() ?? '',
+      parentAttendanceStatus:
+          json['parent_attendance_status']?.toString().trim() ?? 'A',
       createdAt: json['created_at']?.toString() ?? '',
     );
   }
@@ -565,56 +625,131 @@ class PrincipalService {
     int page = 1,
     int perPage = 3,
   }) async {
+    try {
+      final response = await MobileApiService.post(
+        '/dashboard/alerts',
+        headers: const {'Accept': 'application/json'},
+        body: {
+          'action': 'GET_DASHBOARD_JUSTIFICATIONS',
+          'page': page.toString(),
+          'per_page': perPage.toString(),
+        },
+      );
+      if (response.statusCode != 200) {
+        final body = _safeDashboardErrorBody(response.body);
+        throw Exception(
+          'Justifications: HTTP ${response.statusCode}'
+          '${body.trim().isEmpty ? '' : ' - $body'}',
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Invalid dashboard justifications response',
+        );
+      }
+
+      return DashboardJustificationPageData.fromJson(decoded);
+    } on Exception catch (error) {
+      if (error.toString().contains('Justifications: HTTP')) rethrow;
+      throw Exception('Justifications: $error');
+    }
+  }
+
+  static Future<DashboardJustificationData> getDashboardJustificationDetail(
+    int id,
+  ) async {
     final response = await MobileApiService.post(
       '/dashboard/alerts',
       headers: const {'Accept': 'application/json'},
       body: {
-        'action': 'GET_DASHBOARD_JUSTIFICATIONS',
-        'page': page.toString(),
-        'per_page': perPage.toString(),
+        'action': 'GET_DASHBOARD_JUSTIFICATION_DETAIL',
+        'id': id.toString(),
       },
     );
     if (response.statusCode != 200) {
+      final body = _safeDashboardErrorBody(response.body);
       throw Exception(
-        'Impossible de charger les justifications (${response.statusCode})',
+        'Justification: HTTP ${response.statusCode}'
+        '${body.trim().isEmpty ? '' : ' - $body'}',
       );
     }
 
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('Invalid dashboard justifications response');
+    if (decoded is! Map<String, dynamic> ||
+        decoded['justification'] is! Map<String, dynamic>) {
+      throw const FormatException('Invalid justification detail response');
+    }
+    return DashboardJustificationData.fromJson(
+      decoded['justification'] as Map<String, dynamic>,
+    );
+  }
+
+  static Future<DashboardJustificationData> validateDashboardJustification(
+    int id,
+  ) async {
+    final response = await MobileApiService.post(
+      '/dashboard/alerts',
+      headers: const {'Accept': 'application/json'},
+      body: {
+        'action': 'VALIDATE_DASHBOARD_JUSTIFICATION',
+        'id': id.toString(),
+      },
+    );
+    if (response.statusCode != 200) {
+      final body = _safeDashboardErrorBody(response.body);
+      throw Exception(
+        'Validation: HTTP ${response.statusCode}'
+        '${body.trim().isEmpty ? '' : ' - $body'}',
+      );
     }
 
-    return DashboardJustificationPageData.fromJson(decoded);
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> ||
+        decoded['justification'] is! Map<String, dynamic>) {
+      throw const FormatException('Invalid justification validation response');
+    }
+    return DashboardJustificationData.fromJson(
+      decoded['justification'] as Map<String, dynamic>,
+    );
   }
 
   static Future<List<InvestigationAlertData>> getInvestigations(
     User user, {
     String? codeClasse,
   }) async {
-    final response = await MobileApiService.post(
-      '/dashboard/alerts',
-      headers: const {'Accept': 'application/json'},
-      body: {
-        'action': 'GET_DASHBOARD_ALERTS',
-        if (codeClasse != null && codeClasse.isNotEmpty)
-          'CodeClasse': codeClasse,
-      },
-    );
-    if (response.statusCode != 200) {
-      throw Exception(
-          'Impossible de charger les investigations (${response.statusCode})');
-    }
+    try {
+      final response = await MobileApiService.post(
+        '/dashboard/alerts',
+        headers: const {'Accept': 'application/json'},
+        body: {
+          'action': 'GET_DASHBOARD_ALERTS',
+          if (codeClasse != null && codeClasse.isNotEmpty)
+            'CodeClasse': codeClasse,
+        },
+      );
+      if (response.statusCode != 200) {
+        final body = _safeDashboardErrorBody(response.body);
+        throw Exception(
+          'Alertes: HTTP ${response.statusCode}'
+          '${body.trim().isEmpty ? '' : ' - $body'}',
+        );
+      }
 
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List) {
-      throw const FormatException('Invalid investigations response');
-    }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) {
+        throw const FormatException('Invalid investigations response');
+      }
 
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(InvestigationAlertData.fromJson)
-        .toList();
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(InvestigationAlertData.fromJson)
+          .toList();
+    } on Exception catch (error) {
+      if (error.toString().contains('Alertes: HTTP')) rethrow;
+      throw Exception('Alertes: $error');
+    }
   }
 
   static Future<InvestigationAlertData> updateInvestigationAlert(

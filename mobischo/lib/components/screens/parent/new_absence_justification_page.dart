@@ -195,6 +195,11 @@ class _NewAbsenceJustificationPageState
           ],
         ),
       );
+    } on ParentAbsenceSubmissionException catch (error) {
+      debugPrint('Justification submission rejected by backend.');
+      if (mounted) {
+        _showMessage(error.message);
+      }
     } on Exception catch (error) {
       debugPrint('Justification submission failed (${error.runtimeType}).');
       if (mounted) {

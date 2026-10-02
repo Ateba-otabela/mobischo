@@ -320,6 +320,15 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
         ).dispatch(context),
       ),
       const SizedBox(height: 14),
+      const _SectionTitle('Justifications récentes'),
+      _DashboardRecentJustifications(
+        user: widget.user,
+        onViewAll: () => PrincipalSectionRequest(
+          title: 'Justifications récentes',
+          screen: DashboardJustificationsPage(user: widget.user),
+        ).dispatch(context),
+      ),
+      const SizedBox(height: 14),
       _SectionTitle('Appels du jour'),
       if (dashboard.todaySessions.isEmpty)
         const _Card(child: Text('Aucune session de présence enregistrée.'))
@@ -1564,6 +1573,313 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
           ],
         );
       },
+    );
+  }
+}
+
+class _DashboardRecentJustifications extends StatefulWidget {
+  final User user;
+  final VoidCallback onViewAll;
+
+  const _DashboardRecentJustifications({
+    required this.user,
+    required this.onViewAll,
+  });
+
+  @override
+  State<_DashboardRecentJustifications> createState() =>
+      _DashboardRecentJustificationsState();
+}
+
+class _DashboardRecentJustificationsState
+    extends State<_DashboardRecentJustifications> {
+  late Future<DashboardJustificationPageData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getDashboardJustifications();
+  }
+
+  void _reload() {
+    setState(() {
+      _future = PrincipalService.getDashboardJustifications();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DashboardJustificationPageData>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _Card(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(14),
+                child: CircularProgressIndicator(color: CustomTheme.blue),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return _Card(
+            child: Column(
+              children: [
+                const Text(
+                  'Impossible de charger les justifications pour le moment.',
+                ),
+                TextButton.icon(
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final justifications =
+            snapshot.data?.justifications ?? const <DashboardJustificationData>[];
+        return Column(
+          children: [
+            if (justifications.isEmpty)
+              const _Card(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.event_note_outlined,
+                      color: CustomTheme.blue),
+                  title: Text('Aucune justification récente.'),
+                ),
+              )
+            else
+              ...justifications
+                  .take(3)
+                  .map((item) => _DashboardJustificationTile(item: item)),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: widget.onViewAll,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Voir plus'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class DashboardJustificationsPage extends StatefulWidget {
+  final User user;
+
+  const DashboardJustificationsPage({Key? key, required this.user})
+      : super(key: key);
+
+  @override
+  State<DashboardJustificationsPage> createState() =>
+      _DashboardJustificationsPageState();
+}
+
+class _DashboardJustificationsPageState
+    extends State<DashboardJustificationsPage> {
+  static const _pageSize = 20;
+
+  late Future<DashboardJustificationPageData> _future;
+  bool _loadingMore = false;
+  Object? _loadMoreError;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PrincipalService.getDashboardJustifications(
+      perPage: _pageSize,
+    );
+  }
+
+  void _reload() {
+    setState(() {
+      _loadMoreError = null;
+      _future = PrincipalService.getDashboardJustifications(
+        perPage: _pageSize,
+      );
+    });
+  }
+
+  Future<void> _loadMore(DashboardJustificationPageData currentPage) async {
+    if (_loadingMore || currentPage.currentPage >= currentPage.lastPage) return;
+
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final nextPage = await PrincipalService.getDashboardJustifications(
+        page: currentPage.currentPage + 1,
+        perPage: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _future = Future.value(
+          DashboardJustificationPageData(
+            justifications: [
+              ...currentPage.justifications,
+              ...nextPage.justifications,
+            ],
+            currentPage: nextPage.currentPage,
+            lastPage: nextPage.lastPage,
+          ),
+        );
+      });
+    } on Exception catch (error) {
+      if (mounted) setState(() => _loadMoreError = error);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DashboardJustificationPageData>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Impossible de charger les justifications pour le moment.',
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _reload,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final page = snapshot.data!;
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            _HeaderCard(
+              title: 'Justifications récentes',
+              subtitle: 'Demandes transmises pour vérification',
+              icon: Icons.event_note_outlined,
+            ),
+            const SizedBox(height: 12),
+            if (page.justifications.isEmpty)
+              const _Card(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.event_note_outlined,
+                      color: CustomTheme.blue),
+                  title: Text('Aucune justification récente.'),
+                ),
+              )
+            else
+              ...page.justifications.map(
+                (item) => _DashboardJustificationTile(item: item),
+              ),
+            if (page.currentPage < page.lastPage) ...[
+              if (_loadMoreError != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Impossible de charger les éléments suivants.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              Center(
+                child: TextButton.icon(
+                  onPressed:
+                      _loadingMore ? null : () => _loadMore(page),
+                  icon: _loadingMore
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.expand_more),
+                  label: Text(
+                    _loadMoreError == null ? 'Charger plus' : 'Réessayer',
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DashboardJustificationTile extends StatelessWidget {
+  final DashboardJustificationData item;
+
+  const _DashboardJustificationTile({required this.item});
+
+  String _displayDate(String value) {
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(value);
+    if (match == null) return value.isEmpty ? 'Date non renseignée' : value;
+    return '${match.group(3)}/${match.group(2)}/${match.group(1)}';
+  }
+
+  String _displayStatus(String value) {
+    switch (value.toLowerCase()) {
+      case 'pending':
+        return 'En attente';
+      case 'validated':
+        return 'Validée';
+      case 'rejected':
+        return 'Rejetée';
+      default:
+        return value.isEmpty ? 'Non renseigné' : value;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentName =
+        item.studentName.isEmpty ? 'Élève' : item.studentName;
+    final className = item.className.isNotEmpty
+        ? item.className
+        : (item.classCode.isEmpty ? 'Classe non renseignée' : item.classCode);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: const Icon(Icons.event_note_outlined, color: CustomTheme.blue),
+        title: Text(
+          studentName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          '$className • ${item.reason.isEmpty ? 'Motif non renseigné' : item.reason}'
+          '\n${_displayDate(item.absenceDate)}',
+        ),
+        isThreeLine: true,
+        trailing: Text(
+          _displayStatus(item.status),
+          style: const TextStyle(
+            color: CustomTheme.blue,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

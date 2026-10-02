@@ -1406,6 +1406,83 @@ class API extends Controller
                 ->get();
         }
 
+        if ($action == 'GET_DASHBOARD_JUSTIFICATIONS') {
+            $user = $request->user();
+            if (!$user instanceof User) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+            if (!in_array($accountType, ['principal', 'principal_encadreur', 'encadreur'], true)) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            if ($schoolCode === '') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $request->validate([
+                'page' => 'sometimes|integer|min:1',
+                'per_page' => 'sometimes|integer|min:1|max:50',
+            ]);
+            $assignedClassCodes = null;
+            if ($accountType === 'encadreur') {
+                $assignedClassCodes = (new EncadreurClassScope())
+                    ->assignedClassCodesForEncadreur($user);
+                if ($assignedClassCodes === []) {
+                    return response()->json([
+                        'data' => [],
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => (int) $request->input('per_page', 3),
+                        'total' => 0,
+                    ]);
+                }
+            }
+
+            $justifications = AbsenceJustification::query()
+                ->join('eleves as justification_student', 'justification_student.CodeEleve', '=', 'absence_justifications.CodeEleve')
+                ->join('classes as justification_class', function ($join) {
+                    $join->on('justification_class.CodeClasse', '=', 'justification_student.CodeClasse')
+                        ->on('justification_class.CodeEtablissement', '=', 'absence_justifications.CodeEtablissement');
+                })
+                ->where('absence_justifications.CodeEtablissement', $schoolCode)
+                ->when(
+                    $assignedClassCodes !== null,
+                    fn ($query) => $query->whereIn('justification_student.CodeClasse', $assignedClassCodes)
+                )
+                ->select([
+                    'absence_justifications.id',
+                    'absence_justifications.CodeEleve',
+                    'absence_justifications.CodeEtablissement',
+                    'justification_student.CodeClasse',
+                    'justification_student.Nom as student_last_name',
+                    'justification_student.Prenom as student_first_name',
+                    'justification_class.LibelleClasse as class_name',
+                    'absence_justifications.justification',
+                    'absence_justifications.created_at',
+                    DB::raw("COALESCE(NULLIF(absence_justifications.motif, ''), NULLIF(absence_justifications.reason, ''), '') as reason"),
+                    DB::raw('COALESCE(absence_justifications.date_absence, absence_justifications.absence_date) as absence_date'),
+                    DB::raw("COALESCE(NULLIF(absence_justifications.statut, ''), NULLIF(absence_justifications.status, ''), '') as status"),
+                ])
+                ->orderByDesc('absence_justifications.created_at')
+                ->orderByDesc('absence_justifications.id')
+                ->paginate((int) $request->input('per_page', 3));
+
+            $justifications->getCollection()->transform(function ($justification) {
+                $justification->student_name = trim(
+                    (string) ($justification->student_last_name ?? '').' '.
+                    (string) ($justification->student_first_name ?? '')
+                );
+                unset($justification->student_last_name, $justification->student_first_name);
+
+                return $justification;
+            });
+
+            return response()->json($justifications);
+        }
+
         if ($action == 'GET_DASHBOARD_ALERTS') {
             $user = $request->user();
             if (!$user instanceof User) {

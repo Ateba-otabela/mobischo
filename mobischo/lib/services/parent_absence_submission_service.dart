@@ -4,6 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/services/mobile_api_service.dart';
 
+class ParentAbsenceSubmissionException implements Exception {
+  final String message;
+
+  const ParentAbsenceSubmissionException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class ParentAbsenceSubmissionService {
   static const _endpoint = '/parent/absence-justifications';
 
@@ -41,6 +50,16 @@ class ParentAbsenceSubmissionService {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 409) {
+        final decoded = jsonDecode(response.body);
+        final error =
+            decoded is Map ? decoded['error']?.toString().trim() : null;
+        throw ParentAbsenceSubmissionException(
+          error != null && error.isNotEmpty
+              ? error
+              : 'Une justification est déjà en attente pour cet élève à cette date.',
+        );
+      }
       debugPrint(
         'Submitting absence justification failed '
         '(HTTP ${response.statusCode}).',

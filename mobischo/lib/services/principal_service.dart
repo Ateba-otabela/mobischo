@@ -481,6 +481,78 @@ class InvestigationAlertData {
   }
 }
 
+class DashboardJustificationData {
+  final int id;
+  final String studentName;
+  final String className;
+  final String classCode;
+  final String reason;
+  final String absenceDate;
+  final String status;
+  final String explanation;
+  final String createdAt;
+
+  const DashboardJustificationData({
+    required this.id,
+    required this.studentName,
+    required this.className,
+    required this.classCode,
+    required this.reason,
+    required this.absenceDate,
+    required this.status,
+    required this.explanation,
+    required this.createdAt,
+  });
+
+  factory DashboardJustificationData.fromJson(Map<String, dynamic> json) {
+    return DashboardJustificationData(
+      id: _toInt(json['id']),
+      studentName: json['student_name']?.toString().trim() ?? '',
+      className: json['class_name']?.toString().trim() ?? '',
+      classCode: json['CodeClasse']?.toString().trim() ?? '',
+      reason: json['reason']?.toString().trim() ?? '',
+      absenceDate: (json['absence_date'] ?? json['date_absence'] ?? json['absence_date'])?.toString() ?? '',
+      status: (json['status'] ?? json['statut'])?.toString().trim() ?? '',
+      explanation: json['justification']?.toString().trim() ?? '',
+      createdAt: json['created_at']?.toString() ?? '',
+    );
+  }
+}
+
+class DashboardJustificationPageData {
+  final List<DashboardJustificationData> justifications;
+  final int currentPage;
+  final int lastPage;
+
+  const DashboardJustificationPageData({
+    required this.justifications,
+    required this.currentPage,
+    required this.lastPage,
+  });
+
+  factory DashboardJustificationPageData.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    final records = json['data'];
+    if (records is! List) {
+      throw const FormatException('Invalid dashboard justifications response');
+    }
+
+    return DashboardJustificationPageData(
+      justifications: records
+          .whereType<Map>()
+          .map(
+            (record) => DashboardJustificationData.fromJson(
+              Map<String, dynamic>.from(record),
+            ),
+          )
+          .toList(),
+      currentPage: _toInt(json['current_page']),
+      lastPage: _toInt(json['last_page']),
+    );
+  }
+}
+
 class PrincipalService {
   static const root = 'https://mobischo.com/api/school_manager';
   static final teacherClassesEndpoint =
@@ -488,6 +560,34 @@ class PrincipalService {
   static const getDashboardAction = 'GET_PRINCIPAL_DASHBOARD';
   static const getClassesAction = 'GET_PRINCIPAL_CLASSES';
   static const getAttendanceAction = 'GET_PRINCIPAL_ATTENDANCE';
+
+  static Future<DashboardJustificationPageData> getDashboardJustifications({
+    int page = 1,
+    int perPage = 3,
+  }) async {
+    final response = await MobileApiService.post(
+      '/dashboard/alerts',
+      headers: const {'Accept': 'application/json'},
+      body: {
+        'action': 'GET_DASHBOARD_JUSTIFICATIONS',
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+      },
+    );
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Impossible de charger les justifications (${response.statusCode})',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Invalid dashboard justifications response');
+    }
+
+    return DashboardJustificationPageData.fromJson(decoded);
+  }
+
   static Future<List<InvestigationAlertData>> getInvestigations(
     User user, {
     String? codeClasse,

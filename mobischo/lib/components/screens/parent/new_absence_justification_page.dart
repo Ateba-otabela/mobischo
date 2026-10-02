@@ -32,13 +32,11 @@ class _NewAbsenceJustificationPageState
   static const _maxDocumentSize = 10 * 1024 * 1024;
 
   final _formKey = GlobalKey<FormState>();
-  final _reasonDetailController = TextEditingController();
   final _explanationController = TextEditingController();
 
   late Future<List<Student>> _childrenFuture;
-  Future<List<EligibleAbsence>>? _absencesFuture;
   Student? _selectedChild;
-  EligibleAbsence? _selectedAbsence;
+  DateTime? _selectedDate;
   String? _selectedReason;
   Uint8List? _documentBytes;
   String? _documentName;
@@ -53,7 +51,6 @@ class _NewAbsenceJustificationPageState
 
   @override
   void dispose() {
-    _reasonDetailController.dispose();
     _explanationController.dispose();
     super.dispose();
   }
@@ -67,16 +64,13 @@ class _NewAbsenceJustificationPageState
   void _selectChild(Student student) {
     setState(() {
       _selectedChild = student;
-      _selectedAbsence = null;
-      _absencesFuture =
-          ParentAbsenceSubmissionService.getEligibleAbsences(student.CodeEleve);
+      _selectedDate = null;
       _resetForm();
     });
   }
 
   void _resetForm() {
     _selectedReason = null;
-    _reasonDetailController.clear();
     _explanationController.clear();
     _documentBytes = null;
     _documentName = null;
@@ -85,17 +79,28 @@ class _NewAbsenceJustificationPageState
   void _changeChild() {
     setState(() {
       _selectedChild = null;
-      _selectedAbsence = null;
-      _absencesFuture = null;
+      _selectedDate = null;
       _resetForm();
     });
   }
 
-  void _changeAbsence() {
-    setState(() {
-      _selectedAbsence = null;
-      _resetForm();
-    });
+  Future<void> _selectAbsenceDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? today,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+      helpText: 'Sélectionnez la date de l’absence',
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = DateUtils.dateOnly(picked));
+    }
+  }
+
+  String _formatDate(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}/'
+        '${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
   Future<void> _pickDocument() async {
@@ -143,7 +148,7 @@ class _NewAbsenceJustificationPageState
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting || _selectedChild == null || _selectedAbsence == null) {
+    if (_isSubmitting || _selectedChild == null || _selectedDate == null) {
       return;
     }
     if (!_formKey.currentState!.validate()) return;
@@ -152,9 +157,8 @@ class _NewAbsenceJustificationPageState
     try {
       await ParentAbsenceSubmissionService.submit(
         studentCode: _selectedChild!.CodeEleve,
-        absenceId: _selectedAbsence!.id,
+        absenceDate: _selectedDate!,
         reason: _selectedReason!,
-        reasonDetail: _reasonDetailController.text.trim(),
         explanation: _explanationController.text.trim(),
         documentBytes: _documentBytes,
         documentName: _documentName,
@@ -237,21 +241,22 @@ class _NewAbsenceJustificationPageState
                     const SizedBox(height: 22),
                     const _StepHeading(
                       number: '2',
-                      title: 'Sélectionnez l’absence',
+                      title: 'Date de l’absence',
                     ),
                     const SizedBox(height: 10),
-                    _buildAbsencesStep(),
+                    _buildAbsenceDateStep(),
                   ],
-                  if (_selectedAbsence != null) ...[
+                  if (_selectedDate != null) ...[
                     const SizedBox(height: 22),
-                    const _StepHeading(number: '3', title: 'Motif'),
+                    const _StepHeading(
+                        number: '3', title: 'Motif et explication'),
                     const SizedBox(height: 10),
                     _buildReasonForm(),
                   ],
                 ],
               ),
             ),
-            if (_selectedAbsence != null) _buildSubmitButton(),
+            if (_selectedDate != null) _buildSubmitButton(),
           ],
         ),
       ),
@@ -266,7 +271,7 @@ class _NewAbsenceJustificationPageState
           return const _LoadingCard();
         }
         if (snapshot.hasError) {
-          return _MessageCard(
+          return _ParentMessageCard(
             icon: Icons.cloud_off_outlined,
             message: 'Impossible de charger vos enfants pour le moment.',
             actionLabel: 'Réessayer',
@@ -276,7 +281,7 @@ class _NewAbsenceJustificationPageState
 
         final children = snapshot.data ?? const <Student>[];
         if (children.isEmpty) {
-          return const _MessageCard(
+          return const _ParentMessageCard(
             icon: Icons.family_restroom,
             message: 'Aucun enfant n’est associé à votre compte.',
           );
@@ -308,73 +313,28 @@ class _NewAbsenceJustificationPageState
     );
   }
 
-  Widget _buildAbsencesStep() {
-    final future = _absencesFuture;
-    if (future == null) {
-      return const _MessageCard(
-        icon: Icons.event_busy_outlined,
-        message: 'Sélectionnez un enfant pour consulter ses absences.',
-      );
-    }
-
-    return FutureBuilder<List<EligibleAbsence>>(
-      future: future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _LoadingCard();
-        }
-        if (snapshot.hasError) {
-          return _MessageCard(
-            icon: Icons.cloud_off_outlined,
-            message: 'Impossible de charger les absences pour le moment.',
-            actionLabel: 'Réessayer',
-            onAction: () {
-              setState(() {
-                _absencesFuture =
-                    ParentAbsenceSubmissionService.getEligibleAbsences(
-                        _selectedChild!.CodeEleve);
-              });
-            },
-          );
-        }
-
-        final absences = snapshot.data ?? const <EligibleAbsence>[];
-        if (absences.isEmpty) {
-          return const _MessageCard(
-            icon: Icons.event_busy_outlined,
-            title: 'Aucune absence à justifier',
-            message:
-                'Cet enfant n’a pas d’absence enregistrée disponible pour une justification.',
-          );
-        }
-
-        if (_selectedAbsence != null) {
-          return _AbsenceTile(
-            absence: _selectedAbsence!,
-            studentName: getStudentDisplayName(_selectedChild!),
-            selected: true,
-            onTap: _changeAbsence,
-            trailingLabel: 'Changer',
-          );
-        }
-
-        return Column(
-          children: absences
-              .map(
-                (absence) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _AbsenceTile(
-                    absence: absence,
-                    studentName: getStudentDisplayName(_selectedChild!),
-                    onTap: () => setState(() {
-                      _selectedAbsence = absence;
-                    }),
-                  ),
-                ),
-              )
-              .toList(),
-        );
-      },
+  Widget _buildAbsenceDateStep() {
+    final selectedDate = _selectedDate;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ListTile(
+        onTap: _selectAbsenceDate,
+        leading: const Icon(Icons.calendar_month, color: CustomTheme.blue),
+        title: Text(
+          selectedDate == null
+              ? 'Sélectionner une date'
+              : _formatDate(selectedDate),
+          style: TextStyle(
+            color: selectedDate == null ? Colors.black54 : CustomTheme.dark,
+            fontWeight:
+                selectedDate == null ? FontWeight.normal : FontWeight.w600,
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_drop_down),
+      ),
     );
   }
 
@@ -405,34 +365,10 @@ class _NewAbsenceJustificationPageState
                       ),
                     )
                     .toList(),
-                onChanged: (reason) => setState(() {
-                  _selectedReason = reason;
-                  if (reason != 'Autre') {
-                    _reasonDetailController.clear();
-                  }
-                }),
+                onChanged: (reason) => setState(() => _selectedReason = reason),
                 validator: (value) =>
                     value == null ? 'Sélectionnez un motif.' : null,
               ),
-              if (_selectedReason == 'Autre') ...[
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _reasonDetailController,
-                  maxLength: 180,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Précisez le motif *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (_selectedReason != 'Autre') return null;
-                    if (value == null || value.trim().length < 3) {
-                      return 'Précisez le motif en quelques mots.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
               const SizedBox(height: 14),
               TextFormField(
                 controller: _explanationController,
@@ -441,13 +377,18 @@ class _NewAbsenceJustificationPageState
                 maxLength: 500,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
-                  labelText: 'Expliquez brièvement la raison de l’absence',
+                  labelText: 'Expliquez brièvement la raison de l’absence *',
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   final explanation = value?.trim() ?? '';
-                  if (explanation.isNotEmpty && explanation.length < 10) {
+                  if (explanation.isEmpty) {
+                    return _selectedReason == 'Autre'
+                        ? 'Expliquez le motif choisi.'
+                        : 'Ajoutez une explication.';
+                  }
+                  if (explanation.length < 10) {
                     return 'Ajoutez quelques détails (10 caractères minimum).';
                   }
                   return null;
@@ -688,76 +629,6 @@ class _ChildTile extends StatelessWidget {
   }
 }
 
-class _AbsenceTile extends StatelessWidget {
-  final EligibleAbsence absence;
-  final String studentName;
-  final bool selected;
-  final VoidCallback onTap;
-  final String? trailingLabel;
-
-  const _AbsenceTile({
-    required this.absence,
-    required this.studentName,
-    required this.onTap,
-    this.selected = false,
-    this.trailingLabel,
-  });
-
-  String _formatDate(String value) {
-    final date = DateTime.tryParse(value);
-    if (date == null) return value;
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      color: Colors.white,
-      elevation: selected ? 2 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: selected ? CustomTheme.blue : Colors.transparent,
-          width: selected ? 1.5 : 0,
-        ),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xffedf7f0),
-          child: Icon(Icons.event_busy_outlined, color: CustomTheme.blue),
-        ),
-        title: Text(
-          'Absence du ${_formatDate(absence.date)}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(studentName),
-            if (absence.className.trim().isNotEmpty) Text(absence.className),
-            const Text('Statut : absent(e)'),
-          ],
-        ),
-        trailing: trailingLabel != null
-            ? Text(
-                trailingLabel!,
-                style: const TextStyle(
-                  color: CustomTheme.blue,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            : Icon(
-                selected ? Icons.check_circle : Icons.chevron_right,
-                color: CustomTheme.blue,
-              ),
-      ),
-    );
-  }
-}
-
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
 
@@ -774,17 +645,15 @@ class _LoadingCard extends StatelessWidget {
   }
 }
 
-class _MessageCard extends StatelessWidget {
+class _ParentMessageCard extends StatelessWidget {
   final IconData icon;
   final String message;
-  final String? title;
   final String? actionLabel;
   final VoidCallback? onAction;
 
-  const _MessageCard({
+  const _ParentMessageCard({
     required this.icon,
     required this.message,
-    this.title,
     this.actionLabel,
     this.onAction,
   });
@@ -803,17 +672,6 @@ class _MessageCard extends StatelessWidget {
           children: [
             Icon(icon, color: CustomTheme.blue, size: 38),
             const SizedBox(height: 10),
-            if (title != null) ...[
-              Text(
-                title!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: CustomTheme.dark,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
             Text(
               message,
               textAlign: TextAlign.center,

@@ -40,7 +40,8 @@ class _AbsenceJustificationsPageState extends State<AbsenceJustificationsPage> {
   }
 
   Future<void> _openNewJustification() async {
-    final submitted = await Navigator.of(context).push<bool>(
+    final submitted =
+        await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => NewAbsenceJustificationPage(user: widget.user),
       ),

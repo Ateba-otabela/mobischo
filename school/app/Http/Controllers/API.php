@@ -254,23 +254,15 @@ class API extends Controller
             $schoolCode = trim((string) ($parent->CodeEtablissement ?? ''));
             $request->validate([
                 'CodeEleve' => 'required|string|max:255',
-                'absence_id' => 'required|integer|min:1',
+                'date_absence' => 'required|date_format:Y-m-d',
                 'reason' => 'required|in:Maladie,Rendez-vous médical,Raisons familiales,Urgence familiale,Autre',
-                'reason_detail' => 'required_if:reason,Autre|nullable|string|min:3|max:180',
-                'justification' => 'nullable|string|min:10|max:500',
+                'justification' => 'required|string|min:10|max:500',
                 'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             ]);
             $studentCode = trim((string) $request->input('CodeEleve', ''));
-            $absenceId = (int) $request->input('absence_id');
             $reason = trim((string) $request->input('reason'));
-            $reasonDetail = trim((string) $request->input('reason_detail', ''));
-            $reasonLabel = $reason === 'Autre'
-                ? 'Autre : '.$reasonDetail
-                : $reason;
+            $absenceDate = trim((string) $request->input('date_absence'));
             $justificationText = trim((string) $request->input('justification', ''));
-            if ($justificationText === '') {
-                $justificationText = $reasonLabel;
-            }
 
             $student = Eleve::query()
                 ->where('CodeEleve', $studentCode)
@@ -280,26 +272,7 @@ class API extends Controller
                 return response()->json(['error' => 'Élève non autorisé.'], 403);
             }
 
-            $absence = Conduite::query()
-                ->whereKey($absenceId)
-                ->where('CodeEleve', $studentCode)
-                ->whereRaw("UPPER(COALESCE(CodeEtatCond, '')) = ?", ['A'])
-                ->first();
-            if (!$absence) {
-                return response()->json([
-                    'error' => 'L’absence sélectionnée n’est pas disponible pour une justification.',
-                ], 422);
-            }
-
-            $absenceDate = trim((string) $absence->DateEnreg);
-            $parsedDate = \DateTime::createFromFormat('Y-m-d', $absenceDate);
-            $dateErrors = \DateTime::getLastErrors();
-            if (!$parsedDate || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0)) ||
-                $parsedDate->format('Y-m-d') !== $absenceDate) {
-                return response()->json(['error' => 'La date d’absence enregistrée est invalide.'], 422);
-            }
-
-            $classCode = trim((string) ($absence->CodeClasse ?: $student->CodeClasse));
+            $classCode = trim((string) $student->CodeClasse);
             $class = Classe::query()
                 ->where('CodeClasse', $classCode)
                 ->when($schoolCode !== '', fn ($query) => $query->where('CodeEtablissement', $schoolCode))
@@ -317,27 +290,19 @@ class API extends Controller
                     $parentCode,
                     $schoolCode,
                     $studentCode,
-                    $absenceId,
                     $absenceDate,
-                    $reasonLabel,
+                    $reason,
                     $justificationText,
                     $class,
                     &$documentPath
                 ) {
-                    Eleve::query()
+                    $lockedStudent = Eleve::query()
                         ->where('CodeEleve', $studentCode)
                         ->where('code', $parentCode)
                         ->lockForUpdate()
                         ->first();
-
-                    $lockedAbsence = Conduite::query()
-                        ->whereKey($absenceId)
-                        ->where('CodeEleve', $studentCode)
-                        ->whereRaw("UPPER(COALESCE(CodeEtatCond, '')) = ?", ['A'])
-                        ->lockForUpdate()
-                        ->first();
-                    if (!$lockedAbsence || trim((string) $lockedAbsence->DateEnreg) !== $absenceDate) {
-                        return ['invalid_absence' => true];
+                    if (!$lockedStudent) {
+                        return ['unauthorized_student' => true];
                     }
 
                     $existing = AbsenceJustification::query()
@@ -370,8 +335,8 @@ class API extends Controller
                         'CodeEtablissement' => $schoolCode !== '' ? $schoolCode : null,
                         'absence_date' => $absenceDate,
                         'date_absence' => $absenceDate,
-                        'reason' => $reasonLabel,
-                        'motif' => $reasonLabel,
+                        'reason' => $reason,
+                        'motif' => $reason,
                         'justification' => $justificationText,
                         'status' => 'pending',
                         'statut' => 'En attente',
@@ -395,10 +360,8 @@ class API extends Controller
                 return response()->json(['error' => 'La justification n’a pas pu être enregistrée.'], 500);
             }
 
-            if (isset($submission['invalid_absence'])) {
-                return response()->json([
-                    'error' => 'L’absence sélectionnée n’est plus disponible pour une justification.',
-                ], 422);
+            if (isset($submission['unauthorized_student'])) {
+                return response()->json(['error' => 'Élève non autorisé.'], 403);
             }
 
             if (isset($submission['duplicate'])) {
@@ -500,71 +463,6 @@ class API extends Controller
                 'per_page' => $perPage,
                 'total_pages' => $totalPages,
             ]);
-        }
-
-        if ($action == 'GET_PARENT_CHILD_ABSENCES') {
-            $parent = $request->user();
-            if (!$parent instanceof User || strtolower(trim((string) $parent->account_type)) !== 'parent') {
-                return response()->json(['error' => 'Parent non autorisé.'], 403);
-            }
-
-            $request->validate([
-                'CodeEleve' => 'required|string|max:255',
-            ]);
-            $parentCode = trim((string) $parent->code);
-            $studentCode = trim((string) $request->input('CodeEleve'));
-            $schoolCode = trim((string) ($parent->CodeEtablissement ?? ''));
-            $student = Eleve::query()
-                ->where('CodeEleve', $studentCode)
-                ->where('code', $parentCode)
-                ->first();
-            if (!$student) {
-                return response()->json(['error' => 'Élève non autorisé.'], 403);
-            }
-
-            $absences = Conduite::query()
-                ->join('classes as absence_class', 'absence_class.CodeClasse', '=', 'conduites.CodeClasse')
-                ->where('conduites.CodeEleve', $studentCode)
-                ->whereRaw("UPPER(COALESCE(conduites.CodeEtatCond, '')) = ?", ['A'])
-                ->when(
-                    $schoolCode !== '',
-                    fn ($query) => $query->where('absence_class.CodeEtablissement', $schoolCode)
-                )
-                ->whereNotExists(function ($query) {
-                    $query->select(DB::raw(1))
-                        ->from('absence_justifications as pending_justification')
-                        ->whereColumn('pending_justification.CodeEleve', 'conduites.CodeEleve')
-                        ->where(function ($dateQuery) {
-                            $dateQuery
-                                ->whereColumn(
-                                    'pending_justification.absence_date',
-                                    'conduites.DateEnreg'
-                                )
-                                ->orWhereColumn(
-                                    'pending_justification.date_absence',
-                                    'conduites.DateEnreg'
-                                );
-                        })
-                        ->where(function ($statusQuery) {
-                            $statusQuery
-                                ->where('pending_justification.status', 'pending')
-                                ->orWhere('pending_justification.statut', 'En attente');
-                        });
-                })
-                ->select([
-                    'conduites.id',
-                    'conduites.DateEnreg',
-                    'conduites.CodeEleve',
-                    'conduites.CodeClasse',
-                    'conduites.CodeEtatCond',
-                    'absence_class.LibelleClasse as class_name',
-                ])
-                ->orderByDesc('conduites.DateEnreg')
-                ->get()
-                ->unique('DateEnreg')
-                ->values();
-
-            return response()->json($absences);
         }
 
         if ($action == 'GET_PARENT_ABSENCE_JUSTIFICATIONS') {
@@ -1506,6 +1404,196 @@ class API extends Controller
             return Devoir::whereIn('CodeClasse', $classCodes)
                 ->orderBy('dateDuDevoir', 'DESC')
                 ->get();
+        }
+
+        if ($action == 'GET_DASHBOARD_ALERTS') {
+            $user = $request->user();
+            if (!$user instanceof User) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+            if (!in_array($accountType, ['principal', 'principal_encadreur', 'encadreur'], true)) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            if ($schoolCode === '') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $assignedClassCodes = null;
+            if ($accountType === 'encadreur') {
+                $assignedClassCodes = (new EncadreurClassScope())
+                    ->assignedClassCodesForEncadreur($user);
+                if ($assignedClassCodes === []) {
+                    return response()->json([]);
+                }
+            }
+
+            $requestedClass = trim((string) $request->input('CodeClasse', ''));
+            if ($requestedClass !== '') {
+                $classIsInSchool = Classe::query()
+                    ->where('CodeClasse', $requestedClass)
+                    ->where('CodeEtablissement', $schoolCode)
+                    ->exists();
+                if (!$classIsInSchool
+                    || ($assignedClassCodes !== null
+                        && !in_array($requestedClass, $assignedClassCodes, true))) {
+                    return response()->json(['error' => 'Unauthorized'], 403);
+                }
+            }
+
+            $attendanceEvents = Conduite::query()
+                ->join('classes as event_class', 'event_class.CodeClasse', '=', 'conduites.CodeClasse')
+                ->join('eleves as event_student', function ($join) {
+                    $join->on('event_student.CodeEleve', '=', 'conduites.CodeEleve')
+                        ->on('event_student.CodeClasse', '=', 'conduites.CodeClasse');
+                })
+                ->where('event_class.CodeEtablissement', $schoolCode)
+                ->whereIn(DB::raw("UPPER(COALESCE(conduites.CodeEtatCond, ''))"), ['A', 'R'])
+                ->when($requestedClass !== '', fn ($query) => $query->where('conduites.CodeClasse', $requestedClass))
+                ->when(
+                    $assignedClassCodes !== null,
+                    fn ($query) => $query->whereIn('conduites.CodeClasse', $assignedClassCodes)
+                )
+                ->select([
+                    'conduites.id',
+                    'conduites.CodeEleve',
+                    'conduites.CodeClasse',
+                    'conduites.CodeEnseignement',
+                    'conduites.CodeMatiere',
+                    'conduites.DateEnreg',
+                    'conduites.CodeEtatCond',
+                    'conduites.created_at',
+                    'event_class.LibelleClasse as class_name',
+                    'event_student.Nom as student_last_name',
+                    'event_student.Prenom as student_first_name',
+                ])
+                ->orderByDesc('conduites.DateEnreg')
+                ->orderByDesc('conduites.created_at')
+                ->limit(50)
+                ->get()
+                ->map(function ($event) use ($schoolCode) {
+                    $status = strtoupper((string) $event->CodeEtatCond);
+                    $studentName = trim((string) ($event->student_last_name ?? '').' '.(string) ($event->student_first_name ?? ''));
+
+                    return [
+                        'event_type' => 'attendance',
+                        'id' => (int) $event->id,
+                        'CodeEtablissement' => $schoolCode,
+                        'CodeEleve' => (string) $event->CodeEleve,
+                        'CodeClasse' => (string) $event->CodeClasse,
+                        'CodeEnseignement' => (string) ($event->CodeEnseignement ?? ''),
+                        'CodeMatiere' => (string) ($event->CodeMatiere ?? ''),
+                        'date_absence' => (string) $event->DateEnreg,
+                        'parent_status' => '',
+                        'teacher_status' => $status,
+                        'status' => 'attendance',
+                        'notes' => $status === 'A' ? 'Élève absent' : 'Élève en retard',
+                        'student_name' => $studentName,
+                        'student_code' => (string) $event->CodeEleve,
+                        'class_name' => (string) ($event->class_name ?? ''),
+                        'created_at' => $event->created_at,
+                    ];
+                });
+
+            $investigationQuery = InvestigationAlert::query()
+                ->where('CodeEtablissement', $schoolCode)
+                ->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('classes as investigation_class')
+                        ->whereColumn('investigation_class.CodeClasse', 'investigation_alerts.CodeClasse')
+                        ->whereColumn('investigation_class.CodeEtablissement', 'investigation_alerts.CodeEtablissement')
+                        ->whereExists(function ($studentQuery) {
+                            $studentQuery->select(DB::raw(1))
+                                ->from('eleves as investigation_student')
+                                ->whereColumn('investigation_student.CodeEleve', 'investigation_alerts.CodeEleve')
+                                ->whereColumn('investigation_student.CodeClasse', 'investigation_alerts.CodeClasse');
+                        });
+                })
+                ->when($requestedClass !== '', fn ($query) => $query->where('CodeClasse', $requestedClass))
+                ->when(
+                    $assignedClassCodes !== null,
+                    fn ($query) => $query->whereIn('CodeClasse', $assignedClassCodes)
+                )
+                ->orderByDesc('date_absence')
+                ->orderByDesc('created_at')
+                ->limit(50);
+            $investigations = $investigationQuery->get();
+            $studentsByCode = Eleve::query()
+                ->whereIn('CodeEleve', $investigations->pluck('CodeEleve')->unique())
+                ->get()
+                ->keyBy('CodeEleve');
+            $classNamesByCode = Classe::query()
+                ->whereIn('CodeClasse', $investigations->pluck('CodeClasse')->unique())
+                ->where('CodeEtablissement', $schoolCode)
+                ->pluck('LibelleClasse', 'CodeClasse');
+            $investigationEvents = $investigations->map(function ($alert) use ($studentsByCode, $classNamesByCode) {
+                $student = $studentsByCode->get($alert->CodeEleve);
+                $payload = $alert->toArray();
+                $payload['event_type'] = 'investigation';
+                $payload['student_name'] = $student
+                    ? trim((string) ($student->Nom ?? '').' '.(string) ($student->Prenom ?? ''))
+                    : '';
+                $payload['student_code'] = (string) ($alert->CodeEleve ?? '');
+                $payload['class_name'] = (string) ($classNamesByCode->get($alert->CodeClasse) ?? '');
+
+                return $payload;
+            });
+
+            $events = $attendanceEvents
+                ->concat($investigationEvents)
+                ->sortByDesc(function ($event) {
+                    return (string) ($event['date_absence'] ?? '')
+                        .' '.(string) ($event['created_at'] ?? '');
+                })
+                ->take(50)
+                ->values();
+
+            return response()->json($events);
+        }
+
+        if ($action == 'UPDATE_DASHBOARD_ALERT') {
+            $user = $request->user();
+            if (!$user instanceof User) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+            if (!in_array($accountType, ['principal', 'principal_encadreur', 'encadreur'], true)) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $request->validate([
+                'id' => 'required|integer|min:1',
+                'status' => 'required|in:validated,rejected',
+                'notes' => 'nullable|string|max:2000',
+            ]);
+            $schoolCode = trim((string) ($user->CodeEtablissement ?? ''));
+            $alert = InvestigationAlert::query()
+                ->whereKey($request->input('id'))
+                ->where('CodeEtablissement', $schoolCode)
+                ->first();
+            if (!$alert) {
+                return response()->json(['error' => 'Investigation not found'], 404);
+            }
+
+            if ($accountType === 'encadreur'
+                && !(new EncadreurClassScope())->ensureClassAccessForEncadreur(
+                    $user,
+                    (string) $alert->CodeClasse
+                )) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $alert->status = $request->input('status');
+            $alert->notes = trim((string) $request->input('notes', '')) ?: ($alert->notes ?? '');
+            $alert->resolved_by = (string) $user->code;
+            $alert->resolved_at = now();
+            $alert->save();
+
+            return response()->json(['status' => 'success', 'alert' => $alert]);
         }
 
         if ($action == 'GET_INVESTIGATIONS') {

@@ -103,13 +103,14 @@ class NotificationDispatchServiceTest extends TestCase
         $this->assertSame(0, $result['sent']);
     }
 
-    public function test_absent_status_notifies_parent_without_principal_or_encadreur(): void
+    public function test_absent_status_notifies_parent_and_same_school_principal(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
         User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
 
         UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
+        UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
 
@@ -123,20 +124,30 @@ class NotificationDispatchServiceTest extends TestCase
                     && ($data['recipient_role'] ?? null) === 'parent';
             }))
             ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')
+            ->once()
+            ->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+                return ($data['type'] ?? null) === 'attendance'
+                    && ($data['student_code'] ?? null) === 'E-1'
+                    && ($data['school_code'] ?? null) === '16801'
+                    && ($data['recipient_role'] ?? null) === 'principal';
+            }))
+            ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
 
         $service = new NotificationDispatchService($fcm);
         $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
 
-        $this->assertSame(1, $result['sent']);
+        $this->assertSame(2, $result['sent']);
     }
 
-    public function test_late_status_notifies_parent_without_principal_or_encadreur(): void
+    public function test_late_status_notifies_parent_and_same_school_principal(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
         User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
 
         UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
+        UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
 
@@ -145,17 +156,49 @@ class NotificationDispatchServiceTest extends TestCase
             return ($data['type'] ?? null) === 'attendance'
                 && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève en retard', Mockery::on(fn ($body) => str_contains($body, 'en retard')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance'
+                && ($data['status'] ?? null) === 'R'
+                && ($data['recipient_role'] ?? null) === 'principal';
+        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
 
         $service = new NotificationDispatchService($fcm);
         $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'R', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
 
-        $this->assertSame(1, $result['sent']);
+        $this->assertSame(2, $result['sent']);
     }
 
     public function test_principal_from_another_school_does_not_receive_notification(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         User::create(['code' => 'PR-1', 'account_type' => 'principal', 'nom' => 'Principal', 'prenom' => 'One', 'CodeEtablissement' => '99999']);
+        User::create(['code' => 'PR-2', 'account_type' => 'principal', 'nom' => 'Principal', 'prenom' => 'Two', 'CodeEtablissement' => '16801']);
+        User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
+
+        UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
+        UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
+        UserDevice::create(['user_code' => 'PR-2', 'fcm_token' => 'principal-school-device-token', 'token_hash' => hash('sha256', 'principal-school-device-token'), 'platform' => 'android', 'is_active' => true]);
+
+        Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
+
+        $fcm = Mockery::mock(FcmNotificationService::class);
+        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
+        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->once()->with('PR-2', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
+        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+
+        $service = new NotificationDispatchService($fcm);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+
+        $this->assertSame(2, $result['sent']);
+    }
+
+    public function test_attendance_notification_does_not_include_encadreur_or_other_staff(): void
+    {
+        User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
+        $this->createNonParentAttendanceRecipients();
         User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
 
         UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
@@ -167,32 +210,14 @@ class NotificationDispatchServiceTest extends TestCase
         $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
-
-        $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
-
-        $this->assertSame(1, $result['sent']);
-    }
-
-    public function test_attendance_notification_remains_parent_only_with_school_staff_present(): void
-    {
-        User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
-        $this->createNonParentAttendanceRecipients();
-        User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
-
-        UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
-
-        Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
-
-        $fcm = Mockery::mock(FcmNotificationService::class);
-        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
-            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
+        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
 
         $service = new NotificationDispatchService($fcm);
         $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
 
-        $this->assertSame(1, $result['sent']);
+        $this->assertSame(2, $result['sent']);
     }
 
     public function test_missing_parent_device_does_not_fall_back_to_school_staff(): void
@@ -209,11 +234,14 @@ class NotificationDispatchServiceTest extends TestCase
         $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
+        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
 
         $service = new NotificationDispatchService($fcm);
         $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
 
-        $this->assertSame(0, $result['sent']);
+        $this->assertSame(1, $result['sent']);
     }
 
     private function createNonParentAttendanceRecipients(): void

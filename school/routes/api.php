@@ -27,6 +27,9 @@ Route::post('/school_manager',[API::class,'school_manager'])->withoutMiddleware(
 Route::post('/parent/absence-justifications', [API::class, 'school_manager'])
     ->middleware(['auth:sanctum', 'abilities:mobischo:mobile', 'throttle:60,1']);
 
+Route::post('/dashboard/alerts', [API::class, 'school_manager'])
+    ->middleware(['auth:sanctum', 'abilities:mobischo:mobile', 'throttle:60,1']);
+
 Route::post('/mobile/login',[API::class,'mobileLogin'])->withoutMiddleware('throttle:api')
 ->middleware('throttle:2000000:1');
 

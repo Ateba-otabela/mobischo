@@ -19,7 +19,7 @@ class NotificationDispatchService
     public function dispatchAttendanceNotification(string $studentCode, string $attendanceDate, string $status, string $actorCode, array $context = []): array
     {
         $normalizedStatus = strtoupper(trim($status));
-        if ($normalizedStatus === 'P') {
+        if (!in_array($normalizedStatus, ['A', 'R'], true)) {
             return ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
         }
 
@@ -61,6 +61,42 @@ class NotificationDispatchService
 
             foreach (['sent', 'attempted', 'failed', 'invalidated'] as $key) {
                 $summary[$key] += (int) ($parentResult[$key] ?? 0);
+            }
+        }
+
+        if ($schoolCode !== '') {
+            $principalCodes = User::query()
+                ->whereIn('account_type', ['principal', 'principal_encadreur'])
+                ->where('CodeEtablissement', $schoolCode)
+                ->where('code', '!=', $actorCode)
+                ->pluck('code')
+                ->filter()
+                ->unique();
+
+            $principalTitle = $normalizedStatus === 'A'
+                ? 'Élève absent'
+                : 'Élève en retard';
+            $principalBody = sprintf(
+                '%s a été marqué(e) %s le %s.',
+                $studentName !== '' ? $studentName : 'Un élève',
+                $this->statusLabel($normalizedStatus),
+                $attendanceDate
+            );
+
+            foreach ($principalCodes as $principalCode) {
+                $principalResult = $this->notifyUser((string) $principalCode, $principalTitle, $principalBody, [
+                    'type' => 'attendance',
+                    'student_code' => $studentCode,
+                    'class_code' => $classCode,
+                    'school_code' => $schoolCode,
+                    'attendance_date' => $attendanceDate,
+                    'status' => $normalizedStatus,
+                    'recipient_role' => 'principal',
+                ]);
+
+                foreach (['sent', 'attempted', 'failed', 'invalidated'] as $key) {
+                    $summary[$key] += (int) ($principalResult[$key] ?? 0);
+                }
             }
         }
 

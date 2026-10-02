@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/services/mobile_api_service.dart';
 
 class PrincipalDashboardSession {
   final String date;
@@ -36,7 +37,8 @@ class PrincipalDashboardSession {
         json['class'],
         fallback: _normalizeDisplayText(
           json['LibelleClasse'],
-          fallback: _normalizeDisplayText(json['CodeClasse'], fallback: 'Classe'),
+          fallback:
+              _normalizeDisplayText(json['CodeClasse'], fallback: 'Classe'),
         ),
       ),
       subject: _normalizeDisplayText(
@@ -50,7 +52,8 @@ class PrincipalDashboardSession {
         json['teacher'],
         fallback: _normalizeDisplayText(
           json['teacher_name'],
-          fallback: _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
+          fallback:
+              _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
         ),
       ),
       present: _toInt(json['present']),
@@ -139,7 +142,8 @@ class PrincipalAttendanceData {
       json['teacher'],
       fallback: _normalizeDisplayText(
         json['teacher_name'],
-        fallback: _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
+        fallback:
+            _normalizeDisplayText(json['enseignant'], fallback: 'Enseignant'),
       ),
     );
 
@@ -235,8 +239,7 @@ class PrincipalDashboardClassOverview {
     required this.attendancePercentage,
   });
 
-  factory PrincipalDashboardClassOverview.fromJson(
-      Map<String, dynamic> json) {
+  factory PrincipalDashboardClassOverview.fromJson(Map<String, dynamic> json) {
     return PrincipalDashboardClassOverview(
       codeClasse: json['CodeClasse']?.toString() ?? '',
       name: json['LibelleClasse']?.toString() ?? '',
@@ -376,6 +379,7 @@ class PrincipalDashboardData {
 
 class InvestigationAlertData {
   final int? id;
+  final String eventType;
   final String codeEtablissement;
   final String codeEleve;
   final String codeClasse;
@@ -388,12 +392,14 @@ class InvestigationAlertData {
   final String notes;
   final String studentName;
   final String studentCode;
+  final String className;
   final String resolvedBy;
   final String resolvedAt;
   final String createdAt;
 
   const InvestigationAlertData({
     required this.id,
+    required this.eventType,
     required this.codeEtablissement,
     required this.codeEleve,
     required this.codeClasse,
@@ -406,6 +412,7 @@ class InvestigationAlertData {
     required this.notes,
     required this.studentName,
     required this.studentCode,
+    required this.className,
     required this.resolvedBy,
     required this.resolvedAt,
     required this.createdAt,
@@ -414,6 +421,7 @@ class InvestigationAlertData {
   factory InvestigationAlertData.fromJson(Map<String, dynamic> json) {
     return InvestigationAlertData(
       id: _toNullableInt(json['id']),
+      eventType: json['event_type']?.toString() ?? 'investigation',
       codeEtablissement: json['CodeEtablissement']?.toString() ?? '',
       codeEleve: json['CodeEleve']?.toString() ?? '',
       codeClasse: json['CodeClasse']?.toString() ?? '',
@@ -426,6 +434,7 @@ class InvestigationAlertData {
       notes: json['notes']?.toString() ?? '',
       studentName: json['student_name']?.toString() ?? '',
       studentCode: json['student_code']?.toString() ?? '',
+      className: json['class_name']?.toString() ?? '',
       resolvedBy: json['resolved_by']?.toString() ?? '',
       resolvedAt: json['resolved_at']?.toString() ?? '',
       createdAt: json['created_at']?.toString() ?? '',
@@ -479,21 +488,19 @@ class PrincipalService {
   static const getDashboardAction = 'GET_PRINCIPAL_DASHBOARD';
   static const getClassesAction = 'GET_PRINCIPAL_CLASSES';
   static const getAttendanceAction = 'GET_PRINCIPAL_ATTENDANCE';
-  static const getInvestigationsAction = 'GET_INVESTIGATIONS';
-  static const updateInvestigationAction = 'UPDATE_INVESTIGATION_ALERT';
-
   static Future<List<InvestigationAlertData>> getInvestigations(
     User user, {
     String? codeClasse,
   }) async {
-    final requestBody = <String, String>{
-      'action': getInvestigationsAction,
-      'code': user.code,
-      'CodeEtablissement': user.CodeEtablissement,
-      if (codeClasse != null && codeClasse.isNotEmpty) 'CodeClasse': codeClasse,
-    };
-
-    final response = await http.post(Uri.parse(root), body: requestBody);
+    final response = await MobileApiService.post(
+      '/dashboard/alerts',
+      headers: const {'Accept': 'application/json'},
+      body: {
+        'action': 'GET_DASHBOARD_ALERTS',
+        if (codeClasse != null && codeClasse.isNotEmpty)
+          'CodeClasse': codeClasse,
+      },
+    );
     if (response.statusCode != 200) {
       throw Exception(
           'Impossible de charger les investigations (${response.statusCode})');
@@ -516,11 +523,11 @@ class PrincipalService {
     required String status,
     String? notes,
   }) async {
-    final response = await http.post(
-      Uri.parse(root),
+    final response = await MobileApiService.post(
+      '/dashboard/alerts',
+      headers: const {'Accept': 'application/json'},
       body: {
-        'action': updateInvestigationAction,
-        'code': user.code,
+        'action': 'UPDATE_DASHBOARD_ALERT',
         'id': alertId,
         'status': status,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
@@ -542,7 +549,8 @@ class PrincipalService {
       return InvestigationAlertData.fromJson(alertJson);
     }
 
-    throw const FormatException('Investigation update response missing alert payload');
+    throw const FormatException(
+        'Investigation update response missing alert payload');
   }
 
   static Future<List<PrincipalAttendanceData>> getPrincipalAttendance(
@@ -581,9 +589,7 @@ class PrincipalService {
       }
     }
 
-    return sessionMaps
-        .map(PrincipalAttendanceData.fromJson)
-        .toList();
+    return sessionMaps.map(PrincipalAttendanceData.fromJson).toList();
   }
 
   static Future<List<PrincipalClassSummary>> getClasses(User user) async {
@@ -597,7 +603,8 @@ class PrincipalService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Unable to load Principal classes (${response.statusCode})');
+      throw Exception(
+          'Unable to load Principal classes (${response.statusCode})');
     }
 
     final decoded = jsonDecode(response.body);
@@ -616,7 +623,8 @@ class PrincipalService {
   ) async {
     final token = user.aiToken.trim();
     if (token.isEmpty) {
-      throw Exception('Votre session doit être renouvelée. Veuillez vous reconnecter.');
+      throw Exception(
+          'Votre session doit être renouvelée. Veuillez vous reconnecter.');
     }
 
     final response = await http.get(
@@ -628,10 +636,12 @@ class PrincipalService {
     );
 
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw Exception('Votre session doit être renouvelée. Veuillez vous reconnecter.');
+      throw Exception(
+          'Votre session doit être renouvelée. Veuillez vous reconnecter.');
     }
     if (response.statusCode != 200) {
-      throw Exception('Unable to load Principal teachers (${response.statusCode})');
+      throw Exception(
+          'Unable to load Principal teachers (${response.statusCode})');
     }
 
     final decoded = jsonDecode(response.body);
@@ -655,7 +665,8 @@ class PrincipalService {
     print('[PrincipalDashboard] URL: $root');
     print('[PrincipalDashboard] request body: $requestBody');
     print('[PrincipalDashboard] user code: ${user.code}');
-    print('[PrincipalDashboard] user CodeEtablissement: ${user.CodeEtablissement}');
+    print(
+        '[PrincipalDashboard] user CodeEtablissement: ${user.CodeEtablissement}');
     print('[PrincipalDashboard] user admin: ${user.admin}');
 
     try {
@@ -673,7 +684,8 @@ class PrincipalService {
       }
 
       final decoded = jsonDecode(response.body);
-      print('[PrincipalDashboard] decoded response type: ${decoded.runtimeType}');
+      print(
+          '[PrincipalDashboard] decoded response type: ${decoded.runtimeType}');
 
       if (decoded is! Map<String, dynamic>) {
         print('[PrincipalDashboard] unexpected response structure: $decoded');
@@ -693,9 +705,8 @@ class PrincipalService {
         'class_overview',
         'today_sessions',
       ];
-      final missingFields = requiredFields
-          .where((field) => !decoded.containsKey(field))
-          .toList();
+      final missingFields =
+          requiredFields.where((field) => !decoded.containsKey(field)).toList();
       if (missingFields.isNotEmpty) {
         print('[PrincipalDashboard] missing response fields: $missingFields');
       }

@@ -1,6 +1,7 @@
 // ignore_for_file: implementation_imports, unnecessary_import
 
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/src/foundation/key.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:mobischo/utils/custom_button.dart';
@@ -21,6 +22,7 @@ class _WelcomeState extends State<Welcome> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Center(
         child: Column(
@@ -37,7 +39,7 @@ class _WelcomeState extends State<Welcome> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     CustomButton(
-                        text: "Continuer",
+                        text: l10n.continueButton,
                         onPress: () {
                           Navigator.push(
                             context,

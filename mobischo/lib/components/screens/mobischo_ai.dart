@@ -65,15 +65,29 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
     final text = (suggestedText ?? _controller.text).trim();
     if (text.isEmpty || _assistantTyping || _loadingHistory) return;
 
+    debugPrint(
+      '[MobischoAI] role=${widget.user.account_type}; '
+      'step=message send entry; '
+      'aiTokenPresent=${widget.user.aiToken.trim().isNotEmpty}',
+    );
     _controller.clear();
     setState(() => _assistantTyping = true);
     try {
       if (_conversationId == null) {
+        debugPrint(
+          '[MobischoAI] role=${widget.user.account_type}; '
+          'step=conversation setup required',
+        );
         final created = await _aiService.createConversation(widget.user);
         _conversationId = int.tryParse(created['id'].toString());
       }
       if (!mounted) return;
     } on MobischoAiServiceException catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=conversation setup; caughtType=${error.runtimeType}; '
+        'caughtMessage=${error.userMessage}',
+      );
       if (mounted) {
         setState(() => _assistantTyping = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -81,11 +95,17 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
         );
       }
       return;
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=conversation setup; caughtType=${error.runtimeType}; '
+        'caughtMessage=$error',
+      );
       if (mounted) {
         setState(() => _assistantTyping = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible de créer une conversation.')),
+          const SnackBar(
+              content: Text('Impossible de créer une conversation.')),
         );
       }
       return;
@@ -119,9 +139,20 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
         conversationId: _conversationId,
       );
     } on MobischoAiServiceException catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=chat screen catch; caughtType=${error.runtimeType}; '
+        'caughtMessage=${error.userMessage}',
+      );
       reply = error.userMessage;
-    } catch (_) {
-      reply = 'Désolé, je rencontre actuellement un problème de connexion. Veuillez réessayer.';
+    } catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=chat screen catch; caughtType=${error.runtimeType}; '
+        'caughtMessage=$error',
+      );
+      reply =
+          'Désolé, je rencontre actuellement un problème de connexion. Veuillez réessayer.';
     }
     if (!mounted) return;
     setState(() {
@@ -134,15 +165,23 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
     _scrollToLatest();
   }
 
-  Future<void> _loadConversations({bool openLatest = false, bool append = false}) async {
+  Future<void> _loadConversations(
+      {bool openLatest = false, bool append = false}) async {
+    debugPrint(
+      '[MobischoAI] role=${widget.user.account_type}; '
+      'step=conversation history screen entry; '
+      'aiTokenPresent=${widget.user.aiToken.trim().isNotEmpty}; '
+      'openLatest=$openLatest; append=$append',
+    );
     try {
       final result = await _aiService.fetchConversations(
         widget.user,
         page: append ? _historyPage + 1 : 1,
       );
-      final pageItems = (result['data'] is List ? result['data'] as List : const [])
-          .whereType<Map<String, dynamic>>()
-          .toList();
+      final pageItems =
+          (result['data'] is List ? result['data'] as List : const [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
       if (!mounted) return;
       setState(() {
         _conversations = append ? [..._conversations, ...pageItems] : pageItems;
@@ -155,16 +194,30 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
         if (id != null) await _openConversation(id);
       }
       if (mounted) setState(() => _loadingHistory = false);
-    } on MobischoAiServiceException {
+    } on MobischoAiServiceException catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=conversation history screen catch; '
+        'caughtType=${error.runtimeType}; caughtMessage=${error.userMessage}',
+      );
       if (!mounted) return;
       setState(() => _loadingHistory = false);
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=conversation history screen catch; '
+        'caughtType=${error.runtimeType}; caughtMessage=$error',
+      );
       if (!mounted) return;
       setState(() => _loadingHistory = false);
     }
   }
 
   Future<void> _openConversation(int conversationId) async {
+    debugPrint(
+      '[MobischoAI] role=${widget.user.account_type}; '
+      'step=open conversation; id=$conversationId',
+    );
     try {
       final conversation =
           await _aiService.fetchConversation(widget.user, conversationId);
@@ -191,14 +244,25 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       });
       _scrollToLatest();
     } on MobischoAiServiceException catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=open conversation; caughtType=${error.runtimeType}; '
+        'caughtMessage=${error.userMessage}',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.userMessage)),
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        '[MobischoAI] role=${widget.user.account_type}; '
+        'step=open conversation; caughtType=${error.runtimeType}; '
+        'caughtMessage=$error',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’ouvrir cette conversation.')),
+        const SnackBar(
+            content: Text('Impossible d’ouvrir cette conversation.')),
       );
     }
   }
@@ -249,127 +313,151 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) => SafeArea(
           child: SizedBox(
-          height: MediaQuery.of(sheetContext).size.height * 0.72,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Conversations',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            height: MediaQuery.of(sheetContext).size.height * 0.72,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Conversations',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Nouvelle conversation',
-                      onPressed: () async {
-                        Navigator.pop(sheetContext);
-                        await _startNewConversation();
-                      },
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
+                      IconButton(
+                        tooltip: 'Nouvelle conversation',
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await _startNewConversation();
+                        },
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: _loadingHistory
-                    ? const Center(child: CircularProgressIndicator())
-                    : _conversations.isEmpty
-                        ? const Center(child: Text('Aucune conversation enregistrée.'))
-                        : ListView.builder(
-                            itemCount: _conversations.length + (_historyHasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _conversations.length) {
-                                return TextButton(
-                                  onPressed: () async {
-                                    final result = await _aiService.fetchConversations(
-                                      widget.user,
-                                      page: _historyPage + 1,
-                                    );
-                                    if (!mounted) return;
-                                    final older = (result['data'] is List
-                                            ? result['data'] as List
-                                            : const [])
-                                        .whereType<Map<String, dynamic>>()
-                                        .toList();
-                                    setState(() {
-                                      _conversations = [..._conversations, ...older];
-                                      _historyPage =
-                                          (result['page'] as num?)?.toInt() ?? _historyPage;
-                                      _historyHasMore = result['has_more'] == true;
-                                    });
-                                    setSheetState(() {});
-                                  },
-                                  child: const Text('Charger les conversations précédentes'),
+                const Divider(height: 1),
+                Expanded(
+                  child: _loadingHistory
+                      ? const Center(child: CircularProgressIndicator())
+                      : _conversations.isEmpty
+                          ? const Center(
+                              child: Text('Aucune conversation enregistrée.'))
+                          : ListView.builder(
+                              itemCount: _conversations.length +
+                                  (_historyHasMore ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (index == _conversations.length) {
+                                  return TextButton(
+                                    onPressed: () async {
+                                      final result =
+                                          await _aiService.fetchConversations(
+                                        widget.user,
+                                        page: _historyPage + 1,
+                                      );
+                                      if (!mounted) return;
+                                      final older = (result['data'] is List
+                                              ? result['data'] as List
+                                              : const [])
+                                          .whereType<Map<String, dynamic>>()
+                                          .toList();
+                                      setState(() {
+                                        _conversations = [
+                                          ..._conversations,
+                                          ...older
+                                        ];
+                                        _historyPage =
+                                            (result['page'] as num?)?.toInt() ??
+                                                _historyPage;
+                                        _historyHasMore =
+                                            result['has_more'] == true;
+                                      });
+                                      setSheetState(() {});
+                                    },
+                                    child: const Text(
+                                        'Charger les conversations précédentes'),
+                                  );
+                                }
+                                final item = _conversations[index];
+                                final id = int.tryParse(item['id'].toString());
+                                final updatedAt = DateTime.tryParse(
+                                  item['updated_at']?.toString() ?? '',
                                 );
-                              }
-                              final item = _conversations[index];
-                              final id = int.tryParse(item['id'].toString());
-                              final updatedAt = DateTime.tryParse(
-                                item['updated_at']?.toString() ?? '',
-                              );
-                              return ListTile(
-                                leading: const Icon(Icons.chat_bubble_outline),
-                                title: Text(
-                                  item['title']?.toString() ?? 'Nouvelle conversation',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  updatedAt == null
-                                      ? 'Conversation'
-                                      : '${MaterialLocalizations.of(context).formatMediumDate(updatedAt)} • '
-                                        '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}',
-                                ),
-                                selected: id == _conversationId,
-                                onTap: id == null
-                                    ? null
-                                    : () async {
-                                        Navigator.pop(sheetContext);
-                                        await _openConversation(id);
-                                      },
-                                trailing: id == null
-                                    ? null
-                                    : IconButton(
-                                        tooltip: 'Supprimer la conversation',
-                                        icon: const Icon(Icons.delete_outline),
-                                        onPressed: () async {
-                                          final shouldDelete =
-                                              await showDialog<bool>(
-                                                    context: sheetContext,
-                                                    builder: (dialogContext) =>
-                                                        AlertDialog(
-                                                      title: const Text('Supprimer cette conversation ?'),
-                                                      content: const Text('Cette action est définitive.'),
-                                                      actions: [
-                                                        TextButton(
-                                                          onPressed: () => Navigator.pop(dialogContext, false),
-                                                          child: const Text('Annuler'),
-                                                        ),
-                                                        TextButton(
-                                                          onPressed: () => Navigator.pop(dialogContext, true),
-                                                          child: const Text('Supprimer'),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ) ??
-                                                  false;
-                                          if (!shouldDelete) return;
-                                          await _deleteConversation(id);
-                                          if (sheetContext.mounted) {
-                                            Navigator.pop(sheetContext);
-                                          }
+                                return ListTile(
+                                  leading:
+                                      const Icon(Icons.chat_bubble_outline),
+                                  title: Text(
+                                    item['title']?.toString() ??
+                                        'Nouvelle conversation',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    updatedAt == null
+                                        ? 'Conversation'
+                                        : '${MaterialLocalizations.of(context).formatMediumDate(updatedAt)} • '
+                                            '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}',
+                                  ),
+                                  selected: id == _conversationId,
+                                  onTap: id == null
+                                      ? null
+                                      : () async {
+                                          Navigator.pop(sheetContext);
+                                          await _openConversation(id);
                                         },
-                                      ),
-                              );
-                            },
-                          ),
-              ),
-            ],
-          ),
+                                  trailing: id == null
+                                      ? null
+                                      : IconButton(
+                                          tooltip: 'Supprimer la conversation',
+                                          icon:
+                                              const Icon(Icons.delete_outline),
+                                          onPressed: () async {
+                                            final shouldDelete =
+                                                await showDialog<bool>(
+                                                      context: sheetContext,
+                                                      builder:
+                                                          (dialogContext) =>
+                                                              AlertDialog(
+                                                        title: const Text(
+                                                            'Supprimer cette conversation ?'),
+                                                        content: const Text(
+                                                            'Cette action est définitive.'),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    dialogContext,
+                                                                    false),
+                                                            child: const Text(
+                                                                'Annuler'),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    dialogContext,
+                                                                    true),
+                                                            child: const Text(
+                                                                'Supprimer'),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ) ??
+                                                    false;
+                                            if (!shouldDelete) return;
+                                            await _deleteConversation(id);
+                                            if (sheetContext.mounted) {
+                                              Navigator.pop(sheetContext);
+                                            }
+                                          },
+                                        ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -398,7 +486,8 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de supprimer cette conversation.')),
+        const SnackBar(
+            content: Text('Impossible de supprimer cette conversation.')),
       );
     }
   }
@@ -558,7 +647,8 @@ class _MessageBubble extends StatelessWidget {
 
   MarkdownStyleSheet _markdownStyleSheet(BuildContext context) {
     final theme = Theme.of(context);
-    final bodyText = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final bodyText =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
 
     return MarkdownStyleSheet(
       a: bodyText.copyWith(color: CustomTheme.blue),
@@ -666,7 +756,8 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Align(
-        alignment: message.fromUser ? Alignment.centerRight : Alignment.centerLeft,
+        alignment:
+            message.fromUser ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.84,
@@ -730,10 +821,11 @@ class _MessageBubble extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           time,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.grey.shade600,
-                                fontSize: 10,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 10,
+                                  ),
                         ),
                       ],
                     )
@@ -886,7 +978,7 @@ class _MessageComposer extends StatelessWidget {
                     shape: const CircleBorder(),
                     child: IconButton(
                       tooltip: hasText ? 'Envoyer' : 'Microphone indisponible',
-                        onPressed: hasText && !isSending
+                      onPressed: hasText && !isSending
                           ? () => onSend(value.text)
                           : null,
                       icon: Icon(

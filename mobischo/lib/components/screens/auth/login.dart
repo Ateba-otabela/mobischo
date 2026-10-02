@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/services/mobile_api_service.dart';
@@ -29,9 +30,10 @@ class _LoginScreenState extends State<LoginScreen> {
   String _error = '';
 
   Future login(BuildContext cont) async {
+    final l10n = AppLocalizations.of(cont)!;
     if (_login.text == '' || _password.text == '') {
       Fluttertoast.showToast(
-          msg: "Les champs ne peuvent pas etre vides !",
+          msg: l10n.emptyFields,
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER,
           fontSize: 16.0);
@@ -47,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.body.isNotEmpty) {
         if (json.decode(response.body) == 'Error') {
           Fluttertoast.showToast(
-            msg: "Les Logins incorrectes",
+            msg: l10n.incorrectLogin,
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
             fontSize: 16.0,
@@ -56,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final data = json.decode(response.body);
           if (data is! List || data.isEmpty) {
             Fluttertoast.showToast(
-              msg: 'Erreur de Connextion',
+              msg: l10n.connectionError,
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.CENTER,
             );
@@ -102,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         Fluttertoast.showToast(
-            msg: 'Erreur de Connextion',
+            msg: l10n.connectionError,
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER);
       }
@@ -126,11 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final _formKey = GlobalKey<FormState>();
+    final l10n = AppLocalizations.of(context)!;
 
-    return MaterialApp(
-        theme: CustomTheme.getTheme(),
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
+    return Scaffold(
           body: Center(
             child: Form(
                 key: _formKey,
@@ -150,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         Text(
-                          'Connectez vous a votre compte',
+                          l10n.loginTitle,
                           style: Theme.of(context).textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
@@ -167,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 CustomInput(
                                     controller: _login,
                                     hintText: 'username1234',
-                                    labelText: 'Login',
+                                    labelText: l10n.login,
                                     isPassword: false,
                                     prefixIcon: Icons.person,
                                     surfixIcon: Icons.lock_outline_rounded,
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 CustomInput(
                                     controller: _password,
                                     hintText: '********',
-                                    labelText: 'Mot de passe',
+                                    labelText: l10n.password,
                                     isPassword: true,
                                     prefixIcon: Icons.lock,
                                     surfixIcon: Icons.lock_outline_rounded,
@@ -192,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 20,
                                 ),
                                 CustomButton(
-                                    text: "Se Connecter",
+                                    text: l10n.signIn,
                                     onPress: () => login(context)),
                                 const SizedBox(
                                   height: 20,
@@ -202,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        'Mot de passe oublié ?',
+                                        l10n.forgotPassword,
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall,
@@ -210,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                       InkWell(
                                           child: const Text(
-                                            'réinitialiser',
+                                            l10n.reset,
                                             style: TextStyle(
                                                 color: CustomTheme.blue),
                                           ),
@@ -227,6 +227,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 )),
           ),
-        ));
+        );
   }
 }

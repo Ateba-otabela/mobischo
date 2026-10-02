@@ -160,6 +160,23 @@ class AiChatEndpointTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_ordinary_mobile_ability_is_not_sufficient_for_ai_chat(): void
+    {
+        $user = $this->principal('mobile-token-user')->forceFill([
+            'account_type' => 'parent',
+        ]);
+        Sanctum::actingAs($user, ['mobischo:mobile']);
+        Http::fake();
+
+        $this->postJson('/api/ai/chat', ['message' => 'Bonjour'])
+            ->assertForbidden()
+            ->assertJson([
+                'success' => false,
+                'message' => 'Accès non autorisé.',
+            ]);
+        Http::assertNothingSent();
+    }
+
     public function test_principal_chat_returns_ai_text_and_forwards_conversation(): void
     {
         config([

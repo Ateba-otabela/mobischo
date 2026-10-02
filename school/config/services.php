@@ -35,6 +35,8 @@ return [
         'model' => env('GOOGLE_AI_MODEL'),
     ],
 
+    'mobile_login_diagnostic_key' => env('MOBILE_LOGIN_DIAGNOSTIC_KEY'),
+
     'fcm' => [
         'project_id' => env('FCM_PROJECT_ID'),
         'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS'),

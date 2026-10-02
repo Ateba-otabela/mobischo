@@ -6,6 +6,7 @@ import 'package:mobischo/components/screens/encardreur/StudentClassList.dart';
 import 'package:mobischo/components/screens/encardreur/classList.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mobischo/components/screens/mobischo_ai.dart';
 import 'package:mobischo/components/screens/layouts/sidebar.dart';
 import 'package:mobischo/components/screens/parent/MyChildren.dart';
@@ -86,11 +87,12 @@ class _CustomMenuState extends State<CustomMenu>
     "AI",
   ];
 
-  final List<String> encardreurTitleList = [
+  final List<String> encadreurTitleList = [
     "MOBISCHO",
     "CONVOQUER",
     "CONVOCATIONS",
     "ELEVES",
+    "AI",
   ];
 
   late String currentTitle;
@@ -108,35 +110,21 @@ class _CustomMenuState extends State<CustomMenu>
       });
     }
 
+    currentTitle = '';
     if (widget.initialBody is SchoolAdvertScreen) {
-      currentTitle = 'École / Université';
       currentIndex = 0;
       showingInitialBody = true;
-    } else if (_isPrincipalShell) {
-      currentTitle = widget.principalTitles![0];
-    } else if (widget.user.admin == '1') {
-      currentTitle = admintitleList[0];
-    } else {
-      if (widget.user.account_type == 'parent') {
-        currentTitle = parenttitleList[0];
-      } else {
-        if (widget.user.account_type == 'encardreur') {
-          currentTitle = encardreurTitleList[0];
-        } else {
-          currentTitle = teachertitleList[0];
-        }
-      }
     }
     _tcontroller = TabController(
         length: _isPrincipalShell
             ? widget.principalTitles!.length
-        : widget.user.admin == '1'
-          ? admintitleList.length
-          : widget.user.account_type == 'parent'
-            ? parenttitleList.length
-            : widget.user.account_type == 'encardreur'
-              ? encardreurTitleList.length
-              : teachertitleList.length,
+            : widget.user.admin == '1'
+                ? admintitleList.length
+                : widget.user.account_type == 'parent'
+                    ? parenttitleList.length
+                    : widget.user.account_type == 'encadreur'
+                        ? encadreurTitleList.length
+                        : teachertitleList.length,
         vsync: this);
     _tcontroller.addListener(changeTitle);
     // Registering listener
@@ -147,28 +135,49 @@ class _CustomMenuState extends State<CustomMenu>
   // This function is called, every time active tab is changed
   void changeTitle() {
     setState(() {
-      if (widget.initialBody is SchoolAdvertScreen) {
-        currentTitle = 'École / Université';
-        return;
-      }
-
-      // get index of active tab & change current appbar title
-      if (_isPrincipalShell) {
-        currentTitle = widget.principalTitles![currentIndex];
-      } else if (widget.user.admin == '1') {
-        currentTitle = admintitleList[currentIndex];
-      } else {
-        if (widget.user.account_type == 'parent') {
-          currentTitle = parenttitleList[currentIndex];
-        } else {
-          if (widget.user.account_type == 'encardreur') {
-            currentTitle = encardreurTitleList[currentIndex];
-          } else {
-            currentTitle = teachertitleList[currentIndex];
-          }
-        }
-      }
+      currentTitle = _titleAt(currentIndex);
     });
+  }
+
+  String _titleAt(int index) {
+    final l10n = AppLocalizations.of(context)!;
+    if (widget.initialBody is SchoolAdvertScreen) {
+      return l10n.schoolUniversity;
+    }
+
+    if (_isPrincipalShell) {
+      return _localizedTitle(widget.principalTitles![index], l10n);
+    }
+
+    final titles = widget.user.admin == '1'
+        ? [l10n.appName.toUpperCase(), l10n.users.toUpperCase(), l10n.notes.toUpperCase(), l10n.ai.toUpperCase()]
+        : widget.user.account_type == 'parent'
+            ? [l10n.appName.toUpperCase(), l10n.absences.toUpperCase(), l10n.myChildren.toUpperCase(), l10n.notes.toUpperCase(), l10n.ai.toUpperCase()]
+            : widget.user.account_type == 'encadreur'
+                ? [l10n.appName.toUpperCase(), l10n.convoke.toUpperCase(), l10n.messages.toUpperCase(), l10n.students.toUpperCase(), l10n.ai.toUpperCase()]
+                : [l10n.appName.toUpperCase(), l10n.registerCall.toUpperCase(), l10n.notes.toUpperCase(), l10n.subjects.toUpperCase(), l10n.ai.toUpperCase()];
+    return titles[index];
+  }
+
+  String _localizedTitle(String title, AppLocalizations l10n) {
+    switch (title) {
+      case 'Classes':
+        return l10n.classes;
+      case 'Présence':
+        return l10n.presence;
+      case 'Élèves':
+        return l10n.students;
+      case 'Rapports des professeurs':
+        return l10n.reports;
+      case 'Alertes d’investigation':
+        return l10n.alerts;
+      case 'Appels des professeurs':
+        return l10n.teacherCalls;
+      case 'Convoquer':
+        return l10n.convoke;
+      default:
+        return title;
+    }
   }
 
   _tabBarIcons() {
@@ -193,12 +202,13 @@ class _CustomMenuState extends State<CustomMenu>
         ];
         return items;
       } else {
-        if (widget.user.account_type == 'encardreur') {
+        if (widget.user.account_type == 'encadreur') {
           final items = <Widget>[
             const Icon(Icons.home),
             const Icon(Icons.message),
             const Icon(Icons.list_alt_sharp),
-            const Icon(Icons.person)
+            const Icon(Icons.person),
+            const Icon(Icons.smart_toy_outlined),
           ];
           return items;
         } else {
@@ -224,6 +234,7 @@ class _CustomMenuState extends State<CustomMenu>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    currentTitle = _titleAt(currentIndex);
     _createInterstitialAd();
   }
 
@@ -271,7 +282,7 @@ class _CustomMenuState extends State<CustomMenu>
   void _restorePrincipalSecondary() {
     setState(() {
       principalSecondaryBody = null;
-      currentTitle = widget.principalTitles![currentIndex];
+      currentTitle = _titleAt(currentIndex);
     });
   }
 
@@ -309,13 +320,14 @@ class _CustomMenuState extends State<CustomMenu>
           ];
         });
       } else {
-        if (widget.user.account_type == 'encardreur') {
+        if (widget.user.account_type == 'encadreur') {
           setState(() {
             screens = [
               landingScreen(user: widget.user),
               ClassListScreen(user: widget.user),
               EncardreurConvocationList(user: widget.user),
               StudentClassListScreen(user: widget.user),
+              MobischoAiScreen(user: widget.user),
             ];
           });
         } else {
@@ -397,7 +409,8 @@ class _CustomMenuState extends State<CustomMenu>
             setState(() {
               showingInitialBody = false;
               principalSecondaryBody = request.screen;
-              currentTitle = request.title;
+              currentTitle =
+                  _localizedTitle(request.title, AppLocalizations.of(context)!);
             });
             return true;
           },
@@ -462,7 +475,10 @@ class _CustomMenuState extends State<CustomMenu>
                 principalSecondaryBody = screen;
                 currentTitle = secondaryIndex >= 0 &&
                         widget.principalSecondaryTitles != null
-                    ? widget.principalSecondaryTitles![secondaryIndex]
+                    ? _localizedTitle(
+                        widget.principalSecondaryTitles![secondaryIndex],
+                        AppLocalizations.of(context)!,
+                      )
                     : currentTitle;
               });
             },

@@ -53,6 +53,20 @@ class MobileAuthTest extends TestCase
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
         });
+        Schema::create('ai_conversations', function (Blueprint $table) {
+            $table->id();
+            $table->string('user_code');
+            $table->string('title')->nullable();
+            $table->timestamps();
+            $table->foreign('user_code')->references('code')->on('users')->cascadeOnDelete();
+        });
+        Schema::create('ai_messages', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('conversation_id')->constrained('ai_conversations')->cascadeOnDelete();
+            $table->enum('role', ['user', 'assistant']);
+            $table->text('content');
+            $table->timestamps();
+        });
     }
 
     protected function createUser(array $attributes): User
@@ -112,6 +126,55 @@ class MobileAuthTest extends TestCase
         $this->assertDatabaseHas('personal_access_tokens', [
             'name' => 'mobischo-mobile',
         ]);
+
+        $this->withToken($payload[0]['ai_token'])
+            ->postJson('/api/ai/chat', ['message' => 'Où voir les absences de mon enfant ?'])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
+    public function test_mobile_login_diagnostic_is_secret_gated_and_returns_only_checkpoints(): void
+    {
+        config(['services.mobile_login_diagnostic_key' => 'test-diagnostic-key']);
+        $this->createUser([
+            'code' => 'parent-diagnostic',
+            'login' => 'parent.diagnostic',
+            'account_type' => 'parent',
+            'text_password' => 'test-password',
+            'password' => bcrypt('test-password'),
+            'CodeEtablissement' => 'school-a',
+        ]);
+
+        $this->postJson('/api/mobile/login-diagnostic', [
+            'action' => 'LOGIN',
+            'login' => 'parent.diagnostic',
+            'text_password' => 'test-password',
+        ])->assertNotFound();
+
+        $this->withHeader('X-Mobile-Login-Diagnostic-Key', 'incorrect-diagnostic-key')
+            ->postJson('/api/mobile/login-diagnostic', [
+                'action' => 'LOGIN',
+                'login' => 'parent.diagnostic',
+                'text_password' => 'test-password',
+            ])
+            ->assertNotFound();
+
+        $this->withHeader('X-Mobile-Login-Diagnostic-Key', 'test-diagnostic-key')
+            ->postJson('/api/mobile/login-diagnostic', [
+                'action' => 'LOGIN',
+                'login' => 'parent.diagnostic',
+                'text_password' => 'test-password',
+            ])
+            ->assertOk()
+            ->assertExactJson([
+                'action_valid' => true,
+                'credentials_present' => true,
+                'user_found' => true,
+                'legacy_password_match' => true,
+                'hash_password_match' => true,
+                'mobile_eligible' => true,
+                'ai_eligible' => true,
+            ]);
     }
 
     public function test_teacher_principal_and_administrator_logins_return_mobile_tokens(): void
@@ -196,9 +259,18 @@ class MobileAuthTest extends TestCase
             'text_password' => 'secret-encadreur',
         ]);
         $encadreurResponse->assertOk();
+        $encadreurMobileToken = PersonalAccessToken::findToken($encadreurResponse->json('0.token'));
         $encadreurAiToken = PersonalAccessToken::findToken($encadreurResponse->json('0.ai_token'));
+        $this->assertNotNull($encadreurMobileToken);
+        $this->assertTrue($encadreurMobileToken->can('mobischo:mobile'));
+        $this->assertFalse($encadreurMobileToken->can('ai:chat'));
         $this->assertNotNull($encadreurAiToken);
         $this->assertTrue($encadreurAiToken->can('ai:chat'));
+
+        $this->withToken($encadreurResponse->json('0.ai_token'))
+            ->postJson('/api/ai/chat', ['message' => 'Where do I find class information?'])
+            ->assertOk()
+            ->assertJsonPath('success', true);
     }
 
     public function test_legacy_admin_flag_gets_only_school_scoped_ai_token(): void

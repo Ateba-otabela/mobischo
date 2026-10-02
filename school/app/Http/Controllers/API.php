@@ -19,6 +19,7 @@ use App\Models\Etablissement;
 use App\Models\SequenceEvaluation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Models\HistoriqueInscription;
 use App\Models\AbsenceJustification;
 use App\Models\InvestigationAlert;
@@ -228,6 +229,41 @@ class API extends Controller
         ];
 
         return response()->json([$userPayload]);
+    }
+
+    public function mobileLoginDiagnostic(Request $request)
+    {
+        $diagnosticKey = (string) config('services.mobile_login_diagnostic_key', '');
+        $providedKey = (string) $request->header('X-Mobile-Login-Diagnostic-Key', '');
+
+        if ($diagnosticKey === '' || $providedKey === '' || !hash_equals($diagnosticKey, $providedKey)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        $actionValid = strtoupper((string) $request->input('action', '')) === 'LOGIN';
+        $login = trim((string) $request->input('login', ''));
+        $textPassword = trim((string) $request->input('text_password', ''));
+        $credentialsPresent = $login !== '' && $textPassword !== '';
+        $user = $actionValid && $credentialsPresent
+            ? User::where('login', $login)->first()
+            : null;
+
+        $storedTextPassword = (string) ($user->text_password ?? '');
+        $storedPasswordHash = (string) ($user->password ?? '');
+        $legacyPasswordMatch = $user !== null && $storedTextPassword !== ''
+            && (hash_equals($storedTextPassword, $textPassword) || strcasecmp($storedTextPassword, $textPassword) === 0);
+        $hashPasswordMatch = $user !== null && $storedPasswordHash !== ''
+            && Hash::check($textPassword, $storedPasswordHash);
+
+        return response()->json([
+            'action_valid' => $actionValid,
+            'credentials_present' => $credentialsPresent,
+            'user_found' => $user !== null,
+            'legacy_password_match' => $legacyPasswordMatch,
+            'hash_password_match' => $hashPasswordMatch,
+            'mobile_eligible' => $user !== null && $this->isMobileEligibleUser($user),
+            'ai_eligible' => $user !== null && (new \App\Services\PrincipalContextService())->canUseAi($user),
+        ]);
     }
 
     public function mobileLogout(Request $request)
@@ -947,11 +983,18 @@ class API extends Controller
                 ->orderBy('DateEnreg')
                 ->orderBy('HeureMatiere')
                 ->get();
-            $teacherAttendanceBySession = TeacherAttendance::query()
-                ->where('CodeEtablissement', $schoolCode)
-                ->whereIn('CodeClasse', $classCodes)
-                ->get()
-                ->keyBy('session_key');
+            $teacherAttendanceBySession = collect();
+            if ($this->teacherAttendanceStorageIsReady()) {
+                $teacherAttendanceBySession = TeacherAttendance::query()
+                    ->where('CodeEtablissement', $schoolCode)
+                    ->whereIn('CodeClasse', $classCodes)
+                    ->get()
+                    ->keyBy('session_key');
+            } else {
+                Log::warning(
+                    'Teacher attendance storage is unavailable; principal attendance report will omit teacher presence.'
+                );
+            }
 
             $sessions = $attendanceRecords
                 ->groupBy(function ($record) {
@@ -1834,6 +1877,10 @@ class API extends Controller
                 }
 
                 if ($request->input('status') === 'validated') {
+                    if (!$this->teacherAttendanceStorageIsReady()) {
+                        return ['teacher_attendance_storage_unavailable' => true];
+                    }
+
                     $class = Classe::query()
                         ->where('CodeClasse', $alert->CodeClasse)
                         ->where('CodeEtablissement', $alert->CodeEtablissement)
@@ -1962,6 +2009,11 @@ class API extends Controller
             }
             if (isset($result['teacher_not_found'])) {
                 return response()->json(['error' => 'No assigned teacher could be resolved.'], 409);
+            }
+            if (isset($result['teacher_attendance_storage_unavailable'])) {
+                return response()->json([
+                    'error' => 'Teacher attendance storage is not ready. Apply the teacher attendance migration.',
+                ], 503);
             }
 
             return response()->json([
@@ -2645,6 +2697,31 @@ class API extends Controller
             'prenom' => (string) ($teacher->prenom ?? ''),
             'full_name' => trim((string) (($teacher->nom ?? '') . ' ' . ($teacher->prenom ?? ''))),
         ];
+    }
+
+    private function teacherAttendanceStorageIsReady(): bool
+    {
+        if (!Schema::hasTable('teacher_attendances')) {
+            return false;
+        }
+
+        foreach ([
+            'session_key',
+            'CodeEtablissement',
+            'CodeEnseignant',
+            'CodeEnseignement',
+            'CodeClasse',
+            'CodeMatiere',
+            'attendance_date',
+            'session_time',
+            'presence_status',
+        ] as $column) {
+            if (!Schema::hasColumn('teacher_attendances', $column)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function formatAttendanceTime($value): string

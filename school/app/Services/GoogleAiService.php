@@ -153,6 +153,12 @@ class GoogleAiService
                     }
                 }
 
+                if (($toolResult['access_denied'] ?? false) === true
+                    && isset($toolResult['message'])
+                    && is_string($toolResult['message'])) {
+                    return $toolResult['message'];
+                }
+
                 $functionResponseParts[] = [
                     'functionResponse' => [
                         'name' => $name,

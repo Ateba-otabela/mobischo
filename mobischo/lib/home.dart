@@ -65,24 +65,21 @@ class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     //to get a different button navigation menu for administrators and parents
-    return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: CustomTheme.getTheme(),
-        home: Scaffold(
-          body: Column(
-            children: [
-              // Container(
-              //     height: 200,
-              //     child: isLoaded?AdWidget(ad: nativeAd!):Center(child: Text('ad loading'))),
-              Flexible(
-                child: CustomMenu(
-                  user: widget.user,
-                  selectedPage: widget.selectedPage,
-                  initialBody: widget.initialBody,
-                ),
-              ),
-            ],
+    return Scaffold(
+      body: Column(
+        children: [
+          // Container(
+          //     height: 200,
+          //     child: isLoaded?AdWidget(ad: nativeAd!):Center(child: Text('ad loading'))),
+          Flexible(
+            child: CustomMenu(
+              user: widget.user,
+              selectedPage: widget.selectedPage,
+              initialBody: widget.initialBody,
+            ),
           ),
-        ));
+        ],
+      ),
+    );
   }
 }

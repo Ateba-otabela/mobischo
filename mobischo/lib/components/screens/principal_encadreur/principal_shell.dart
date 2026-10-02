@@ -289,12 +289,13 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           title: 'Professeurs',
           screen: PrincipalTeacherClassesPage(
             user: widget.user,
-            onSelectTeacher: (teacherName) {
+            onSelectTeacher: (teacher) {
               PrincipalSectionRequest(
-                title: teacherName,
+                title: teacher.fullName,
                 screen: PrincipalTeacherCallsPage(
-                  teacherName: teacherName,
-                  attendanceFuture: _attendanceFuture,
+                  user: widget.user,
+                  teacherName: teacher.fullName,
+                  teacherCode: teacher.code,
                 ),
               ).dispatch(context);
             },
@@ -538,7 +539,7 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
 
 class PrincipalTeacherClassesPage extends StatefulWidget {
   final User user;
-  final ValueChanged<String>? onSelectTeacher;
+  final ValueChanged<PrincipalClassTeacher>? onSelectTeacher;
 
   const PrincipalTeacherClassesPage({
     Key? key,
@@ -598,8 +599,12 @@ class _PrincipalTeacherClassesPageState
                                       ),
                                       onTap: widget.onSelectTeacher == null
                                           ? null
-                                          : () => widget.onSelectTeacher!(
-                                              teacher.fullName),
+                                          : () {
+                                              print(
+                                                'SELECTED TEACHER CODE: ${teacher.code}',
+                                              );
+                                              widget.onSelectTeacher!(teacher);
+                                            },
                                     ))
                                 .toList(),
                           ),
@@ -611,57 +616,65 @@ class _PrincipalTeacherClassesPageState
 }
 
 class PrincipalTeacherCallsPage extends StatelessWidget {
+  final User user;
   final String teacherName;
-  final Future<List<PrincipalAttendanceData>> attendanceFuture;
+  final String teacherCode;
 
   const PrincipalTeacherCallsPage({
     Key? key,
+    required this.user,
     required this.teacherName,
-    required this.attendanceFuture,
+    required this.teacherCode,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) =>
-      FutureBuilder<List<PrincipalAttendanceData>>(
-        future: attendanceFuture,
+      FutureBuilder<List<PrincipalTeacherPresenceData>>(
+        future: _loadTeacherPresenceHistory(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final sessions = (snapshot.data ?? <PrincipalAttendanceData>[])
-              .where((session) => session.teacher == teacherName)
-              .toList()
-            ..sort((first, second) => second.date.compareTo(first.date));
-
           if (snapshot.hasError) {
             return const Center(
-              child: Text('Impossible de charger les appels du professeur.'),
+              child: Text('Impossible de charger les présences du professeur.'),
             );
           }
 
+          final sessions = snapshot.data ?? <PrincipalTeacherPresenceData>[];
           return ListView(
             padding: const EdgeInsets.all(14),
             children: sessions.isEmpty
-                ? [const _Card(child: Text('Aucun appel disponible.'))]
+                ? [
+                    const _Card(
+                      child: Text(
+                        'Aucune présence enseignant enregistrée pour ce professeur.',
+                      ),
+                    ),
+                  ]
                 : sessions
-                    .map((session) => _DashboardActivityCard(
-                          assetPath: 'assets/images/landing3.png',
-                          title: session.subject.isNotEmpty
-                              ? session.subject
-                              : session.codeMatiere,
-                          subtitle:
-                              '${session.className}\n${session.date} • ${session.time}',
-                          titleTrailing: session.attendancePercentage == null
-                              ? '—'
-                              : '${session.attendancePercentage}%',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PrincipalLiveAttendanceSessionPage(
-                                session: session,
-                                preferApiAttendancePercentage: true,
-                                showRawStatuses: true,
+                    .map((session) => _Card(
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.fact_check_outlined,
+                              color: CustomTheme.blue,
+                            ),
+                            title: Text(
+                              '${_teacherPresenceDate(session.date)} • ${session.session}',
+                            ),
+                            subtitle: Text(
+                              '${session.className} • ${session.subject}\n'
+                              'Enseignement : ${session.codeEnseignement}',
+                            ),
+                            isThreeLine: true,
+                            trailing: Text(
+                              session.presenceLabel,
+                              style: TextStyle(
+                                color: session.presenceStatus.toLowerCase() ==
+                                        'present'
+                                    ? Colors.green.shade700
+                                    : Colors.red.shade700,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -670,6 +683,20 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
           );
         },
       );
+
+  Future<List<PrincipalTeacherPresenceData>> _loadTeacherPresenceHistory() {
+    print('TEACHER DETAIL LOADER: PrincipalTeacherCallsPage');
+    return PrincipalService.getTeacherPresenceHistory(
+      user,
+      teacherCode: teacherCode,
+    );
+  }
+
+  String _teacherPresenceDate(String date) {
+    final parts = date.split('-');
+    if (parts.length != 3) return date;
+    return '${parts[2]}/${parts[1]}/${parts[0]}';
+  }
 }
 
 class PrincipalMessagesConvocationsPage extends StatefulWidget {
@@ -1249,94 +1276,24 @@ class PrincipalAttendanceSessionPage extends StatelessWidget {
       );
 }
 
-class PrincipalReportsPage extends StatefulWidget {
+class PrincipalReportsPage extends StatelessWidget {
   final User user;
 
   const PrincipalReportsPage({Key? key, required this.user}) : super(key: key);
 
   @override
-  State<PrincipalReportsPage> createState() => _PrincipalReportsPageState();
-}
-
-class _PrincipalReportsPageState extends State<PrincipalReportsPage> {
-  late Future<List<PrincipalAttendanceData>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = PrincipalService.getPrincipalAttendance(widget.user);
-  }
-
-  void _reload() {
-    setState(() {
-      _future = PrincipalService.getPrincipalAttendance(widget.user);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<PrincipalAttendanceData>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                      'Impossible de charger les rapports des professeurs.'),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: _reload,
-                    child: const Text('Réessayer'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final sessions = snapshot.data ?? const <PrincipalAttendanceData>[];
-
-        return ListView(
-          padding: const EdgeInsets.all(14),
-          children: [
-            _HeaderCard(
-                title: 'Rapports des professeurs',
-                subtitle: 'Appels de présence transmis par les enseignants',
-                icon: Icons.assignment_outlined),
-            const SizedBox(height: 12),
-            if (sessions.isEmpty)
-              _Card(
-                child: Text('Aucun rapport de présence pour le moment.'),
-              )
-            else
-              ...sessions.map((session) => _Card(
-                    child: ListTile(
-                      title: Text('${session.className} • ${session.subject}'),
-                      subtitle: Text(
-                          '${session.date} à ${session.time} • ${session.teacher}\n'
-                          '${session.present} présents • ${session.absent} absents • ${session.late} retards\n'
-                          'Présence enseignant : ${session.teacherPresenceLabel}'),
-                      isThreeLine: true,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PrincipalLiveAttendanceSessionPage(
-                            session: session,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )),
-          ],
-        );
+    return PrincipalTeacherClassesPage(
+      user: user,
+      onSelectTeacher: (teacher) {
+        PrincipalSectionRequest(
+          title: teacher.fullName,
+          screen: PrincipalTeacherCallsPage(
+            user: user,
+            teacherName: teacher.fullName,
+            teacherCode: teacher.code,
+          ),
+        ).dispatch(context);
       },
     );
   }
@@ -1471,53 +1428,70 @@ class _InvestigationAlertCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         side: BorderSide(color: Colors.red.shade300),
       ),
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        isThreeLine: true,
-        leading: Icon(
-          Icons.warning_rounded,
-          color: Colors.red.shade800,
-          size: 30,
-        ),
-        title: Text(
-          'Alerte d’investigation',
-          style: TextStyle(
-            color: Colors.red.shade900,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            [
-              if (studentName.isNotEmpty) studentName,
-              if (className.isNotEmpty) 'Classe : $className',
-              if (subjectDetails.isNotEmpty) subjectDetails,
-              'Date : ${alert.dateAbsence}',
-              explanation,
-            ].join('\n'),
-            maxLines: 5,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.red.shade900),
-          ),
-        ),
-        trailing: SizedBox(
-          width: showChevron ? 82 : 76,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Flexible(
-                child: Text(
-                  isPending ? 'À traiter' : alert.displayStatus,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    color: Colors.red.shade800,
-                    fontWeight: FontWeight.bold,
-                  ),
+              Icon(
+                Icons.warning_rounded,
+                color: Colors.red.shade800,
+                size: 30,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Alerte d’investigation',
+                      style: TextStyle(
+                        color: Colors.red.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        if (studentName.isNotEmpty) studentName,
+                        if (className.isNotEmpty) 'Classe : $className',
+                        if (subjectDetails.isNotEmpty) subjectDetails,
+                        'Date : ${alert.dateAbsence}',
+                        explanation,
+                      ].join('\n'),
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.red.shade900),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
+                        children: [
+                          Text(
+                            isPending ? 'À traiter' : alert.displayStatus,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              color: Colors.red.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (showChevron)
+                            Icon(
+                              Icons.chevron_right,
+                              color: Colors.red.shade800,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (showChevron)
-                Icon(Icons.chevron_right, color: Colors.red.shade800),
             ],
           ),
         ),
@@ -1639,8 +1613,10 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                     },
                   ),
                 ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 TextButton.icon(
                   onPressed: _reload,
@@ -1650,7 +1626,11 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                 TextButton.icon(
                   onPressed: widget.onViewAll,
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Voir les alertes d’investigation'),
+                  label: const Text(
+                    'Voir les alertes d’investigation',
+                    textAlign: TextAlign.end,
+                    softWrap: true,
+                  ),
                 ),
               ],
             ),

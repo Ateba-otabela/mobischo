@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\AiReadOnlyToolService;
+use App\Services\GoogleAiService;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -308,6 +309,14 @@ class AiReadOnlyToolServiceTest extends TestCase
             'CodeEtablissement' => 'school-a',
         ]);
         Sanctum::actingAs($parent, ['ai:chat']);
+        DB::table('eleves')->insert([
+            'CodeEleve' => 'other-parent-child',
+            'code' => 'parent-b',
+            'Nom' => 'Cross',
+            'Prenom' => 'Parent',
+            'Sex' => '0',
+            'CodeClasse' => 'class-a3',
+        ]);
         $tools = app(AiReadOnlyToolService::class);
 
         $declaredNames = array_column($tools->functionDeclarations($parent), 'name');
@@ -352,14 +361,23 @@ class AiReadOnlyToolServiceTest extends TestCase
         $this->assertSame('Exercices d’algèbre', $homework['homework'][0]['title']);
 
         foreach ([
+            ['get_child_notes', ['childCode' => 'other-parent-child']],
             ['get_child_notes', ['childCode' => 'student-b1']],
+            ['get_child_attendance', ['childCode' => 'other-parent-child', 'dateFrom' => $this->today, 'dateTo' => $this->today]],
             ['get_child_attendance', ['childCode' => 'student-b1', 'dateFrom' => $this->today, 'dateTo' => $this->today]],
+            ['get_child_absences', ['childCode' => 'other-parent-child', 'dateFrom' => $this->today, 'dateTo' => $this->today]],
             ['get_child_absences', ['childCode' => 'student-b1', 'dateFrom' => $this->today, 'dateTo' => $this->today]],
+            ['get_child_convocations', ['childCode' => 'other-parent-child']],
             ['get_child_convocations', ['childCode' => 'student-b1']],
+            ['get_child_messages', ['childCode' => 'other-parent-child']],
             ['get_child_messages', ['childCode' => 'student-b1']],
+            ['get_child_homework', ['childCode' => 'other-parent-child']],
             ['get_child_homework', ['childCode' => 'student-b1']],
         ] as [$toolName, $arguments]) {
-            $this->assertFalse($tools->execute($parent, $toolName, $arguments)['found'], $toolName);
+            $denial = $tools->execute($parent, $toolName, $arguments);
+            $this->assertFalse($denial['found'], $toolName);
+            $this->assertTrue($denial['access_denied'], $toolName);
+            $this->assertStringContainsString('Accès refusé', $denial['message']);
         }
 
         try {
@@ -454,11 +472,19 @@ class AiReadOnlyToolServiceTest extends TestCase
         $this->assertSame(2, $attendance['attendance']['total']);
 
         foreach (['class-a2', 'class-b'] as $unauthorizedClass) {
-            try {
-                $tools->execute($encadreur, 'get_class_information', ['classCode' => $unauthorizedClass]);
-                $this->fail('Encadreur must not access an unassigned class, including one in the same school.');
-            } catch (ValidationException $exception) {
-                $this->assertNotEmpty($exception->errors());
+            foreach ([
+                ['get_class_students', ['classCode' => $unauthorizedClass]],
+                ['get_class_attendance', [
+                    'classCode' => $unauthorizedClass,
+                    'dateFrom' => $this->today,
+                    'dateTo' => $this->today,
+                ]],
+                ['get_class_information', ['classCode' => $unauthorizedClass]],
+            ] as [$toolName, $arguments]) {
+                $denial = $tools->execute($encadreur, $toolName, $arguments);
+                $this->assertFalse($denial['found'], $toolName);
+                $this->assertTrue($denial['access_denied'], $toolName);
+                $this->assertStringContainsString('Accès refusé', $denial['message']);
             }
         }
 
@@ -468,6 +494,61 @@ class AiReadOnlyToolServiceTest extends TestCase
         } catch (InvalidArgumentException $exception) {
             $this->assertStringContainsString('not authorized', $exception->getMessage());
         }
+    }
+
+    public function test_parent_scope_denial_is_returned_without_sending_rows_to_the_ai(): void
+    {
+        $parent = (new User())->forceFill([
+            'code' => 'parent-a',
+            'account_type' => 'parent',
+            'admin' => '0',
+            'CodeEtablissement' => 'school-a',
+        ]);
+        Sanctum::actingAs($parent, ['ai:chat']);
+        DB::table('eleves')->insert([
+            'CodeEleve' => 'other-parent-child',
+            'code' => 'parent-b',
+            'Nom' => 'Cross',
+            'Prenom' => 'Parent',
+            'Sex' => '0',
+            'CodeClasse' => 'class-a3',
+        ]);
+        config([
+            'services.google_ai.api_key' => 'test-only-key',
+            'services.google_ai.model' => 'test-model',
+        ]);
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'role' => 'model',
+                        'parts' => [[
+                            'functionCall' => [
+                                'name' => 'get_child_notes',
+                                'args' => ['childCode' => 'other-parent-child'],
+                                ],
+                            ]],
+                        ],
+                    ]],
+            ], 200),
+        ]);
+
+        $tools = app(AiReadOnlyToolService::class);
+        $reply = app(GoogleAiService::class)->generateReply(
+            'Show me this student’s grades.',
+            [],
+            fn ($name, array $arguments) => $tools->execute($parent, $name, $arguments),
+            $tools->functionDeclarations($parent)
+        );
+
+        $this->assertSame(
+            'Accès refusé : cet élève n’est pas associé à votre compte parent.',
+            $reply
+        );
+        Http::assertSentCount(1);
+        Http::assertSent(function (ClientRequest $request) {
+            return !str_contains(json_encode($request->data()), 'other-parent-child');
+        });
     }
 
     public function test_admin_flag_uses_school_bound_admin_context_not_global_scope(): void

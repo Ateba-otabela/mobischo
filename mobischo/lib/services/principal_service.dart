@@ -25,8 +25,6 @@ class PrincipalDashboardSession {
   final String className;
   final String subject;
   final String teacher;
-  final String teacherCode;
-  final String teacherPresenceStatus;
   final int present;
   final int absent;
   final int late;
@@ -39,8 +37,6 @@ class PrincipalDashboardSession {
     required this.className,
     required this.subject,
     required this.teacher,
-    required this.teacherCode,
-    required this.teacherPresenceStatus,
     required this.present,
     required this.absent,
     required this.late,
@@ -113,6 +109,8 @@ class PrincipalAttendanceData {
   final String className;
   final String subject;
   final String teacher;
+  final String teacherCode;
+  final String teacherPresenceStatus;
   final int present;
   final int absent;
   final int late;
@@ -130,6 +128,8 @@ class PrincipalAttendanceData {
     required this.className,
     required this.subject,
     required this.teacher,
+    required this.teacherCode,
+    required this.teacherPresenceStatus,
     required this.present,
     required this.absent,
     required this.late,
@@ -298,6 +298,63 @@ class PrincipalClassTeacher {
       code: json['code']?.toString() ?? '',
       fullName: json['full_name']?.toString() ?? '',
     );
+  }
+}
+
+class PrincipalTeacherPresenceData {
+  final String teacherCode;
+  final String codeEnseignement;
+  final String codeClasse;
+  final String codeMatiere;
+  final String date;
+  final String session;
+  final String className;
+  final String subject;
+  final String presenceStatus;
+
+  const PrincipalTeacherPresenceData({
+    required this.teacherCode,
+    required this.codeEnseignement,
+    required this.codeClasse,
+    required this.codeMatiere,
+    required this.date,
+    required this.session,
+    required this.className,
+    required this.subject,
+    required this.presenceStatus,
+  });
+
+  factory PrincipalTeacherPresenceData.fromJson(Map<String, dynamic> json) {
+    return PrincipalTeacherPresenceData(
+      teacherCode: json['teacher_code']?.toString() ?? '',
+      codeEnseignement: json['CodeEnseignement']?.toString() ?? '',
+      codeClasse: json['CodeClasse']?.toString() ?? '',
+      codeMatiere: json['CodeMatiere']?.toString() ?? '',
+      date: json['attendance_date']?.toString() ?? '',
+      session: json['session']?.toString() ?? '',
+      className: _normalizeDisplayText(
+        json['class_name'],
+        fallback: json['CodeClasse']?.toString() ?? '',
+      ),
+      subject: _normalizeDisplayText(
+        json['subject_name'],
+        fallback: json['CodeMatiere']?.toString() ?? '',
+      ),
+      presenceStatus: json['presence_status']?.toString() ?? '',
+    );
+  }
+
+  String get presenceLabel {
+    switch (presenceStatus.toLowerCase()) {
+      case 'present':
+        return 'Présent';
+      case 'absent':
+        return 'Absent';
+      case 'late':
+        return 'En retard';
+      default:
+        return presenceStatus;
+    }
   }
 }
 
@@ -620,6 +677,54 @@ class PrincipalService {
   static const getDashboardAction = 'GET_PRINCIPAL_DASHBOARD';
   static const getClassesAction = 'GET_PRINCIPAL_CLASSES';
   static const getAttendanceAction = 'GET_PRINCIPAL_ATTENDANCE';
+
+  static Future<List<PrincipalTeacherPresenceData>> getTeacherPresenceHistory(
+    User user, {
+    required String teacherCode,
+  }) async {
+    print('NEW TEACHER PRESENCE METHOD CALLED: getTeacherPresenceHistory');
+    print('SELECTED TEACHER CODE: $teacherCode');
+
+    final token = user.aiToken.trim();
+    if (token.isEmpty) {
+      throw Exception(
+          'Votre session doit être renouvelée. Veuillez vous reconnecter.');
+    }
+
+    final endpoint = Uri.parse(
+      'https://mobischo.com/api/principal/teachers/'
+      '${Uri.encodeComponent(teacherCode)}/attendance',
+    );
+    print('TEACHER ATTENDANCE REQUEST: ${endpoint.toString()}');
+    final response = await http.get(
+      endpoint,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    print('RESPONSE STATUS: ${response.statusCode}');
+    print('RESPONSE BODY: ${response.body}');
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception(
+          'Votre session doit être renouvelée. Veuillez vous reconnecter.');
+    }
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Unable to load teacher presence (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw const FormatException('Invalid teacher presence response');
+    }
+
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(PrincipalTeacherPresenceData.fromJson)
+        .toList();
+  }
 
   static Future<DashboardJustificationPageData> getDashboardJustifications({
     int page = 1,

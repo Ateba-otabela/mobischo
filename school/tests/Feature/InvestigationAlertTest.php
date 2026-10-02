@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -837,6 +838,7 @@ class InvestigationAlertTest extends TestCase
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         $this->postJson('/api/school_manager', [
             'action' => 'GET_PRINCIPAL_ATTENDANCE',
+            'code' => 'PR-INV-VALIDATE',
         ])->assertOk()
             ->assertJsonFragment([
                 'teacher_presence_status' => 'present',
@@ -928,6 +930,35 @@ class InvestigationAlertTest extends TestCase
                 '2026-09-28',
                 '1'
             ),
+        ]);
+        $this->assertDatabaseHas('conduites', [
+            'id' => $fixture['attendance']->id,
+            'CodeEtatCond' => 'A',
+        ]);
+    }
+
+    public function test_missing_teacher_attendance_schema_does_not_break_reports_or_resolve_alerts(): void
+    {
+        $fixture = $this->createPendingInvestigationValidationFixture(
+            'ELE-INV-MISSING-PRESENCE-SCHEMA',
+            'PR-INV-MISSING-PRESENCE-SCHEMA'
+        );
+        Sanctum::actingAs($fixture['principal'], ['mobischo:mobile']);
+        Schema::dropIfExists('teacher_attendances');
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_PRINCIPAL_ATTENDANCE',
+            'code' => 'PR-INV-MISSING-PRESENCE-SCHEMA',
+        ])->assertOk();
+        $this->postJson('/api/dashboard/alerts', [
+            'action' => 'UPDATE_DASHBOARD_ALERT',
+            'id' => $fixture['alert']->id,
+            'status' => 'validated',
+        ])->assertStatus(503);
+
+        $this->assertDatabaseHas('investigation_alerts', [
+            'id' => $fixture['alert']->id,
+            'status' => 'pending',
         ]);
         $this->assertDatabaseHas('conduites', [
             'id' => $fixture['attendance']->id,

@@ -310,6 +310,20 @@ class AiReadOnlyToolService
         }
 
         if ($context['role'] === 'encadreur' && isset($encadreurMethods[$toolName])) {
+            if (in_array($toolName, [
+                'get_class_students',
+                'get_class_attendance',
+                'get_class_information',
+            ], true) && isset($arguments['classCode']) && is_string($arguments['classCode'])
+                && !app(EncadreurClassScope::class)->ensureClassAccessForEncadreur(
+                    $context['user'],
+                    $arguments['classCode']
+                )) {
+                return $this->scopeDenied(
+                    'Accès refusé : cette classe ne fait pas partie des classes attribuées à votre compte.'
+                );
+            }
+
             return $this->{$encadreurMethods[$toolName]}($context, $arguments);
         }
 
@@ -815,7 +829,9 @@ class AiReadOnlyToolService
         $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
         $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
         if (!$child) {
-            return ['found' => false];
+            return $this->scopeDenied(
+                'Accès refusé : cet élève n’est pas associé à votre compte parent.'
+            );
         }
 
         $rows = DB::table('notes as n')
@@ -856,7 +872,9 @@ class AiReadOnlyToolService
         $args = $this->parentAttendanceArguments($arguments);
         $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
         if (!$child) {
-            return ['found' => false];
+            return $this->scopeDenied(
+                'Accès refusé : cet élève n’est pas associé à votre compte parent.'
+            );
         }
 
         return $this->getStudentAttendanceSummary($child->schoolCode, [
@@ -870,7 +888,7 @@ class AiReadOnlyToolService
     {
         $attendance = $this->getChildAttendance($context, $arguments);
         if (!($attendance['found'] ?? false)) {
-            return ['found' => false];
+            return $attendance;
         }
 
         $absenceDays = array_values(array_filter($attendance['by_date'], function ($day) {
@@ -895,7 +913,9 @@ class AiReadOnlyToolService
         $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
         $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
         if (!$child) {
-            return ['found' => false];
+            return $this->scopeDenied(
+                'Accès refusé : cet élève n’est pas associé à votre compte parent.'
+            );
         }
 
         $rows = DB::table('convocations as cv')
@@ -933,7 +953,9 @@ class AiReadOnlyToolService
         $args = $this->validateArguments($arguments, ['childCode' => 'required|string|max:80']);
         $child = $this->parentOwnedChild($context['parent_code'], $args['childCode']);
         if (!$child) {
-            return ['found' => false];
+            return $this->scopeDenied(
+                'Accès refusé : cet élève n’est pas associé à votre compte parent.'
+            );
         }
 
         $rows = DB::table('devoirs as d')
@@ -995,6 +1017,15 @@ class AiReadOnlyToolService
             'name' => trim((string) ($child->Nom ?? '').' '.(string) ($child->Prenom ?? '')),
             'CodeClasse' => (string) $child->CodeClasse,
             'className' => (string) ($child->LibelleClasse ?? ''),
+        ];
+    }
+
+    private function scopeDenied(string $message): array
+    {
+        return [
+            'found' => false,
+            'access_denied' => true,
+            'message' => $message,
         ];
     }
 

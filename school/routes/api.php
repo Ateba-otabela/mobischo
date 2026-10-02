@@ -33,6 +33,9 @@ Route::post('/dashboard/alerts', [API::class, 'school_manager'])
 Route::post('/mobile/login',[API::class,'mobileLogin'])->withoutMiddleware('throttle:api')
 ->middleware('throttle:2000000:1');
 
+Route::post('/mobile/login-diagnostic', [API::class, 'mobileLoginDiagnostic'])
+    ->middleware('throttle:5,1');
+
 Route::post('/mobile/logout', [API::class, 'mobileLogout'])
     ->middleware(['auth:sanctum', 'throttle:60,1']);
 
@@ -105,6 +108,8 @@ Route::post('/ai/chat', [AiChatController::class, 'chat'])
     ->middleware(['auth:sanctum', 'throttle:15,1']);
 
 Route::get('/principal/teacher-classes', [PrincipalTeacherController::class, 'index'])
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+Route::get('/principal/teachers/{teacherCode}/attendance', [PrincipalTeacherController::class, 'attendance'])
     ->middleware(['auth:sanctum', 'throttle:60,1']);
 
 Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {

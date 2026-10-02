@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Eleve;
+use App\Models\EncadreurClasse;
 use App\Models\Enseignement;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -179,6 +180,60 @@ class NotificationDispatchService
                 'class_code' => $classCode,
                 'school_code' => $schoolCode,
             ]);
+
+            foreach (['sent', 'attempted', 'failed', 'invalidated'] as $key) {
+                $summary[$key] += (int) ($result[$key] ?? 0);
+            }
+        }
+
+        return $summary;
+    }
+
+    public function dispatchAbsenceJustificationToEncadreurs(
+        int $justificationId,
+        string $studentCode,
+        string $studentName,
+        string $classCode,
+        string $absenceDate,
+        string $schoolCode
+    ): array {
+        $encadreurCodes = EncadreurClasse::query()
+            ->where('CodeClasse', $classCode)
+            ->where('CodeEtablissement', $schoolCode)
+            ->pluck('code')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($encadreurCodes->isEmpty()) {
+            return ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
+        }
+
+        $recipients = User::query()
+            ->whereIn('code', $encadreurCodes)
+            ->where('account_type', 'encadreur')
+            ->where('CodeEtablissement', $schoolCode)
+            ->pluck('code')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $summary = ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
+        foreach ($recipients as $recipientCode) {
+            $result = $this->notifyUser(
+                (string) $recipientCode,
+                'Nouvelle justification d\'absence',
+                sprintf('Une justification d\'absence a été soumise pour %s.', $studentName),
+                [
+                    'type' => 'absence_justification',
+                    'recipient_role' => 'encadreur',
+                    'justification_id' => (string) $justificationId,
+                    'student_code' => $studentCode,
+                    'class_code' => $classCode,
+                    'school_code' => $schoolCode,
+                    'absence_date' => $absenceDate,
+                ]
+            );
 
             foreach (['sent', 'attempted', 'failed', 'invalidated'] as $key) {
                 $summary[$key] += (int) ($result[$key] ?? 0);

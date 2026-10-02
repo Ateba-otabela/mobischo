@@ -10,7 +10,7 @@ class MobileApiService {
   static const _userKey = 'mobischo_auth_user';
   static const _baseUrl = 'https://mobischo.com/api';
 
-  static final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static String? _sessionToken;
   static User? _currentUser;
   static final Set<String> _registeredFcmTokens = <String>{};
@@ -67,7 +67,8 @@ class MobileApiService {
   static Future<bool> registerDevice(String fcmToken, String platform) async {
     try {
       final token = fcmToken.trim();
-      if (token.isEmpty || !['android', 'ios'].contains(platform) ||
+      if (token.isEmpty ||
+          !['android', 'ios'].contains(platform) ||
           _logoutInProgress) {
         return false;
       }
@@ -93,7 +94,9 @@ class MobileApiService {
 
       try {
         final registered = await request;
-        if (registered && generation == _sessionGeneration && !_logoutInProgress) {
+        if (registered &&
+            generation == _sessionGeneration &&
+            !_logoutInProgress) {
           _registeredFcmTokens.add(token);
         }
         return registered;
@@ -159,7 +162,10 @@ class MobileApiService {
     final token = await loadToken();
     final userJson = await _secureStorage.read(key: _userKey);
 
-    if (token == null || token.isEmpty || userJson == null || userJson.isEmpty) {
+    if (token == null ||
+        token.isEmpty ||
+        userJson == null ||
+        userJson.isEmpty) {
       _sessionToken = null;
       _currentUser = null;
       return null;
@@ -192,7 +198,8 @@ class MobileApiService {
     ]);
   }
 
-  static Future<Map<String, String>> buildHeaders({Map<String, String>? extra}) async {
+  static Future<Map<String, String>> buildHeaders(
+      {Map<String, String>? extra}) async {
     final headers = <String, String>{};
 
     if (extra != null) {
@@ -207,7 +214,8 @@ class MobileApiService {
     return headers;
   }
 
-  static Future<http.Response> get(String path, {Map<String, String>? headers}) async {
+  static Future<http.Response> get(String path,
+      {Map<String, String>? headers}) async {
     final finalHeaders = await buildHeaders(extra: headers);
     return http.get(Uri.parse('$_baseUrl$path'), headers: finalHeaders);
   }
@@ -218,7 +226,27 @@ class MobileApiService {
     Map<String, String>? headers,
   }) async {
     final finalHeaders = await buildHeaders(extra: headers);
-    return http.post(Uri.parse('$_baseUrl$path'), headers: finalHeaders, body: body);
+    return http.post(Uri.parse('$_baseUrl$path'),
+        headers: finalHeaders, body: body);
+  }
+
+  static Future<http.Response> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    http.MultipartFile? file,
+    Map<String, String>? headers,
+  }) async {
+    final finalHeaders = await buildHeaders(extra: headers);
+    final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'))
+      ..headers.addAll(finalHeaders)
+      ..fields.addAll(fields);
+    if (file != null) {
+      request.files.add(file);
+    }
+
+    final streamedResponse =
+        await request.send().timeout(const Duration(seconds: 30));
+    return http.Response.fromStream(streamedResponse);
   }
 
   static Future<void> logout() async {

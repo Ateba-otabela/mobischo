@@ -12,6 +12,9 @@ use App\Models\InvestigationAlert;
 use App\Models\Matiere;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class InvestigationAlertTest extends TestCase
@@ -67,14 +70,24 @@ class InvestigationAlertTest extends TestCase
 
     private function submitJustification(string $parentCode, string $studentCode, array $overrides = [])
     {
-        return $this->postJson('/api/school_manager', array_merge([
-            'action' => 'SUBMIT_ABSENCE_JUSTIFICATION',
-            'code' => $parentCode,
+        $parent = User::where('code', $parentCode)->firstOrFail();
+        Sanctum::actingAs($parent, ['mobischo:mobile']);
+        $absence = Conduite::firstOrCreate([
             'CodeEleve' => $studentCode,
-            'date_absence' => '2026-09-30',
-            'motif' => 'Maladie',
+            'DateEnreg' => '2026-09-30',
+        ], [
+            'CodeEtatCond' => 'A',
+            'CodeClasse' => 'CL-JUST',
+            'CodeAnnee' => 'AN-1',
+        ]);
+
+        return $this->postJson('/api/parent/absence-justifications', array_merge([
+            'action' => 'SUBMIT_ABSENCE_JUSTIFICATION',
+            'CodeEleve' => $studentCode,
+            'absence_id' => $absence->id,
+            'reason' => 'Maladie',
+            'reason_detail' => '',
             'justification' => 'Le parent signale une absence.',
-            'piece_jointe' => '',
         ], $overrides));
     }
 
@@ -112,22 +125,25 @@ class InvestigationAlertTest extends TestCase
         $this->assertDatabaseCount('absence_justifications', 0);
     }
 
-    public function test_parent_justification_rejects_invalid_date_and_missing_required_fields(): void
+    public function test_parent_justification_rejects_unrecorded_absence_and_missing_reason(): void
     {
         $this->createJustificationParent('P-JUST-1', 'parent-just-1');
         $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
 
         $this->submitJustification('P-JUST-1', 'E-JUST-1', [
-            'date_absence' => '30/09/2026',
+            'absence_id' => 999999,
+            'date_absence' => '2026-09-30',
         ])->assertUnprocessable()->assertJson([
-            'error' => 'La date d’absence est invalide.',
+            'error' => 'L’absence sélectionnée n’est pas disponible pour une justification.',
         ]);
 
         $this->submitJustification('P-JUST-1', 'E-JUST-1', [
-            'motif' => '',
-        ])->assertUnprocessable()->assertJson([
-            'error' => 'Les champs de justification sont obligatoires.',
-        ]);
+            'reason' => '',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reason']);
+        $this->submitJustification('P-JUST-1', 'E-JUST-1', [
+            'reason' => 'Autre',
+            'reason_detail' => '',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reason_detail']);
 
         $this->assertDatabaseCount('absence_justifications', 0);
     }
@@ -167,9 +183,9 @@ class InvestigationAlertTest extends TestCase
         $submitted = $this->submitJustification('P-JUST-1', 'E-JUST-1');
         $submitted->assertOk()->assertJsonPath('status', 'success');
 
-        $history = $this->postJson('/api/school_manager', [
+        Sanctum::actingAs(User::where('code', 'P-JUST-1')->firstOrFail(), ['mobischo:mobile']);
+        $history = $this->postJson('/api/parent/absence-justifications', [
             'action' => 'GET_PARENT_ABSENCE_JUSTIFICATIONS',
-            'code' => 'P-JUST-1',
         ])->assertOk();
 
         $this->assertCount(2, $history->json());
@@ -181,6 +197,96 @@ class InvestigationAlertTest extends TestCase
             ['En attente', 'validée'],
             array_column($history->json(), 'statut')
         );
+    }
+
+    public function test_parent_absence_list_only_returns_unjustified_recorded_absences_for_own_child(): void
+    {
+        $parent = $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
+        $eligible = Conduite::create([
+            'DateEnreg' => '2026-09-30',
+            'CodeEleve' => 'E-JUST-1',
+            'CodeEtatCond' => 'A',
+            'CodeClasse' => 'CL-JUST',
+            'CodeAnnee' => 'AN-1',
+        ]);
+        Conduite::create([
+            'DateEnreg' => '2026-10-01',
+            'CodeEleve' => 'E-JUST-1',
+            'CodeEtatCond' => 'P',
+            'CodeClasse' => 'CL-JUST',
+            'CodeAnnee' => 'AN-1',
+        ]);
+        Conduite::create([
+            'DateEnreg' => '2026-09-29',
+            'CodeEleve' => 'E-JUST-1',
+            'CodeEtatCond' => 'A',
+            'CodeClasse' => 'CL-JUST',
+            'CodeAnnee' => 'AN-1',
+        ]);
+        AbsenceJustification::create([
+            'parent_code' => 'P-JUST-1',
+            'CodeEleve' => 'E-JUST-1',
+            'date_absence' => '2026-09-29',
+            'motif' => 'Maladie',
+            'statut' => 'En attente',
+        ]);
+        Sanctum::actingAs($parent, ['mobischo:mobile']);
+
+        $response = $this->postJson('/api/parent/absence-justifications', [
+            'action' => 'GET_PARENT_CHILD_ABSENCES',
+            'CodeEleve' => 'E-JUST-1',
+        ])->assertOk();
+
+        $this->assertCount(1, $response->json());
+        $response->assertJsonPath('0.id', $eligible->id);
+        $response->assertJsonPath('0.class_name', 'Classe Justification');
+    }
+
+    public function test_submission_requires_an_authenticated_parent_even_on_legacy_action_route(): void
+    {
+        $response = $this->postJson('/api/school_manager', [
+            'action' => 'SUBMIT_ABSENCE_JUSTIFICATION',
+            'code' => 'P-JUST-1',
+            'CodeEleve' => 'E-JUST-1',
+            'absence_id' => 1,
+            'reason' => 'Maladie',
+        ]);
+
+        $response->assertForbidden()->assertJson([
+            'error' => 'Parent non autorisé.',
+        ]);
+    }
+
+    public function test_parent_can_upload_a_supported_document_with_the_justification(): void
+    {
+        Storage::fake('public');
+        $parent = $this->createJustificationParent('P-JUST-1', 'parent-just-1');
+        $this->createJustificationStudent('E-JUST-1', 'P-JUST-1');
+        $absence = Conduite::create([
+            'DateEnreg' => '2026-09-30',
+            'CodeEleve' => 'E-JUST-1',
+            'CodeEtatCond' => 'A',
+            'CodeClasse' => 'CL-JUST',
+            'CodeAnnee' => 'AN-1',
+        ]);
+        Sanctum::actingAs($parent, ['mobischo:mobile']);
+
+        $response = $this->post('/api/parent/absence-justifications', [
+            'action' => 'SUBMIT_ABSENCE_JUSTIFICATION',
+            'CodeEleve' => 'E-JUST-1',
+            'absence_id' => $absence->id,
+            'reason' => 'Rendez-vous médical',
+            'justification' => 'Consultation médicale programmée.',
+            'document' => UploadedFile::fake()
+                ->createWithContent('certificat.pdf', "%PDF-1.4\nTest document\n")
+                ->mimeType('application/pdf'),
+        ]);
+
+        $response->assertOk()->assertJsonPath('status', 'success');
+        $path = AbsenceJustification::firstOrFail()->document_path;
+        $this->assertNotEmpty($path);
+        Storage::disk('public')->assertExists($path);
     }
 
     public function test_parent_absent_and_teacher_present_creates_investigation_alert(): void

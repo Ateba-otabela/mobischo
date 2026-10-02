@@ -6,6 +6,7 @@ import 'package:mobischo/components/screens/parent/MyChildrenAbsences.dart';
 import 'package:mobischo/components/screens/parent/MyChildren.dart';
 import 'package:mobischo/components/screens/parent/devoirs_messages.dart';
 import 'package:mobischo/components/screens/parent/SchoolAdvertScreen.dart';
+import 'package:mobischo/components/screens/parent/absence_justifications_page.dart';
 import 'package:mobischo/components/screens/teachers.dart/teacher_devoirs.dart';
 import 'package:flutter/material.dart';
 import 'package:mobischo/components/screens/teachers.dart/TeacherConvocationList.dart';
@@ -718,6 +719,80 @@ class _MainMenuState extends State<MainMenu> {
                       borderRadius: BorderRadius.circular(15.0),
                     ),
                     elevation: 10,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(15.0),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AbsenceJustificationsPage(user: widget.user),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: const Color(0xffedf7f0),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.edit_calendar_outlined,
+                                color: CustomTheme.blue,
+                                size: 25,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'JUSTIFIER UNE ABSENCE',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Soumettez une justification pour une absence.',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: CustomTheme.blue,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5.0),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(2),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15.0),
+                    ),
+                    elevation: 10,
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: InkWell(
@@ -751,7 +826,7 @@ class _MainMenuState extends State<MainMenu> {
                               ),
                             ),
                             Text(
-                              'École / Université',
+                              'ÉCOLE / UNIVERSITÉ',
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),

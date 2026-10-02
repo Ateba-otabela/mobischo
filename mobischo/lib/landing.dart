@@ -7,7 +7,6 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 // ignore: unused_import
 import 'package:mobischo/components/screens/MyAccount.dart';
 import 'package:mobischo/components/screens/layouts/main_menu.dart';
-import 'package:mobischo/components/screens/parent/absence_justification_screen.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
@@ -66,45 +65,6 @@ class _landingScreenState extends State<landingScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           MainMenu(user: widget.user),
-          if (widget.user.account_type == 'parent')
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                elevation: 10,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(15),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AbsenceJustificationScreen(
-                          user: widget.user,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const ListTile(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 8,
-                    ),
-                    leading: Icon(
-                      Icons.edit_calendar_outlined,
-                      color: CustomTheme.blue,
-                      size: 32,
-                    ),
-                    title: Text('Justifier une absence'),
-                    subtitle: Text(
-                      'Signalez et justifiez l\'absence de votre enfant.',
-                    ),
-                    trailing: Icon(Icons.arrow_forward_ios),
-                  ),
-                ),
-              ),
-            ),
         ],
       )),
     );

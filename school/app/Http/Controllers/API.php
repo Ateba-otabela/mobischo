@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use App\Models\Etablissement;
 use App\Models\SequenceEvaluation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\HistoriqueInscription;
 use App\Models\AbsenceJustification;
 use App\Models\InvestigationAlert;
@@ -40,6 +41,127 @@ class API extends Controller
             'principal_encadreur',
             'administrateur',
         ], true);
+    }
+
+    private function normalizeInstitutionFilterValue(string $value): string
+    {
+        $lower = strtolower($value);
+        $lower = str_replace(['é', 'è', 'ê', 'à', 'ç', 'ô', 'î', 'ï', 'ù'], ['e', 'e', 'e', 'a', 'c', 'o', 'i', 'i', 'u'], $lower);
+
+        $aliases = [
+            'private' => 'private',
+            'prive' => 'private',
+            'privé' => 'private',
+            'public' => 'public',
+            'universitaire' => 'universitaire',
+            'universitaires' => 'universitaire',
+            'secondaire' => 'secondaire',
+            'secondaires' => 'secondaire',
+        ];
+
+        return $aliases[$lower] ?? $lower;
+    }
+
+    private function getInstitutionDiscoveryCatalog(): array
+    {
+        return [
+            [
+                'id' => 'universite-de-douala',
+                'name' => 'Université de Douala',
+                'type' => 'public',
+                'category' => 'universitaire',
+                'location' => 'Douala, Littoral',
+                'city' => 'Douala',
+                'region' => 'Littoral',
+                'description' => 'Université publique de référence au Cameroun, reconnue pour ses filières scientifiques, économiques et technologiques.',
+                'programs' => ['Informatique', 'Droit', 'Commerce', 'Génie civil'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => 'https://www.univ-douala.cm/images/logo_udo.jpg',
+                'image_url' => 'https://www.univ-douala.cm/images/logo_udo.jpg',
+                'website_url' => 'https://www.univ-douala.cm/',
+                'featured' => true,
+            ],
+            [
+                'id' => 'universite-de-yaounde-i',
+                'name' => 'Université de Yaoundé I',
+                'type' => 'public',
+                'category' => 'universitaire',
+                'location' => 'Yaoundé, Centre',
+                'city' => 'Yaoundé',
+                'region' => 'Centre',
+                'description' => 'Grande université publique de référence dans la capitale camerounaise, avec un large éventail de formations et de laboratoires.',
+                'programs' => ['Sciences', 'Médecine', 'Droit', 'Lettres'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => 'https://uy1.uninet.cm/wp-content/uploads/2025/03/Logo-Universite-de-Yaounde-1-251px-.png',
+                'image_url' => 'https://uy1.uninet.cm/wp-content/uploads/2025/03/Logo-Universite-de-Yaounde-1-251px-.png',
+                'website_url' => 'https://uy1.uninet.cm/',
+                'featured' => true,
+            ],
+            [
+                'id' => 'institut-universitaire-siantou',
+                'name' => 'Institut Universitaire SIANTOU',
+                'type' => 'privé',
+                'category' => 'universitaire',
+                'location' => 'Yaoundé, Centre',
+                'city' => 'Yaoundé',
+                'region' => 'Centre',
+                'description' => 'Institut privé axé sur l’innovation pédagogique et les formations professionnelles de qualité.',
+                'programs' => ['Digital', 'Gestion', 'Marketing', 'Administration'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => 'https://siantou-univ.com/wp-content/uploads/2025/06/logo-IUS-etoile-Copie-Photoroo666m.png',
+                'image_url' => 'https://siantou-univ.com/wp-content/uploads/2025/07/WhatsApp-Image-2025-07-17-at-05.32.39.jpeg',
+                'website_url' => 'https://siantou-univ.com/',
+                'featured' => true,
+            ],
+            [
+                'id' => 'campus-centre-dexcellence-paul-biya',
+                'name' => 'Campus du Centre d’Excellence Technologique Paul Biya',
+                'type' => 'public',
+                'category' => 'universitaire',
+                'location' => 'Yaoundé, Centre',
+                'city' => 'Yaoundé',
+                'region' => 'Centre',
+                'description' => 'Campus technologique orienté formation, innovation et mise en œuvre de projets de recherche appliquée.',
+                'programs' => ['Technologie', 'Innovation', 'IA', 'Numérique'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => '',
+                'image_url' => '',
+                'website_url' => 'https://www.paulbiya-center.cm/',
+                'featured' => false,
+            ],
+            [
+                'id' => 'institut-saint-jean',
+                'name' => 'Institut Saint Jean',
+                'type' => 'privé',
+                'category' => 'secondaire',
+                'location' => 'Yaoundé, Centre',
+                'city' => 'Yaoundé',
+                'region' => 'Centre',
+                'description' => 'Établissement secondaire privé orienté excellence académique, leadership et développement personnel.',
+                'programs' => ['Sciences', 'Lettres', 'Commercial', 'TIC'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => '',
+                'image_url' => '',
+                'website_url' => 'https://www.institutsaintjean.cm/',
+                'featured' => false,
+            ],
+            [
+                'id' => 'college-bilingue-de-bafoussam',
+                'name' => 'Collège Bilingue de Bafoussam',
+                'type' => 'privé',
+                'category' => 'secondaire',
+                'location' => 'Bafoussam, Ouest',
+                'city' => 'Bafoussam',
+                'region' => 'Ouest',
+                'description' => 'Structure secondaire bilingue avec forte vocation d’accompagnement à la réussite scolaire et à l’orientation.',
+                'programs' => ['Sciences', 'Lettres', 'Commercial', 'Mécanique'],
+                'languages' => ['Français', 'Anglais'],
+                'logo_url' => '',
+                'image_url' => '',
+                'website_url' => 'https://www.bafoussamcollege.cm/',
+                'featured' => false,
+            ],
+        ];
     }
 
     public function mobileLogin(Request $request)
@@ -123,59 +245,396 @@ class API extends Controller
         $action = $request->action;
 
         if ($action == 'SUBMIT_ABSENCE_JUSTIFICATION') {
-            $parentCode = trim((string) $request->input('code', ''));
-            $studentCode = trim((string) $request->input('CodeEleve', ''));
-            $absenceDate = trim((string) $request->input('date_absence', ''));
-            $reason = trim((string) $request->input('motif', ''));
-            $description = trim((string) $request->input('justification', ''));
-
-            if ($parentCode === '' || $studentCode === '' || $absenceDate === '' ||
-                $reason === '' || $description === '') {
-                return response()->json(['error' => 'Les champs de justification sont obligatoires.'], 422);
+            $parent = $request->user();
+            if (!$parent instanceof User || strtolower(trim((string) $parent->account_type)) !== 'parent') {
+                return response()->json(['error' => 'Parent non autorisé.'], 403);
             }
 
-            $studentBelongsToParent = Eleve::where('CodeEleve', $studentCode)
+            $parentCode = trim((string) $parent->code);
+            $schoolCode = trim((string) ($parent->CodeEtablissement ?? ''));
+            $request->validate([
+                'CodeEleve' => 'required|string|max:255',
+                'absence_id' => 'required|integer|min:1',
+                'reason' => 'required|in:Maladie,Rendez-vous médical,Raisons familiales,Urgence familiale,Autre',
+                'reason_detail' => 'required_if:reason,Autre|nullable|string|min:3|max:180',
+                'justification' => 'nullable|string|min:10|max:500',
+                'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            ]);
+            $studentCode = trim((string) $request->input('CodeEleve', ''));
+            $absenceId = (int) $request->input('absence_id');
+            $reason = trim((string) $request->input('reason'));
+            $reasonDetail = trim((string) $request->input('reason_detail', ''));
+            $reasonLabel = $reason === 'Autre'
+                ? 'Autre : '.$reasonDetail
+                : $reason;
+            $justificationText = trim((string) $request->input('justification', ''));
+            if ($justificationText === '') {
+                $justificationText = $reasonLabel;
+            }
+
+            $student = Eleve::query()
+                ->where('CodeEleve', $studentCode)
                 ->where('code', $parentCode)
-                ->exists();
-            if (!$studentBelongsToParent) {
+                ->first();
+            if (!$student) {
                 return response()->json(['error' => 'Élève non autorisé.'], 403);
             }
 
+            $absence = Conduite::query()
+                ->whereKey($absenceId)
+                ->where('CodeEleve', $studentCode)
+                ->whereRaw("UPPER(COALESCE(CodeEtatCond, '')) = ?", ['A'])
+                ->first();
+            if (!$absence) {
+                return response()->json([
+                    'error' => 'L’absence sélectionnée n’est pas disponible pour une justification.',
+                ], 422);
+            }
+
+            $absenceDate = trim((string) $absence->DateEnreg);
             $parsedDate = \DateTime::createFromFormat('Y-m-d', $absenceDate);
             $dateErrors = \DateTime::getLastErrors();
             if (!$parsedDate || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0)) ||
                 $parsedDate->format('Y-m-d') !== $absenceDate) {
-                return response()->json(['error' => 'La date d’absence est invalide.'], 422);
+                return response()->json(['error' => 'La date d’absence enregistrée est invalide.'], 422);
             }
 
-            $justification = AbsenceJustification::create([
-                'parent_code' => $parentCode,
-                'CodeEleve' => $studentCode,
-                'date_absence' => $absenceDate,
-                'motif' => $reason,
-                'justification' => $description,
-                'piece_jointe' => trim((string) $request->input('piece_jointe', '')) ?: null,
+            $classCode = trim((string) ($absence->CodeClasse ?: $student->CodeClasse));
+            $class = Classe::query()
+                ->where('CodeClasse', $classCode)
+                ->when($schoolCode !== '', fn ($query) => $query->where('CodeEtablissement', $schoolCode))
+                ->first();
+            if (!$class) {
+                return response()->json(['error' => 'La classe de l’élève ne correspond pas à votre établissement.'], 403);
+            }
+            $schoolCode = trim((string) $class->CodeEtablissement);
+
+            $documentPath = null;
+            try {
+                $submission = DB::transaction(function () use (
+                    $request,
+                    $parent,
+                    $parentCode,
+                    $schoolCode,
+                    $studentCode,
+                    $absenceId,
+                    $absenceDate,
+                    $reasonLabel,
+                    $justificationText,
+                    $class,
+                    &$documentPath
+                ) {
+                    Eleve::query()
+                        ->where('CodeEleve', $studentCode)
+                        ->where('code', $parentCode)
+                        ->lockForUpdate()
+                        ->first();
+
+                    $lockedAbsence = Conduite::query()
+                        ->whereKey($absenceId)
+                        ->where('CodeEleve', $studentCode)
+                        ->whereRaw("UPPER(COALESCE(CodeEtatCond, '')) = ?", ['A'])
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$lockedAbsence || trim((string) $lockedAbsence->DateEnreg) !== $absenceDate) {
+                        return ['invalid_absence' => true];
+                    }
+
+                    $existing = AbsenceJustification::query()
+                        ->where('CodeEleve', $studentCode)
+                        ->where(function ($query) use ($absenceDate) {
+                            $query->where('absence_date', $absenceDate)
+                                ->orWhere('date_absence', $absenceDate);
+                        })
+                        ->where(function ($query) {
+                            $query->where('status', 'pending')
+                                ->orWhere('statut', 'En attente');
+                        })
+                        ->lockForUpdate()
+                        ->first();
+                    if ($existing) {
+                        return ['duplicate' => $existing];
+                    }
+
+                    if ($request->hasFile('document')) {
+                        $storedDocumentPath = $request->file('document')->store('absence-justifications', 'public');
+                        if ($storedDocumentPath === false) {
+                            throw new \RuntimeException('Document storage failed.');
+                        }
+                        $documentPath = $storedDocumentPath;
+                    }
+
+                    $parentName = trim((string) ($parent->nom ?? '').' '.(string) ($parent->prenom ?? ''));
+                    $record = AbsenceJustification::create([
+                        'CodeEleve' => $studentCode,
+                        'CodeEtablissement' => $schoolCode !== '' ? $schoolCode : null,
+                        'absence_date' => $absenceDate,
+                        'date_absence' => $absenceDate,
+                        'reason' => $reasonLabel,
+                        'motif' => $reasonLabel,
+                        'justification' => $justificationText,
+                        'status' => 'pending',
+                        'statut' => 'En attente',
+                        'parent_code' => $parentCode,
+                        'parent_name' => $parentName,
+                        'document_path' => $documentPath,
+                    ]);
+
+                    return ['record' => $record];
+                });
+            } catch (\Throwable $exception) {
+                if (is_string($documentPath) && $documentPath !== '') {
+                    Storage::disk('public')->delete($documentPath);
+                }
+                Log::warning('Parent absence justification could not be stored.', [
+                    'parent_code' => $parentCode,
+                    'student_code' => $studentCode,
+                    'exception_type' => get_class($exception),
+                ]);
+
+                return response()->json(['error' => 'La justification n’a pas pu être enregistrée.'], 500);
+            }
+
+            if (isset($submission['invalid_absence'])) {
+                return response()->json([
+                    'error' => 'L’absence sélectionnée n’est plus disponible pour une justification.',
+                ], 422);
+            }
+
+            if (isset($submission['duplicate'])) {
+                return response()->json([
+                    'error' => 'Une justification est déjà en attente pour cet élève à cette date.',
+                    'id' => $submission['duplicate']->id,
+                ], 409);
+            }
+
+            $justification = $submission['record'];
+            $studentName = trim((string) ($student->Nom ?? '').' '.(string) ($student->Prenom ?? ''));
+            $dispatcher = app(NotificationDispatchService::class);
+            try {
+                $dispatcher->dispatchAbsenceJustificationNotification(
+                    $studentCode,
+                    $parentCode,
+                    ['school_code' => $schoolCode]
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('Teacher notification for parent absence justification failed.', [
+                    'justification_id' => $justification->id,
+                    'student_code' => $studentCode,
+                    'exception_type' => get_class($exception),
+                ]);
+            }
+
+            try {
+                $dispatcher->dispatchAbsenceJustificationToEncadreurs(
+                    (int) $justification->id,
+                    $studentCode,
+                    $studentName,
+                    (string) $class->CodeClasse,
+                    $absenceDate,
+                    $schoolCode
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('Encadreur notification for parent absence justification failed.', [
+                    'justification_id' => $justification->id,
+                    'student_code' => $studentCode,
+                    'class_code' => $class->CodeClasse,
+                    'exception_type' => get_class($exception),
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'id' => $justification->id,
                 'statut' => 'En attente',
-            ]);
+            ], 200);
+        }
 
-            $student = Eleve::query()->where('CodeEleve', $studentCode)->first();
-            if ($student) {
-                $schoolCode = trim((string) ((User::where('code', '=', $parentCode)->value('CodeEtablissement')) ?? ''));
-                $dispatcher = new NotificationDispatchService();
-                $dispatcher->dispatchAbsenceJustificationNotification($studentCode, $parentCode, ['school_code' => $schoolCode]);
+        if ($action == 'GET_INSTITUTIONS') {
+            $search = trim((string) strtolower((string) $request->input('search', '')));
+            $type = $this->normalizeInstitutionFilterValue((string) $request->input('type', ''));
+            $category = $this->normalizeInstitutionFilterValue((string) $request->input('category', ''));
+            $location = trim((string) strtolower((string) $request->input('location', '')));
+            $page = max(1, (int) $request->input('page', 1));
+            $perPage = max(1, min(50, (int) $request->input('per_page', 12)));
+
+            $institutions = $this->getInstitutionDiscoveryCatalog();
+
+            $filtered = array_values(array_filter($institutions, function ($institution) use ($search, $type, $category, $location) {
+                $name = strtolower((string) ($institution['name'] ?? ''));
+                $description = strtolower((string) ($institution['description'] ?? ''));
+                $city = strtolower((string) ($institution['city'] ?? ''));
+                $region = strtolower((string) ($institution['region'] ?? ''));
+                $locationText = strtolower((string) ($institution['location'] ?? ''));
+                $institutionType = $this->normalizeInstitutionFilterValue((string) ($institution['type'] ?? ''));
+                $institutionCategory = $this->normalizeInstitutionFilterValue((string) ($institution['category'] ?? ''));
+
+                if ($search !== '' && strpos($name, $search) === false && strpos($description, $search) === false && strpos($city, $search) === false && strpos($region, $search) === false) {
+                    return false;
+                }
+
+                if ($type !== '' && $institutionType !== $type) {
+                    return false;
+                }
+
+                if ($category !== '' && $institutionCategory !== $category) {
+                    return false;
+                }
+
+                if ($location !== '' && strpos($locationText, $location) === false && strpos($city, $location) === false && strpos($region, $location) === false) {
+                    return false;
+                }
+
+                return true;
+            }));
+
+            $total = count($filtered);
+            $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
+            $offset = ($page - 1) * $perPage;
+            $paginated = array_slice($filtered, $offset, $perPage);
+
+            return response()->json([
+                'data' => $paginated,
+                'total' => $total,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => $totalPages,
+            ]);
+        }
+
+        if ($action == 'GET_PARENT_CHILD_ABSENCES') {
+            $parent = $request->user();
+            if (!$parent instanceof User || strtolower(trim((string) $parent->account_type)) !== 'parent') {
+                return response()->json(['error' => 'Parent non autorisé.'], 403);
             }
 
-            return response()->json(['status' => 'success', 'id' => $justification->id]);
+            $request->validate([
+                'CodeEleve' => 'required|string|max:255',
+            ]);
+            $parentCode = trim((string) $parent->code);
+            $studentCode = trim((string) $request->input('CodeEleve'));
+            $schoolCode = trim((string) ($parent->CodeEtablissement ?? ''));
+            $student = Eleve::query()
+                ->where('CodeEleve', $studentCode)
+                ->where('code', $parentCode)
+                ->first();
+            if (!$student) {
+                return response()->json(['error' => 'Élève non autorisé.'], 403);
+            }
+
+            $absences = Conduite::query()
+                ->join('classes as absence_class', 'absence_class.CodeClasse', '=', 'conduites.CodeClasse')
+                ->where('conduites.CodeEleve', $studentCode)
+                ->whereRaw("UPPER(COALESCE(conduites.CodeEtatCond, '')) = ?", ['A'])
+                ->when(
+                    $schoolCode !== '',
+                    fn ($query) => $query->where('absence_class.CodeEtablissement', $schoolCode)
+                )
+                ->whereNotExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('absence_justifications as pending_justification')
+                        ->whereColumn('pending_justification.CodeEleve', 'conduites.CodeEleve')
+                        ->where(function ($dateQuery) {
+                            $dateQuery
+                                ->whereColumn(
+                                    'pending_justification.absence_date',
+                                    'conduites.DateEnreg'
+                                )
+                                ->orWhereColumn(
+                                    'pending_justification.date_absence',
+                                    'conduites.DateEnreg'
+                                );
+                        })
+                        ->where(function ($statusQuery) {
+                            $statusQuery
+                                ->where('pending_justification.status', 'pending')
+                                ->orWhere('pending_justification.statut', 'En attente');
+                        });
+                })
+                ->select([
+                    'conduites.id',
+                    'conduites.DateEnreg',
+                    'conduites.CodeEleve',
+                    'conduites.CodeClasse',
+                    'conduites.CodeEtatCond',
+                    'absence_class.LibelleClasse as class_name',
+                ])
+                ->orderByDesc('conduites.DateEnreg')
+                ->get()
+                ->unique('DateEnreg')
+                ->values();
+
+            return response()->json($absences);
         }
 
         if ($action == 'GET_PARENT_ABSENCE_JUSTIFICATIONS') {
-            $parentCode = trim((string) $request->input('code', ''));
-            $studentCodes = Eleve::where('code', $parentCode)->pluck('CodeEleve');
-            return AbsenceJustification::where('parent_code', '=', $parentCode)
-                ->whereIn('CodeEleve', $studentCodes)
-                ->orderBy('date_absence', 'DESC')
-                ->orderBy('created_at', 'DESC')
-                ->get();
+            try {
+                $parent = $request->user();
+                if (!$parent instanceof User || strtolower(trim((string) $parent->account_type)) !== 'parent') {
+                    return response()->json(['error' => 'Parent non autorisé.'], 403);
+                }
+
+                $parentCode = (string) $parent->code;
+                $schoolCode = trim((string) ($parent->CodeEtablissement ?? ''));
+                $studentCodes = DB::table('eleves as e')
+                    ->join('classes as cl', 'cl.CodeClasse', '=', 'e.CodeClasse')
+                    ->where('e.code', $parentCode)
+                    ->when($schoolCode !== '', fn ($query) => $query->where('cl.CodeEtablissement', $schoolCode))
+                    ->pluck('e.CodeEleve');
+
+                $query = AbsenceJustification::query()
+                    ->where('parent_code', $parentCode)
+                    ->where(function ($builder) use ($schoolCode) {
+                        if ($schoolCode !== '') {
+                            $builder->where('CodeEtablissement', $schoolCode)
+                                ->orWhereNull('CodeEtablissement');
+                        }
+                    })
+                    ->whereIn('CodeEleve', $studentCodes)
+                    ->orderByRaw('COALESCE(date_absence, absence_date) DESC')
+                    ->orderBy('created_at', 'DESC');
+
+                return response()->json($query->get());
+            } catch (\Throwable $exception) {
+                // TEMPORARY DIAGNOSTIC CODE: remove after identifying the production failure.
+                $safeMessage = $exception->getMessage();
+                $sql = null;
+                $queryException = $exception;
+                while ($queryException !== null) {
+                    if ($queryException instanceof \Illuminate\Database\QueryException) {
+                        $sql = $queryException->getSql();
+                        foreach ($queryException->getBindings() as $binding) {
+                            if (is_scalar($binding) && (string) $binding !== '') {
+                                $safeMessage = str_replace((string) $binding, '[REDACTED]', $safeMessage);
+                            }
+                        }
+                        break;
+                    }
+                    $queryException = $queryException->getPrevious();
+                }
+
+                $safeMessage = preg_replace('/Bearer\s+\S+/i', 'Bearer [REDACTED]', $safeMessage) ?? $safeMessage;
+                $safeMessage = preg_replace('/-----BEGIN [^-]+-----.*?-----END [^-]+-----/s', '[REDACTED]', $safeMessage) ?? $safeMessage;
+                $httpMessage = preg_replace('/\s*\(SQL:.*$/s', '', $safeMessage) ?? $safeMessage;
+                $httpMessage = preg_replace('/\b(password|token|api[_-]?key|authorization)\b\s*[=:]\s*[^\s,;]+/i', '$1=[REDACTED]', $httpMessage) ?? $httpMessage;
+
+                Log::error('Temporary parent absence history diagnostic.', [
+                    'exception_class' => get_class($exception),
+                    'exception_message' => $safeMessage,
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                    'sql' => $sql,
+                    'trace' => $exception->getTraceAsString(),
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'error_type' => get_class($exception),
+                    'message' => $httpMessage,
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ], 500);
+            }
         }
 
         #users
@@ -1821,8 +2280,8 @@ class API extends Controller
 
             $absenceJustification = AbsenceJustification::query()
                 ->where('CodeEleve', '=', $studentCode)
-                ->where('date_absence', '=', $attendanceDate)
-                ->whereIn('statut', ['En attente', 'validée', 'Validee', 'Validée'])
+                ->where('absence_date', '=', $attendanceDate)
+                ->whereIn('status', ['pending', 'validated', 'approved'])
                 ->orderByDesc('id')
                 ->first();
 
@@ -1846,4 +2305,3 @@ class API extends Controller
         }
     }
 }
-

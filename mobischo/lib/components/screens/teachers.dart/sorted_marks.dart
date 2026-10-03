@@ -9,6 +9,7 @@ import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/mark_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class SortedMarkListScreen extends StatefulWidget {
   final Course course;
@@ -132,7 +133,7 @@ class _SortedMarkListScreenState extends State<SortedMarkListScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(
                 snapshot.data!.toUpperCase(),
@@ -193,7 +194,8 @@ class _SortedMarkListScreenState extends State<SortedMarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -211,7 +213,8 @@ class _SortedMarkListScreenState extends State<SortedMarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -285,7 +288,7 @@ class _SortedMarkListScreenState extends State<SortedMarkListScreen> {
                             });
                           },
                           elevation: 10,
-                          hint: const Text('Sequences Evaluations'),
+                          hint: Text(uiText(context, 'sequencesEvaluations')),
                         ),
                         DropdownButton(
                           items: ListYears,
@@ -301,7 +304,7 @@ class _SortedMarkListScreenState extends State<SortedMarkListScreen> {
                             // Navigator.pop(context);
                           },
                           elevation: 10,
-                          hint: const Text('Annee Scholaires'),
+                          hint: Text(uiText(context, 'schoolYears')),
                         )
                       ],
                     ),
@@ -376,7 +379,7 @@ class markList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",
@@ -385,7 +388,10 @@ class markList extends StatelessWidget {
                                 );
                               }
                             }),
-                        subtitle: Text("Note: ${snapshot.data[index].valeur}"),
+                        subtitle:
+                            Text(uiText(context, 'noteLabel', parameters: {
+                          'value': '${snapshot.data[index].valeur}',
+                        })),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {},
                       ),

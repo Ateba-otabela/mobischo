@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -152,7 +153,8 @@ class _AllStudentAbsencesState extends State<AllStudentAbsences> {
                                       AssetImage('assets/images/welcome.png'),
                                 ),
                                 title: Text(current_date),
-                                subtitle: const Text("Date D'Enregistrement"),
+                                subtitle:
+                                    Text(uiText(context, 'recordedOnDate')),
                                 onTap: () {
                                   if (isLoaded == true) {
                                     _interstitialAd!.show();
@@ -227,102 +229,103 @@ class absencesList extends StatelessWidget {
           return Container(
             color: CustomTheme.grey,
             child: snapshot.data.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: CustomTheme.cardShadow,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Image.asset(
-                            'assets/images/landing3.png',
-                            height: 110,
-                            fit: BoxFit.contain,
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Aucun retard ou absence',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFF424242),
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: CustomTheme.cardShadow,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/images/landing3.png',
+                              height: 110,
+                              fit: BoxFit.contain,
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            "Bonne nouvelle ! Aucun retard ou absence n'a été enregistré pour cet élève pour le moment.",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFF757575),
-                              fontSize: 14,
-                              height: 1.4,
+                            const SizedBox(height: 18),
+                            Text(
+                              uiText(context, 'noAbsenceOrLate'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFF424242),
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            Text(
+                              uiText(context, 'absenceSummaryClear'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFF757575),
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                )
+                  )
                 : ListView.builder(
-                shrinkWrap: true,
-                itemCount: snapshot.data.length,
-                itemBuilder: (BuildContext context, int index) {
-                  return Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: Container(
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          color: Colors.white),
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.timer,
-                          color: CustomTheme.blue,
-                        ),
-                        title: FutureBuilder<String>(
-                            future: CourseServices.getMainCourse(
-                                snapshot.data[index].CodeMatiere),
-                            builder: (
-                              BuildContext context,
-                              AsyncSnapshot<String> snapshot,
-                            ) {
-                              if (snapshot.data == null) {
-                                return const Text('loading ...');
-                              } else {
-                                return Text(
-                                  snapshot.data ?? "",
-                                );
+                    shrinkWrap: true,
+                    itemCount: snapshot.data.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: Container(
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: Colors.white),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.timer,
+                              color: CustomTheme.blue,
+                            ),
+                            title: FutureBuilder<String>(
+                                future: CourseServices.getMainCourse(
+                                    snapshot.data[index].CodeMatiere),
+                                builder: (
+                                  BuildContext context,
+                                  AsyncSnapshot<String> snapshot,
+                                ) {
+                                  if (snapshot.data == null) {
+                                    return Text(
+                                        uiText(context, 'loadingEllipsis'));
+                                  } else {
+                                    return Text(
+                                      snapshot.data ?? "",
+                                    );
+                                  }
+                                }),
+                            subtitle: Text(
+                              "Date : ${HumanDateFormat(snapshot.data[index].DateEnreg)}",
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            // subtitle: Text("Note: ${snapshot.data[index].valeur}"),
+                            trailing: const Icon(Icons.arrow_forward_ios),
+                            onTap: () {
+                              if (isLoaded == true) {
+                                interstitialAd!.show();
                               }
-                            }),
-                        subtitle: Text(
-                          "Date : ${HumanDateFormat(snapshot.data[index].DateEnreg)}",
-                          style: Theme.of(context).textTheme.bodyMedium,
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: ((context) => AbsenceDetail(
+                                          // course: widget.course,
+                                          student: widget.student,
+                                          absence: snapshot.data[index]))));
+                            },
+                          ),
                         ),
-                        // subtitle: Text("Note: ${snapshot.data[index].valeur}"),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          if (isLoaded == true) {
-                            interstitialAd!.show();
-                          }
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: ((context) => AbsenceDetail(
-                                      // course: widget.course,
-                                      student: widget.student,
-                                      absence: snapshot.data[index]))));
-                        },
-                      ),
-                    ),
-                  );
-                }),
+                      );
+                    }),
           );
         }
       },

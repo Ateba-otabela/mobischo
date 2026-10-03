@@ -2,6 +2,7 @@
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/models/class.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:flutter/material.dart';
 import 'package:mobischo/components/screens/students/student_detail.dart';
 import 'package:mobischo/models/user.dart';
@@ -87,13 +88,13 @@ class _ClassStudentsState extends State<ClassStudents> {
         ));
   }
 
-  String getGender(String sex) {
+  String getGender(String sex, BuildContext context) {
     final normalized = sex.trim().toLowerCase();
     if (normalized == '1' || normalized == 'm' || normalized == 'masculin') {
-      return "Masculin";
+      return uiText(context, 'genderMale');
     }
     if (normalized == '0' || normalized == 'f' || normalized == 'feminin') {
-      return "Féminin";
+      return uiText(context, 'genderFemale');
     }
     return '';
   }
@@ -111,14 +112,14 @@ class _ClassStudentsState extends State<ClassStudents> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Impossible de charger les élèves.'),
+                Text(uiText(context, 'retryLoadingStudents')),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () => setState(() {
                     _studentsFuture = StudentServices.getCourseStudents(
                         widget.classe.CodeClasse);
                   }),
-                  child: const Text('Réessayer'),
+                  child: Text(uiText(context, 'retry')),
                 ),
               ],
             ),
@@ -126,10 +127,10 @@ class _ClassStudentsState extends State<ClassStudents> {
         }
 
         final students = (snapshot.data ?? <Student>[])
-          .where((student) => student.CodeClasse == widget.classe.CodeClasse)
-          .toList();
+            .where((student) => student.CodeClasse == widget.classe.CodeClasse)
+            .toList();
         if (students.isEmpty) {
-          return const Center(child: Text('Aucun élève dans cette classe.'));
+          return Center(child: Text(uiText(context, 'noStudentsInClass')));
         }
 
         return ListView.builder(
@@ -160,7 +161,7 @@ class _ClassStudentsState extends State<ClassStudents> {
                     style: const TextStyle(fontSize: 13),
                   ),
                   subtitle: Text(
-                    getGender(student.Sex),
+                    getGender(student.Sex, context),
                     style: const TextStyle(color: CustomTheme.blue),
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -196,7 +197,10 @@ class _ClassStudentsState extends State<ClassStudents> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
-        title: Text('Élèves', style: Theme.of(context).textTheme.titleLarge),
+        title: Text(
+          uiText(context, 'studentList'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         centerTitle: true,
       ),
       body: content,

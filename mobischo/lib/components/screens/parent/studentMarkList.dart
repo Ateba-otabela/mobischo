@@ -6,6 +6,7 @@ import 'package:mobischo/components/screens/parent/SortedStudentMarks.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/services/academic_services.dart';
@@ -186,7 +187,8 @@ class _StudentMarkListScreenState extends State<StudentMarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -203,7 +205,8 @@ class _StudentMarkListScreenState extends State<StudentMarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -278,7 +281,7 @@ class _StudentMarkListScreenState extends State<StudentMarkListScreen> {
                             });
                           },
                           elevation: 10,
-                          hint: const Text('Sequences Evaluations'),
+                          hint: Text(uiText(context, 'sequencesEvaluations')),
                         ),
                         DropdownButton(
                           items: ListYears,
@@ -294,7 +297,7 @@ class _StudentMarkListScreenState extends State<StudentMarkListScreen> {
                             // Navigator.pop(context);
                           },
                           elevation: 10,
-                          hint: const Text('Annee Scholaires'),
+                          hint: Text(uiText(context, 'schoolYears')),
                         )
                       ],
                     ),
@@ -369,7 +372,7 @@ class markList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",
@@ -386,7 +389,7 @@ class markList extends StatelessWidget {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(
                                 snapshot.data!.toUpperCase(),

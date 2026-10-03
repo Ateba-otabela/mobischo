@@ -1,6 +1,7 @@
 // ignore_for_file: unrelated_type_equality_checks, avoid_print, file_names
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/components/screens/encardreur/EncardreurconvocationList.dart';
 import 'package:mobischo/components/screens/encardreur/StudentClassList.dart';
 import 'package:mobischo/components/screens/encardreur/classList.dart';
@@ -140,44 +141,46 @@ class _CustomMenuState extends State<CustomMenu>
   }
 
   String _titleAt(int index) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     if (widget.initialBody is SchoolAdvertScreen) {
       return l10n.schoolUniversity;
     }
 
     if (_isPrincipalShell) {
-      return _localizedTitle(widget.principalTitles![index], l10n);
+      return localizedMenuTitle(context, widget.principalTitles![index]);
     }
 
     final titles = widget.user.admin == '1'
-        ? [l10n.appName.toUpperCase(), l10n.users.toUpperCase(), l10n.notes.toUpperCase(), l10n.ai.toUpperCase()]
+        ? [
+            l10n.appName.toUpperCase(),
+            l10n.users.toUpperCase(),
+            l10n.notes.toUpperCase(),
+            l10n.ai.toUpperCase()
+          ]
         : widget.user.account_type == 'parent'
-            ? [l10n.appName.toUpperCase(), l10n.absences.toUpperCase(), l10n.myChildren.toUpperCase(), l10n.notes.toUpperCase(), l10n.ai.toUpperCase()]
+            ? [
+                l10n.appName.toUpperCase(),
+                l10n.absences.toUpperCase(),
+                l10n.myChildren.toUpperCase(),
+                l10n.notes.toUpperCase(),
+                l10n.ai.toUpperCase()
+              ]
             : widget.user.account_type == 'encadreur'
-                ? [l10n.appName.toUpperCase(), l10n.convoke.toUpperCase(), l10n.messages.toUpperCase(), l10n.students.toUpperCase(), l10n.ai.toUpperCase()]
-                : [l10n.appName.toUpperCase(), l10n.registerCall.toUpperCase(), l10n.notes.toUpperCase(), l10n.subjects.toUpperCase(), l10n.ai.toUpperCase()];
+                ? [
+                    l10n.appName.toUpperCase(),
+                    l10n.convoke.toUpperCase(),
+                    l10n.convocations.toUpperCase(),
+                    l10n.students.toUpperCase(),
+                    l10n.ai.toUpperCase()
+                  ]
+                : [
+                    l10n.appName.toUpperCase(),
+                    l10n.registerCall.toUpperCase(),
+                    l10n.notes.toUpperCase(),
+                    l10n.subjects.toUpperCase(),
+                    l10n.ai.toUpperCase()
+                  ];
     return titles[index];
-  }
-
-  String _localizedTitle(String title, AppLocalizations l10n) {
-    switch (title) {
-      case 'Classes':
-        return l10n.classes;
-      case 'Présence':
-        return l10n.presence;
-      case 'Élèves':
-        return l10n.students;
-      case 'Rapports des professeurs':
-        return l10n.reports;
-      case 'Alertes d’investigation':
-        return l10n.alerts;
-      case 'Appels des professeurs':
-        return l10n.teacherCalls;
-      case 'Convoquer':
-        return l10n.convoke;
-      default:
-        return title;
-    }
   }
 
   _tabBarIcons() {
@@ -379,10 +382,10 @@ class _CustomMenuState extends State<CustomMenu>
                   : null,
           title: Text(
             (widget.initialBody is SchoolAdvertScreen && showingInitialBody)
-                ? 'École / Université'
+                ? localizedMenuTitle(context, 'École / Université')
                 : (widget.initialBody is ConvocationDetail &&
                         showingInitialBody)
-                    ? 'Convocation'
+                    ? localizedMenuTitle(context, 'Convocation')
                     : currentTitle,
             style: Theme.of(context).textTheme.headlineLarge,
           ),
@@ -409,8 +412,7 @@ class _CustomMenuState extends State<CustomMenu>
             setState(() {
               showingInitialBody = false;
               principalSecondaryBody = request.screen;
-              currentTitle =
-                  _localizedTitle(request.title, AppLocalizations.of(context)!);
+              currentTitle = localizedMenuTitle(context, request.title);
             });
             return true;
           },
@@ -475,9 +477,9 @@ class _CustomMenuState extends State<CustomMenu>
                 principalSecondaryBody = screen;
                 currentTitle = secondaryIndex >= 0 &&
                         widget.principalSecondaryTitles != null
-                    ? _localizedTitle(
+                    ? localizedMenuTitle(
+                        context,
                         widget.principalSecondaryTitles![secondaryIndex],
-                        AppLocalizations.of(context)!,
                       )
                     : currentTitle;
               });

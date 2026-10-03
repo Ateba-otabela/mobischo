@@ -4,6 +4,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/parent/allStudentAbsences.dart';
 import 'package:flutter/material.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/utils/student_display_name.dart';
@@ -124,8 +125,8 @@ class _MyChildrenAbsencesState extends State<MyChildrenAbsences> {
                                           fit: BoxFit.fill),
                                     )),
                                 title: Text(
-                                  getStudentDisplayName(snapshot.data[index]),
-                                  style: const TextStyle(fontSize: 13)),
+                                    getStudentDisplayName(snapshot.data[index]),
+                                    style: const TextStyle(fontSize: 13)),
                                 subtitle: Text(
                                   getGender(snapshot.data[index].Sex),
                                   style:
@@ -172,7 +173,7 @@ class _MyChildrenAbsencesState extends State<MyChildrenAbsences> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
-                    tooltip: 'Retour au tableau de bord',
+                    tooltip: uiText(context, 'homeDashboardTooltip'),
                     icon: const Icon(Icons.arrow_back_ios),
                     color: CustomTheme.blue,
                     onPressed: widget.onBack,

@@ -3,6 +3,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/students/student_detail.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
@@ -81,7 +82,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                 Icons.arrow_back_ios,
                 color: Colors.white,
               )),
-          title: Text('LISTE DES ELEVES',
+          title: Text(uiText(context, 'studentListUpper'),
               style: Theme.of(context).textTheme.titleLarge),
           centerTitle: true,
         ),
@@ -146,8 +147,8 @@ class _StudentListScreenState extends State<StudentListScreen> {
         ),
       );
     } else {
-      return const Center(
-        child: Text("Liste des eleves"),
+      return Center(
+        child: Text(uiText(context, 'studentList')),
       );
     }
   }

@@ -4,6 +4,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/teachers.dart/absences.dart';
 import 'package:mobischo/components/screens/teachers.dart/absences_list.dart';
 import 'package:mobischo/services/courses.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -132,7 +133,8 @@ class _teacherClassListState extends State<teacherClassList> {
                                   AsyncSnapshot<String> snapshot,
                                 ) {
                                   if (snapshot.data == null) {
-                                    return const Text('loading ...');
+                                    return Text(
+                                        uiText(context, 'loadingEllipsis'));
                                   } else {
                                     return Text(snapshot.data ?? "");
                                   }
@@ -146,7 +148,8 @@ class _teacherClassListState extends State<teacherClassList> {
                                   AsyncSnapshot<String> snapshot,
                                 ) {
                                   if (snapshot.data == null) {
-                                    return const Text('loading ...');
+                                    return Text(
+                                        uiText(context, 'loadingEllipsis'));
                                   } else {
                                     return Text(
                                       snapshot.data ?? "",

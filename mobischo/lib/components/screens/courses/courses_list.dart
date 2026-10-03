@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../../models/user.dart';
@@ -88,7 +89,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(snapshot.data ?? "");
                             }
@@ -102,7 +103,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(snapshot.data ?? "");
                             }

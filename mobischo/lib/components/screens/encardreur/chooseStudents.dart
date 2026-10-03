@@ -7,6 +7,7 @@ import 'package:mobischo/services/students_services.dart';
 import 'package:flutter/material.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class ChooseStudents extends StatefulWidget {
   final Classe classe;
@@ -27,12 +28,11 @@ class ChooseStudents extends StatefulWidget {
 }
 
 class _ChooseStudentsState extends State<ChooseStudents> {
-  String getGender(String sex) {
+  String getGender(String sex, BuildContext context) {
     if (sex == '0') {
-      return "Masculin";
-    } else {
-      return "Feminin";
+      return uiText(context, 'male');
     }
+    return uiText(context, 'female');
   }
 
   List<Map> list = [];
@@ -169,7 +169,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
 
     if (selectedStudents.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sélectionnez au moins un élève.')),
+        SnackBar(content: Text(uiText(context, 'selectAtLeastOneStudent'))),
       );
       return;
     }
@@ -220,7 +220,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
               // color: CustomTheme.blue,
             )),
         title: Text(
-          'CONVOQUEZ DES ELEVES',
+          uiText(context, 'conveneStudents'),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         centerTitle: true,
@@ -268,9 +268,11 @@ class _ChooseStudentsState extends State<ChooseStudents> {
                                     });
                                   },
                                 ),
-                                title: const Text("ELEVES A CONVOQUER"),
+                                title:
+                                    Text(uiText(context, 'studentsToConvene')),
                                 subtitle: Text(
-                                  "Ne cochez que les eleves a convoquer",
+                                  uiText(
+                                      context, 'selectOnlyStudentsToConvene'),
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                                 onTap: () {
@@ -301,7 +303,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
                 value: hobby["isSelected"],
                 title:
                     Text(hobby["name"], style: const TextStyle(fontSize: 13)),
-                subtitle: Text(getGender(hobby['Sex']),
+                subtitle: Text(getGender(hobby['Sex'], context),
                     style: const TextStyle(color: CustomTheme.blue)),
                 onChanged: (newValue) {
                   setState(() {
@@ -343,7 +345,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
               child: ElevatedButton.icon(
                 onPressed: () => _continueToCreate(context),
                 icon: const Icon(Icons.arrow_forward),
-                label: const Text('Continuer'),
+                label: Text(uiText(context, 'continueAction')),
               ),
             ),
           ),

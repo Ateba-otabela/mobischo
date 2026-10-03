@@ -5,6 +5,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/services/academic_services.dart';
@@ -188,7 +189,8 @@ class _SortedStudentMarksState extends State<SortedStudentMarks> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -206,7 +208,8 @@ class _SortedStudentMarksState extends State<SortedStudentMarks> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -279,7 +282,7 @@ class _SortedStudentMarksState extends State<SortedStudentMarks> {
                             });
                           },
                           elevation: 10,
-                          hint: const Text('Sequences Evaluations'),
+                          hint: Text(uiText(context, 'sequencesEvaluations')),
                         ),
                         DropdownButton(
                           items: ListYears,
@@ -295,7 +298,7 @@ class _SortedStudentMarksState extends State<SortedStudentMarks> {
                             // Navigator.pop(context);
                           },
                           elevation: 10,
-                          hint: const Text('Annee Scholaires'),
+                          hint: Text(uiText(context, 'schoolYears')),
                         )
                       ],
                     ),
@@ -368,7 +371,7 @@ class markList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",
@@ -385,7 +388,7 @@ class markList extends StatelessWidget {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(
                                 snapshot.data!.toUpperCase(),

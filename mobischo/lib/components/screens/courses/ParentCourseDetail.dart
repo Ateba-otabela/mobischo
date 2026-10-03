@@ -7,6 +7,7 @@ import 'package:flutter/src/foundation/key.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:mobischo/components/screens/parent/studentMarkList.dart';
 import 'package:mobischo/services/school.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 import '../../../models/course.dart';
 import '../../../models/student.dart';
@@ -98,7 +99,7 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
               AsyncSnapshot<String> snapshot,
             ) {
               if (snapshot.data == null) {
-                return const Text('loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               } else {
                 return Text(
                   snapshot.data ?? "",
@@ -112,7 +113,7 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.course.CodeEnseignement),
-            subtitle: const Text('Code Enseignement'),
+            subtitle: Text(uiText(context, 'courseCode')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -120,13 +121,13 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
               future: CourseServices.getMainCourse(widget.course.CodeMatiere),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Matiere'),
+            subtitle: Text(uiText(context, 'subject')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -134,23 +135,23 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
               future: CourseServices.getMainClass(widget.course.CodeClasse),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Matiere'),
+            subtitle: Text(uiText(context, 'subject')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.course.Coefficient),
-            subtitle: const Text("Coefficient"),
+            subtitle: Text(uiText(context, 'coefficient')),
           ),
           ListTile(
             leading: const Icon(Icons.timer, color: CustomTheme.blue),
             title: Text(widget.course.NBRHEURE),
-            subtitle: const Text("Nombre D'Heures"),
+            subtitle: Text(uiText(context, 'hoursCount')),
           ),
           ListTile(
               leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -159,13 +160,13 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
                 builder:
                     (BuildContext context, AsyncSnapshot<String> snapshot) {
                   if (snapshot.data == null) {
-                    return const Text('Loading ...');
+                    return Text(uiText(context, 'loadingEllipsis'));
                   } else {
                     return Text(snapshot.data ?? "");
                   }
                 },
               ),
-              subtitle: const Text("Etablissement"))
+              subtitle: Text(uiText(context, 'institution')))
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -198,7 +199,7 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
                       Icons.menu_book,
                       color: CustomTheme.blue,
                     ),
-                    title: const Text('Notes'),
+                    title: Text(uiText(context, 'notes')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -219,7 +220,7 @@ class _ParentCourseDetailState extends State<ParentCourseDetail> {
                       ),
                   ListTile(
                     leading: const Icon(Icons.timer, color: CustomTheme.blue),
-                    title: const Text('Absences'),
+                    title: Text(uiText(context, 'absences')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       Navigator.pop(context);

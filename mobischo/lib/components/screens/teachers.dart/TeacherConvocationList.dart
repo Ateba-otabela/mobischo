@@ -12,6 +12,7 @@ import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class TeacherConvocationList extends StatefulWidget {
   final User user;
@@ -187,8 +188,8 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
                 : DropdownButtonFormField<Classe>(
                     value: _selectedClass,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Classe',
+                    decoration: InputDecoration(
+                      labelText: uiText(context, 'className'),
                       border: OutlineInputBorder(),
                     ),
                     items: _classes
@@ -231,9 +232,10 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
                                   image:
                                       AssetImage('assets/images/landing5.png'),
                                 ),
-                                title: const Text('Eleves Convoques'),
+                                title:
+                                    Text(uiText(context, 'studentsToConvene')),
                                 subtitle:
-                                    const Text('Cliquez pour plus de details'),
+                                    Text(uiText(context, 'moreDetailsTap')),
                                 onTap: () {
                                   // BottomForm(context);
                                 },
@@ -254,7 +256,7 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
           // ),
           Flexible(
             child: _selectedClass == null
-                ? const Center(child: Text('Sélectionnez une classe.'))
+                ? Center(child: Text(uiText(context, 'selectClass')))
                 : _loadingConvocations
                     ? const Center(child: CircularProgressIndicator())
                     : _convocations.isEmpty
@@ -271,12 +273,13 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
                                   ),
                                   SizedBox(height: 16),
                                   Text(
-                                    'Aucune convocation pour cette classe pour le moment.',
+                                    uiText(context, 'noConvocationForClass'),
                                     textAlign: TextAlign.center,
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    'Vous pouvez créer une nouvelle convocation avec le bouton +.',
+                                    uiText(
+                                        context, 'createConvocationWithButton'),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -310,7 +313,7 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
     if (!mounted) return;
     if (students.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucun élève disponible.')),
+        SnackBar(content: Text(uiText(context, 'noStudentsAvailable'))),
       );
       return;
     }
@@ -363,7 +366,7 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
                             });
                           },
                           elevation: 10,
-                          hint: const Text('Sequences Evaluations'),
+                          hint: Text(uiText(context, 'sequencesEvaluations')),
                         ),
                         DropdownButton(
                           items: ListYears,
@@ -379,7 +382,7 @@ class _TeacherConvocationListState extends State<TeacherConvocationList> {
                             // Navigator.pop(context);
                           },
                           elevation: 10,
-                          hint: const Text('Annee Scholaires'),
+                          hint: Text(uiText(context, 'schoolYears')),
                         )
                       ],
                     ),
@@ -459,7 +462,10 @@ class convocationList extends StatelessWidget {
                 children: [
                   ListTile(
                     title: Text(
-                      'Convoqué le ${convocation.dateConvocation} pour ${convocation.motif}',
+                      uiText(context, 'convocationDateReason', parameters: {
+                        'date': convocation.dateConvocation,
+                        'reason': convocation.motif,
+                      }),
                     ),
                     trailing: const Icon(Icons.arrow_forward),
                     onTap: () {
@@ -475,7 +481,7 @@ class convocationList extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    title: const Text('MESSAGE'),
+                    title: Text(uiText(context, 'convocationMessage')),
                     subtitle: Text(convocation.description),
                     onTap: () {
                       Navigator.push(

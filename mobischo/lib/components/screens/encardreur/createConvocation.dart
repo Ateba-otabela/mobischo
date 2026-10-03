@@ -11,6 +11,7 @@ import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class CreateEncardreurConvocation extends StatefulWidget {
   final User user;
@@ -84,14 +85,17 @@ class _CreateEncardreurConvocationState
   List<DropdownMenuItem> motifs() {
     ListMotifs.clear();
     ListMotifs.add(DropdownMenuItem(
-        value: "Insubordination", child: Text('Insurbodination')));
+        value: "Insubordination",
+        child: Text(uiText(context, 'insubordination'))));
     ListMotifs.add(DropdownMenuItem(
-        value: "Retard Abusive", child: Text('Retard Abusive')));
-    ListMotifs.add(
-        DropdownMenuItem(value: "Violence", child: Text('Violence')));
-    ListMotifs.add(
-        DropdownMenuItem(value: "Indiscipline", child: Text('Indiscipline')));
-    ListMotifs.add(DropdownMenuItem(value: "Autre", child: Text('Autre')));
+        value: "Retard Abusive",
+        child: Text(uiText(context, 'excessiveLateness'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Violence", child: Text(uiText(context, 'violence'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Indiscipline", child: Text(uiText(context, 'indiscipline'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Autre", child: Text(uiText(context, 'otherReason'))));
     return ListMotifs;
   }
 
@@ -112,7 +116,7 @@ class _CreateEncardreurConvocationState
                 AsyncSnapshot<String> snapshot,
               ) {
                 if (snapshot.data == null) {
-                  return const Text('loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(
                     snapshot.data ?? "",
@@ -202,7 +206,9 @@ class _CreateEncardreurConvocationState
                   children: [
                     ListTile(
                       leading: Icon(Icons.calendar_month),
-                      title: Text(date),
+                      title: Text(date == 'Date de convocation'
+                          ? uiText(context, 'conveningDate')
+                          : date),
                       onTap: () {
                         if (isLoaded == true) {
                           _interstitialAd!.show();
@@ -226,7 +232,7 @@ class _CreateEncardreurConvocationState
                           // Navigator.pop(context);
                         },
                         elevation: 10,
-                        hint: const Text('Matiere'),
+                        hint: Text(uiText(context, 'subject')),
                       ),
                     ),
                     Padding(
@@ -244,7 +250,7 @@ class _CreateEncardreurConvocationState
                           // Navigator.pop(context);
                         },
                         elevation: 10,
-                        hint: const Text('Motif de convocation'),
+                        hint: Text(uiText(context, 'conveningReason')),
                       ),
                     ),
                     Padding(
@@ -252,7 +258,7 @@ class _CreateEncardreurConvocationState
                       child: TextField(
                         controller: description,
                         decoration: InputDecoration(
-                          labelText: 'Description',
+                          labelText: uiText(context, 'description'),
                           // border: OutlineInputBorder(
 
                           // ),
@@ -263,7 +269,7 @@ class _CreateEncardreurConvocationState
                     ),
                     Padding(
                       padding: EdgeInsets.only(left: 17, right: 17, top: 30),
-                        child: CustomButton(
+                      child: CustomButton(
                           text: "Convoquer",
                           loading: _isSaving,
                           onPress: () {
@@ -307,7 +313,7 @@ class _CreateEncardreurConvocationState
         .toList();
     if (studentCodes.isEmpty) {
       Fluttertoast.showToast(
-        msg: 'Sélectionnez au moins un élève.',
+        msg: uiText(context, 'selectAtLeastOneStudent'),
         toastLength: Toast.LENGTH_LONG,
       );
       return;
@@ -346,7 +352,7 @@ class _CreateEncardreurConvocationState
       if (!mounted) return;
       setState(() => _isSaving = false);
       Fluttertoast.showToast(
-        msg: 'Échec de l’enregistrement. Vérifiez les champs et réessayez.',
+        msg: uiText(context, 'convocationSaveFailed'),
         toastLength: Toast.LENGTH_LONG,
       );
     }
@@ -368,7 +374,7 @@ class _CreateEncardreurConvocationState
                   color: CustomTheme.blue,
                   child: ListTile(
                     title: Text(
-                      'Eleves qui seront convoqués',
+                      uiText(context, 'studentsToConvene'),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),

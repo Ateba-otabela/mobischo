@@ -6,6 +6,7 @@ import 'package:mobischo/components/screens/changePassword.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/welcome.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class MyAccount extends StatefulWidget {
   final User user;
@@ -65,7 +66,7 @@ class _MyAccountState extends State<MyAccount> {
             },
             icon: const Icon(Icons.arrow_back_ios)),
         title: Text(
-          "Mon Compte",
+          uiText(context, 'myAccount'),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         centerTitle: true,
@@ -117,7 +118,7 @@ class _MyAccountState extends State<MyAccount> {
               color: CustomTheme.blue,
             ),
             title: Text(widget.user.code),
-            subtitle: const Text('Code'),
+            subtitle: Text(uiText(context, 'accountCode')),
           ),
           ListTile(
             leading: const Icon(
@@ -125,15 +126,15 @@ class _MyAccountState extends State<MyAccount> {
               color: CustomTheme.blue,
             ),
             title: Text(widget.user.login),
-            subtitle: const Text('Login'),
+            subtitle: Text(uiText(context, 'loginName')),
           ),
           ListTile(
             leading: const Icon(
               Icons.logout,
               color: CustomTheme.blue,
             ),
-            title: const Text('Deconnection'),
-            subtitle: const Text('Se Deconnecter'),
+            title: Text(uiText(context, 'signOut')),
+            subtitle: Text(uiText(context, 'signOut')),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               if (isLoaded == true) {
@@ -175,9 +176,9 @@ class _MyAccountState extends State<MyAccount> {
                 children: <Widget>[
                   ListTile(
                     leading: const Icon(Icons.menu_book),
-                    title: const Text("Modifier le mot de passe"),
-                    subtitle: const Text(
-                      'Cliquez pour modifier',
+                    title: Text(uiText(context, 'changePassword')),
+                    subtitle: Text(
+                      uiText(context, 'clickToEdit'),
                       style: TextStyle(color: CustomTheme.blue),
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios),
@@ -200,9 +201,9 @@ class _MyAccountState extends State<MyAccount> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.timer),
-                    title: const Text('Deconnection'),
-                    subtitle: const Text(
-                      'Cliquez pour vous deconnecter',
+                    title: Text(uiText(context, 'signOut')),
+                    subtitle: Text(
+                      uiText(context, 'clickToSignOut'),
                       style: TextStyle(color: CustomTheme.blue),
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios),

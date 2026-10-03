@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -13,9 +14,12 @@ class Body extends StatefulWidget {
 class _BodyState extends State<Body> {
   List<Map<String, String>> splashData = [
     {'text': "MOBISCHO", 'image': "assets/images/icon.png"},
-    {'text': "CONSULTEZ SANS STRESS", 'image': "assets/images/landing1.png"},
-    {'text': "RESTEZ CONNECTÉ", 'image': "assets/images/landing2.png"},
-    {'text': "CONNECTEZ VOUS", 'image': "assets/images/landing3.png"},
+    {
+      'text': "welcomeConsultWithoutStress",
+      'image': "assets/images/landing1.png"
+    },
+    {'text': "welcomeStayConnected", 'image': "assets/images/landing2.png"},
+    {'text': "welcomeSignIn", 'image': "assets/images/landing3.png"},
   ];
   int currentPage = 0;
 
@@ -34,7 +38,10 @@ class _BodyState extends State<Body> {
                 },
                 itemCount: splashData.length,
                 itemBuilder: (context, index) => SplashContent(
-                      text: splashData[index]['text'].toString(),
+                      text: index == 0
+                          ? splashData[index]['text'].toString()
+                          : uiText(
+                              context, splashData[index]['text'].toString()),
                       image: splashData[index]['image'].toString(),
                     )),
           ),
@@ -95,8 +102,10 @@ class SplashContent extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text('Votre etablissement aux bouts des doits',
-                  style: Theme.of(context).textTheme.bodySmall),
+              child: Text(
+                uiText(context, 'welcomeTagline'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             )
           ],
         )),

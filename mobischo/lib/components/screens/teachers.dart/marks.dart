@@ -5,6 +5,7 @@ import 'package:mobischo/models/mark.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/year.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
@@ -95,7 +96,7 @@ class _MarkScreenState extends State<MarkScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Impossible de charger les notes.';
+        _error = uiText(context, 'marksLoadError');
       });
     }
   }
@@ -188,7 +189,7 @@ class _MarkScreenState extends State<MarkScreen> {
       if (!mounted) return;
       setState(() {
         _loadingMarks = false;
-        _error = 'Impossible de charger les notes de cette matière.';
+        _error = uiText(context, 'subjectMarksLoadError');
       });
     }
   }
@@ -282,21 +283,28 @@ class _MarkScreenState extends State<MarkScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Note existante'),
+          title: Text(uiText(context, 'existingMark')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('${student.Nom} ${student.Prenom}'.trim()),
               const SizedBox(height: 12),
-              Text(
-                  'Note : ${existingMark.valeur == '—' ? 'Aucune' : existingMark.valeur}'),
+              Text(uiText(
+                context,
+                'noteLabel',
+                parameters: <String, String>{
+                  'value': existingMark.valeur == '—'
+                      ? uiText(context, 'noMark')
+                      : existingMark.valeur,
+                },
+              )),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Fermer'),
+              child: Text(uiText(context, 'close')),
             ),
           ],
         );
@@ -316,17 +324,16 @@ class _MarkScreenState extends State<MarkScreen> {
     }
 
     if (_courses.isEmpty) {
-      return const Center(
-          child: Text('Aucune matière ne vous est actuellement attribuée.'));
+      return Center(child: Text(uiText(context, 'noAssignedSubjects')));
     }
 
     final currentTitle = _step == 'classes'
-        ? 'Notes — Classes'
+        ? uiText(context, 'marksByClass')
         : _step == 'subjects'
-            ? 'Notes — Matières'
+            ? uiText(context, 'marksBySubject')
             : _step == 'semesters'
-                ? 'Notes — Semestres'
-                : 'Notes — Notes';
+                ? uiText(context, 'marksBySemesters')
+                : uiText(context, 'grades');
 
     return Stack(
       children: [
@@ -365,7 +372,13 @@ class _MarkScreenState extends State<MarkScreen> {
                         return Card(
                           child: ListTile(
                             title: Text(_classLabel(classCode)),
-                            subtitle: Text('Classe $classCode'),
+                            subtitle: Text(uiText(
+                              context,
+                              'classLabel',
+                              parameters: <String, String>{
+                                'className': classCode,
+                              },
+                            )),
                             trailing: const Icon(Icons.arrow_forward_ios),
                             onTap: () => _selectClass(classCode),
                           ),
@@ -410,8 +423,9 @@ class _MarkScreenState extends State<MarkScreen> {
                                       child: ListTile(
                                         title: Text(sequence.LibelleEvaluation),
                                         subtitle: Text(hasMarks
-                                            ? 'Notes disponibles'
-                                            : 'Aucune note disponible'),
+                                            ? uiText(context, 'marksAvailable')
+                                            : uiText(
+                                                context, 'noMarksForSubject')),
                                         leading: Icon(
                                           hasMarks
                                               ? Icons.check_circle_outline
@@ -447,12 +461,14 @@ class _MarkScreenState extends State<MarkScreen> {
                                                 ),
                                                 SizedBox(height: 16),
                                                 Text(
-                                                  'Aucune note disponible pour le moment.',
+                                                  uiText(
+                                                      context, 'noMarksForNow'),
                                                   textAlign: TextAlign.center,
                                                 ),
                                                 SizedBox(height: 8),
                                                 Text(
-                                                  "Vos notes n'ont pas encore été publiées. Veuillez transmettre vos notes à l'administration afin qu'elles puissent être saisies et publiées dans l'application.",
+                                                  uiText(context,
+                                                      'marksNotPublished'),
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ],

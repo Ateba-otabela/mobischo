@@ -9,6 +9,7 @@ import 'package:mobischo/models/student.dart';
 // ignore: unused_import
 import 'package:mobischo/services/services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class MarkDetail extends StatefulWidget {
   final Mark mark;
@@ -88,12 +89,12 @@ class _MarkDetailState extends State<MarkDetail> {
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.mark.valeur),
-            subtitle: const Text('Valeur'),
+            subtitle: Text(uiText(context, 'markValue')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.mark.total),
-            subtitle: const Text('total'),
+            subtitle: Text(uiText(context, 'total')),
           ),
           // ListTile(
           //   leading: const Icon(Icons.menu_book, color: CustomTheme.blue),

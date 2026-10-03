@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobischo/components/screens/parent/new_absence_justification_page.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/parent_absence_history_service.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -58,7 +59,7 @@ class _AbsenceJustificationsPageState extends State<AbsenceJustificationsPage> {
       appBar: AppBar(
         backgroundColor: CustomTheme.blue,
         foregroundColor: Colors.white,
-        title: const Text('JUSTIFIER UNE ABSENCE'),
+        title: Text(uiText(context, 'justifyAbsence')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -95,7 +96,7 @@ class _AbsenceJustificationsPageState extends State<AbsenceJustificationsPage> {
               record: history.records[index],
               studentName: studentNames[
                       (history.records[index]['CodeEleve'] ?? '').toString()] ??
-                  'Élève',
+                  uiText(context, 'studentName'),
             ),
           );
         },
@@ -134,7 +135,7 @@ class _HistoryEmptyState extends StatelessWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Icon(
                 Icons.event_note_outlined,
                 color: CustomTheme.blue,
@@ -142,7 +143,7 @@ class _HistoryEmptyState extends StatelessWidget {
               ),
               SizedBox(height: 18),
               Text(
-                'Aucune justification pour le moment',
+                uiText(context, 'noJustificationYet'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: CustomTheme.dark,
@@ -152,7 +153,7 @@ class _HistoryEmptyState extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'Vous n’avez pas encore soumis de justification d’absence.',
+                uiText(context, 'noJustificationSubmitted'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xff757575),
@@ -184,8 +185,8 @@ class _HistoryErrorState extends StatelessWidget {
             const Icon(Icons.cloud_off_outlined,
                 color: CustomTheme.blue, size: 44),
             const SizedBox(height: 12),
-            const Text(
-              'L’historique est momentanément indisponible.',
+            Text(
+              uiText(context, 'justificationHistoryUnavailable'),
               textAlign: TextAlign.center,
               style: TextStyle(color: CustomTheme.dark, fontSize: 15),
             ),
@@ -193,7 +194,7 @@ class _HistoryErrorState extends StatelessWidget {
             TextButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
+              label: Text(uiText(context, 'retry')),
             ),
           ],
         ),
@@ -287,7 +288,13 @@ class _JustificationHistoryCard extends StatelessWidget {
               const SizedBox(height: 12),
               _HistoryDetail(
                 icon: Icons.event_outlined,
-                label: 'Absence du ${_formatDate(absenceDate)}',
+                label: uiText(
+                  context,
+                  'absenceOnDate',
+                  parameters: <String, String>{
+                    'date': _formatDate(absenceDate)
+                  },
+                ),
               ),
             ],
             if (reason.isNotEmpty) ...[
@@ -298,7 +305,13 @@ class _JustificationHistoryCard extends StatelessWidget {
               const SizedBox(height: 8),
               _HistoryDetail(
                 icon: Icons.schedule_rounded,
-                label: 'Soumise le ${_formatDate(submittedAt)}',
+                label: uiText(
+                  context,
+                  'submittedOnDate',
+                  parameters: <String, String>{
+                    'date': _formatDate(submittedAt)
+                  },
+                ),
               ),
             ],
           ],

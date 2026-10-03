@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String _error = '';
 
   Future login(BuildContext cont) async {
-    final l10n = AppLocalizations.of(cont)!;
+    final l10n = AppLocalizations.of(cont);
     if (_login.text == '' || _password.text == '') {
       Fluttertoast.showToast(
           msg: l10n.emptyFields,
@@ -128,105 +128,104 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final _formKey = GlobalKey<FormState>();
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-          body: Center(
-            child: Form(
-                key: _formKey,
-                child: Wrap(
+      body: Center(
+        child: Form(
+            key: _formKey,
+            child: Wrap(
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Image(
-                          image: AssetImage('assets/images/icon.png'),
-                          width: 80,
-                          height: 80,
-                        ),
-                        Text(
-                          'MOBISCHO',
-                          style: Theme.of(context).textTheme.headlineLarge,
-                          textAlign: TextAlign.center,
-                        ),
-                        Text(
-                          l10n.loginTitle,
-                          style: Theme.of(context).textTheme.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(
-                          height: 20,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: CustomTheme.getCardDecoration(),
-                            child: Column(
-                              children: [
-                                CustomInput(
-                                    controller: _login,
-                                    hintText: 'username1234',
-                                    labelText: l10n.login,
-                                    isPassword: false,
-                                    prefixIcon: Icons.person,
-                                    surfixIcon: Icons.lock_outline_rounded,
-                                    readOnly: false,
-                                    borderColor: Colors.grey,
-                                    helperText: ""),
-                                const SizedBox(
-                                  height: 2,
-                                ),
-                                CustomInput(
-                                    controller: _password,
-                                    hintText: '********',
-                                    labelText: l10n.password,
-                                    isPassword: true,
-                                    prefixIcon: Icons.lock,
-                                    surfixIcon: Icons.lock_outline_rounded,
-                                    enablePasswordToggle: true,
-                                    readOnly: false,
-                                    borderColor: Colors.grey,
-                                    helperText: ""),
-                                const SizedBox(
-                                  height: 20,
-                                ),
-                                CustomButton(
-                                    text: l10n.signIn,
-                                    onPress: () => login(context)),
-                                const SizedBox(
-                                  height: 20,
-                                ),
-                                Center(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        l10n.forgotPassword,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      InkWell(
-                                          child: const Text(
-                                            l10n.reset,
-                                            style: TextStyle(
-                                                color: CustomTheme.blue),
-                                          ),
-                                          onTap: () => () {}),
-                                    ],
-                                  ),
-                                )
-                              ],
+                    const Image(
+                      image: AssetImage('assets/images/icon.png'),
+                      width: 80,
+                      height: 80,
+                    ),
+                    Text(
+                      'MOBISCHO',
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      l10n.loginTitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: CustomTheme.getCardDecoration(),
+                        child: Column(
+                          children: [
+                            CustomInput(
+                                controller: _login,
+                                hintText: 'username1234',
+                                labelText: l10n.login,
+                                isPassword: false,
+                                prefixIcon: Icons.person,
+                                surfixIcon: Icons.lock_outline_rounded,
+                                readOnly: false,
+                                borderColor: Colors.grey,
+                                helperText: ""),
+                            const SizedBox(
+                              height: 2,
                             ),
-                          ),
+                            CustomInput(
+                                controller: _password,
+                                hintText: '********',
+                                labelText: l10n.password,
+                                isPassword: true,
+                                prefixIcon: Icons.lock,
+                                surfixIcon: Icons.lock_outline_rounded,
+                                enablePasswordToggle: true,
+                                readOnly: false,
+                                borderColor: Colors.grey,
+                                helperText: ""),
+                            const SizedBox(
+                              height: 20,
+                            ),
+                            CustomButton(
+                                text: l10n.signIn,
+                                onPress: () => login(context)),
+                            const SizedBox(
+                              height: 20,
+                            ),
+                            Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    l10n.forgotPassword,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  InkWell(
+                                      child: Text(
+                                        l10n.reset,
+                                        style: const TextStyle(
+                                            color: CustomTheme.blue),
+                                      ),
+                                      onTap: () => () {}),
+                                ],
+                              ),
+                            )
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ],
-                )),
-          ),
-        );
+                ),
+              ],
+            )),
+      ),
+    );
   }
 }

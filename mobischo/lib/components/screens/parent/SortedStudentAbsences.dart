@@ -8,6 +8,7 @@ import 'package:mobischo/components/screens/teachers.dart/AbsenceDetail.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
@@ -147,7 +148,7 @@ class _SortedStudentAbsencesState extends State<SortedStudentAbsences> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(
                 snapshot.data!.toUpperCase(),
@@ -156,9 +157,9 @@ class _SortedStudentAbsencesState extends State<SortedStudentAbsences> {
             }
           },
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
             preferredSize: Size.zero,
-            child: Text("Cliquez sur l'icone du calendrier pour trier")),
+            child: Text(uiText(context, 'dateOfCall'))),
         centerTitle: true,
         actions: [
           IconButton(
@@ -205,7 +206,7 @@ class _SortedStudentAbsencesState extends State<SortedStudentAbsences> {
                                 ),
                                 title:
                                     Text(HumanDateFormat(widget.current_date)),
-                                subtitle: const Text("Date D'appel"),
+                                subtitle: Text(uiText(context, 'dateOfCall')),
                                 onTap: () {
                                   if (isLoaded == true) {
                                     _interstitialAd!.show();
@@ -299,7 +300,7 @@ class absencesList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",

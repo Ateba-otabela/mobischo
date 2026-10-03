@@ -14,6 +14,7 @@ import 'package:mobischo/home.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/welcome.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class SideBarMenu extends StatefulWidget {
   final User user;
@@ -39,8 +40,25 @@ class _SideBarMenuState extends State<SideBarMenu> {
 
   bool isLoaded = false;
 
-  bool get _isPrincipal => widget.principalScreens != null ||
+  bool get _isPrincipal =>
+      widget.principalScreens != null ||
       widget.user.account_type == 'principal_encadreur';
+
+  String _localizedAccountType(BuildContext context) {
+    switch (widget.user.account_type) {
+      case 'parent':
+        return uiText(context, 'parent');
+      case 'enseignant':
+      case 'teacher':
+        return uiText(context, 'teacher');
+      case 'encadreur':
+        return uiText(context, 'encadreur');
+      case 'principal':
+        return uiText(context, 'principal');
+      default:
+        return widget.user.account_type;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -77,8 +95,8 @@ class _SideBarMenuState extends State<SideBarMenu> {
       const Divider(height: 2),
       ListTile(
         leading: const Icon(Icons.lock_outline, color: CustomTheme.blue),
-        title: const Text('MODIFIER LE MOT DE PASSE'),
-        subtitle: const Text('Sécurisez votre compte'),
+        title: Text(uiText(context, 'changePassword')),
+        subtitle: Text(uiText(context, 'secureAccount')),
         onTap: () {
           final navigator = Navigator.of(context);
           navigator.pop();
@@ -93,8 +111,8 @@ class _SideBarMenuState extends State<SideBarMenu> {
       const Divider(height: 2),
       ListTile(
         leading: const Icon(Icons.logout, color: CustomTheme.blue),
-        title: const Text('DÉCONNEXION'),
-        subtitle: const Text('Quitter votre session'),
+        title: Text(uiText(context, 'signOut')),
+        subtitle: Text(uiText(context, 'leaveSession')),
         onTap: () async {
           await MobileApiService.logout();
           if (!context.mounted) return;
@@ -111,10 +129,10 @@ class _SideBarMenuState extends State<SideBarMenu> {
   Widget build(BuildContext context) {
     if (_isPrincipal) {
       final titles = widget.principalTitles ??
-          const [
-            'Rapports des professeurs',
-            'Alertes de présence',
-            'Appels des professeurs',
+          [
+            uiText(context, 'teacherReports'),
+            uiText(context, 'teacherPresence'),
+            uiText(context, 'teacherCallHistory'),
           ];
       final icons = const [
         Icons.message_outlined,
@@ -133,8 +151,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   backgroundImage: AssetImage('assets/images/avatar-s-19.jpg'),
                   radius: 30,
                 ),
-                title: const Text('Principal — Encadreur'),
-                subtitle: const Text('Toutes les classes'),
+                title: Text(
+                    '${uiText(context, 'principal')} — ${uiText(context, 'encadreur')}'),
+                subtitle: Text(uiText(context, 'allClasses')),
               ),
             ),
           ),
@@ -144,7 +163,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
                     children: [
                       ListTile(
                         leading: Icon(icons[index], color: CustomTheme.blue),
-                        title: Text(titles[index]),
+                        title: Text(localizedMenuTitle(context, titles[index])),
                         onTap: () {
                           if (widget.principalScreens == null ||
                               index >= widget.principalScreens!.length) {
@@ -172,14 +191,14 @@ class _SideBarMenuState extends State<SideBarMenu> {
             ),
             child: Text(widget.user.nom),
           ),
-          const ListTile(
+          ListTile(
             leading: Icon(
               Icons.child_care,
               color: CustomTheme.blue,
             ),
-            title: Text('ELEVES'),
+            title: Text(uiText(context, 'studentListUpper')),
             subtitle: Text(
-              'Liste des eleves',
+              uiText(context, 'studentList'),
               style: TextStyle(color: Colors.grey),
             ),
             trailing: Icon(
@@ -217,7 +236,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
                     title: Text(
                         "${widget.user.nom.toUpperCase()} ${widget.user.prenom.toUpperCase()}",
                         style: Theme.of(context).textTheme.headlineMedium),
-                    subtitle: Text(widget.user.account_type,
+                    subtitle: Text(_localizedAccountType(context),
                         style: Theme.of(context).textTheme.bodyMedium),
                     onTap: () {
                       if (isLoaded == true) {
@@ -237,9 +256,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.home,
                 color: CustomTheme.blue,
               ),
-              title: const Text('ACEUIL'),
-              subtitle: const Text(
-                "Page d'Aceuil",
+              title: Text(uiText(context, 'pageHome')),
+              subtitle: Text(
+                uiText(context, 'pageHome'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -265,9 +284,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.note_add_rounded,
                 color: CustomTheme.blue,
               ),
-              title: const Text('NOTES'),
-              subtitle: const Text(
-                'Notes de vos enfants',
+              title: Text(uiText(context, 'notes')),
+              subtitle: Text(
+                uiText(context, 'childrenGradesDescription'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -293,9 +312,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.timer,
                 color: CustomTheme.blue,
               ),
-              title: const Text("ABSENCES"),
-              subtitle: const Text(
-                "Absences de vos enfants",
+              title: Text(uiText(context, 'absences')),
+              subtitle: Text(
+                uiText(context, 'childrenAbsencesDescription'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -321,9 +340,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.person_pin,
                 color: CustomTheme.blue,
               ),
-              title: const Text("HISTORIQUE D'INSCRIPTIONS"),
-              subtitle: const Text(
-                "Consultez l'Historique",
+              title: Text(uiText(context, 'enrollmentHistory')),
+              subtitle: Text(
+                uiText(context, 'consultEnrollmentHistory'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -349,9 +368,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.security,
                 color: CustomTheme.blue,
               ),
-              title: const Text('MESSAGES'),
-              subtitle: const Text(
-                'Consulter',
+              title: Text(uiText(context, 'messages')),
+              subtitle: Text(
+                uiText(context, 'mainMenuView'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -383,9 +402,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                 Icons.person,
                 color: CustomTheme.blue,
               ),
-              title: const Text('MON COMPTE'),
-              subtitle: const Text(
-                'Vos information personnel',
+              title: Text(uiText(context, 'myAccount')),
+              subtitle: Text(
+                uiText(context, 'personalInformation'),
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () {
@@ -430,7 +449,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
                       title: Text(
                           "${widget.user.nom.toUpperCase()} ${widget.user.prenom.toUpperCase()}",
                           style: Theme.of(context).textTheme.headlineMedium),
-                      subtitle: Text(widget.user.account_type,
+                      subtitle: Text(_localizedAccountType(context),
                           style: Theme.of(context).textTheme.bodyMedium),
                       onTap: () {
                         Navigator.pop(context);
@@ -448,9 +467,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.home,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('ACEUIL'),
-                subtitle: const Text(
-                  "Page d'Aceuil",
+                title: Text(uiText(context, 'pageHome')),
+                subtitle: Text(
+                  uiText(context, 'pageHome'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -476,9 +495,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.note_add_rounded,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('MES NOTES'),
-                subtitle: const Text(
-                  'Toutes vos notes enregistrees',
+                title: Text(uiText(context, 'notes')),
+                subtitle: Text(
+                  uiText(context, 'allGradesRegistered'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -504,9 +523,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.timer,
                   color: CustomTheme.blue,
                 ),
-                title: const Text("HEURES D'ABSENCES"),
-                subtitle: const Text(
-                  "Ajoutez et consultez des absenses",
+                title: Text(uiText(context, 'absences')),
+                subtitle: Text(
+                  uiText(context, 'manageAbsencesDescription'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -532,9 +551,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.person_pin,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('MES COLLEGUES'),
-                subtitle: const Text(
-                  'Liste de vos collegues',
+                title: Text(uiText(context, 'colleagues')),
+                subtitle: Text(
+                  uiText(context, 'colleaguesListDescription'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -561,9 +580,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.security,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('CONVOCATIONS'),
-                subtitle: const Text(
-                  'Envoyez et consultez',
+                title: Text(uiText(context, 'convocations')),
+                subtitle: Text(
+                  uiText(context, 'sendAndView'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -588,9 +607,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.person,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('MON COMPTE'),
-                subtitle: const Text(
-                  'Vos information personnel',
+                title: Text(uiText(context, 'myAccount')),
+                subtitle: Text(
+                  uiText(context, 'personalInformation'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -634,7 +653,7 @@ class _SideBarMenuState extends State<SideBarMenu> {
                       title: Text(
                           "${widget.user.nom.toUpperCase()} ${widget.user.prenom.toUpperCase()}",
                           style: Theme.of(context).textTheme.headlineMedium),
-                      subtitle: Text(widget.user.account_type,
+                      subtitle: Text(_localizedAccountType(context),
                           style: Theme.of(context).textTheme.bodyMedium),
                       onTap: () {
                         if (isLoaded == true) {
@@ -655,9 +674,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.home,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('ACEUIL'),
-                subtitle: const Text(
-                  "Page d'Aceuil",
+                title: Text(uiText(context, 'pageHome')),
+                subtitle: Text(
+                  uiText(context, 'pageHome'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -683,9 +702,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.note_add_rounded,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('ENVOYER MESSAGES'),
-                subtitle: const Text(
-                  'Convoquez des eleves',
+                title: Text(uiText(context, 'sendMessages')),
+                subtitle: Text(
+                  uiText(context, 'conveneParents'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -711,9 +730,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.timer,
                   color: CustomTheme.blue,
                 ),
-                title: const Text("CONSULTER MESSAGES"),
-                subtitle: const Text(
-                  "Consulter les convocations",
+                title: Text(uiText(context, 'viewMessages')),
+                subtitle: Text(
+                  uiText(context, 'viewMessagesDescription'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -739,9 +758,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.person_pin,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('MES COLLEGUES'),
-                subtitle: const Text(
-                  'Liste de vos collegues',
+                title: Text(uiText(context, 'colleagues')),
+                subtitle: Text(
+                  uiText(context, 'colleaguesListDescription'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -768,9 +787,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.security,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('ELEVES'),
-                subtitle: const Text(
-                  'Consultez les listes',
+                title: Text(uiText(context, 'students')),
+                subtitle: Text(
+                  uiText(context, 'viewStudentLists'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {
@@ -797,9 +816,9 @@ class _SideBarMenuState extends State<SideBarMenu> {
                   Icons.person,
                   color: CustomTheme.blue,
                 ),
-                title: const Text('MON COMPTE'),
-                subtitle: const Text(
-                  'Vos information personnel',
+                title: Text(uiText(context, 'myAccount')),
+                subtitle: Text(
+                  uiText(context, 'personalInformation'),
                   style: TextStyle(color: Colors.grey),
                 ),
                 onTap: () {

@@ -5,6 +5,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/teachers.dart/convocation_detail.dart';
 import 'package:mobischo/home.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -113,69 +114,68 @@ class _ParentConvocationListState extends State<ParentConvocationList> {
   @override
   Widget build(BuildContext context) {
     final body = Column(
-        children: [
-          Container(
-            color: CustomTheme.grey,
-            // decoration: CustomTheme.getCardDecoration(),
-            height: 80,
-            width: double.infinity,
-            // color: CustomTheme.blue,
-            child: Column(
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Center(
-                        child: SizedBox(
-                      width: double.infinity,
-                      height: 80,
-                      // padding: const EdgeInsets.all(2.0),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15.0),
-                        ),
-                        // elevation: 10,
-                        child: InkWell(
-                          onTap: () {},
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: <Widget>[
-                              ListTile(
-                                trailing: const Image(
-                                  image:
-                                      AssetImage('assets/images/landing5.png'),
-                                ),
-                                title: const Text('Eleves Convoques'),
-                                subtitle: Text(
-                                  'Cliquez pour plus de details',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                onTap: () {
-                                  // BottomForm(context);
-                                },
+      children: [
+        Container(
+          color: CustomTheme.grey,
+          // decoration: CustomTheme.getCardDecoration(),
+          height: 80,
+          width: double.infinity,
+          // color: CustomTheme.blue,
+          child: Column(
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Center(
+                      child: SizedBox(
+                    width: double.infinity,
+                    height: 80,
+                    // padding: const EdgeInsets.all(2.0),
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15.0),
+                      ),
+                      // elevation: 10,
+                      child: InkWell(
+                        onTap: () {},
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            ListTile(
+                              trailing: const Image(
+                                image: AssetImage('assets/images/landing5.png'),
                               ),
-                            ],
-                          ),
+                              title: Text(uiText(context, 'convenedStudents')),
+                              subtitle: Text(
+                                uiText(context, 'moreDetailsTap'),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              onTap: () {
+                                // BottomForm(context);
+                              },
+                            ),
+                          ],
                         ),
                       ),
-                    ))
-                  ],
-                ),
-              ],
-            ),
+                    ),
+                  ))
+                ],
+              ),
+            ],
           ),
-          // const Divider(
-          //   height: 10,
-          //   color: CustomTheme.grey,
-          // ),
-          Flexible(
-              child: convocationList(
-            widget: widget,
-            isLoaded: isLoaded,
-            interstitialAd: _interstitialAd,
-          )),
-        ],
-      );
+        ),
+        // const Divider(
+        //   height: 10,
+        //   color: CustomTheme.grey,
+        // ),
+        Flexible(
+            child: convocationList(
+          widget: widget,
+          isLoaded: isLoaded,
+          interstitialAd: _interstitialAd,
+        )),
+      ],
+    );
 
     if (widget.embedded) {
       return Container(
@@ -186,7 +186,7 @@ class _ParentConvocationListState extends State<ParentConvocationList> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  tooltip: 'Retour au tableau de bord',
+                  tooltip: uiText(context, 'homeDashboardTooltip'),
                   icon: const Icon(Icons.arrow_back_ios),
                   color: CustomTheme.blue,
                   onPressed: () => Navigator.of(context).pop(),
@@ -211,7 +211,7 @@ class _ParentConvocationListState extends State<ParentConvocationList> {
               Icons.arrow_back_ios,
             )),
         title: Text(
-          'Liste des Convocations',
+          uiText(context, 'convocations'),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         centerTitle: true,
@@ -247,7 +247,8 @@ class _MessagesEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final illustrationSize = (constraints.maxWidth * 0.46).clamp(140.0, 180.0);
+        final illustrationSize =
+            (constraints.maxWidth * 0.46).clamp(140.0, 180.0);
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Container(
@@ -262,8 +263,8 @@ class _MessagesEmptyState extends StatelessWidget {
                 children: [
                   _MessagesIllustration(size: illustrationSize),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Aucun message disponible pour le moment.',
+                  Text(
+                    uiText(context, 'noMessagesAvailable'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF424242),
@@ -274,8 +275,8 @@ class _MessagesEmptyState extends StatelessWidget {
                   const SizedBox(height: 8),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 280),
-                    child: const Text(
-                      'Les messages et informations de l\'établissement apparaîtront ici lorsqu\'ils seront disponibles.',
+                    child: Text(
+                      uiText(context, 'messagesWillAppear'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13),
                     ),
@@ -334,24 +335,31 @@ class _MessagesIllustration extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               boxShadow: const [
-                BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 4)),
+                BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 4)),
               ],
             ),
-            child: Icon(Icons.chat_bubble_outline, size: size * 0.34, color: const Color(0xFF2E7D32)),
+            child: Icon(Icons.chat_bubble_outline,
+                size: size * 0.34, color: const Color(0xFF2E7D32)),
           ),
           Positioned(
             bottom: size * 0.06,
-            child: Icon(Icons.mail_outline, size: size * 0.38, color: const Color(0xFF616161)),
+            child: Icon(Icons.mail_outline,
+                size: size * 0.38, color: const Color(0xFF616161)),
           ),
           Positioned(
             top: size * 0.02,
             right: size * 0.04,
-            child: Icon(Icons.notifications_none_rounded, size: size * 0.22, color: const Color(0xFF2E7D32)),
+            child: Icon(Icons.notifications_none_rounded,
+                size: size * 0.22, color: const Color(0xFF2E7D32)),
           ),
           Positioned(
             bottom: size * 0.02,
             left: size * 0.04,
-            child: Icon(Icons.check_circle_outline_rounded, size: size * 0.2, color: const Color(0xFF66BB6A)),
+            child: Icon(Icons.check_circle_outline_rounded,
+                size: size * 0.2, color: const Color(0xFF66BB6A)),
           ),
         ],
       ),
@@ -406,7 +414,8 @@ class convocationList extends StatelessWidget {
       final third = parts[2];
       try {
         if (first.length == 4) {
-          return DateTime.parse('$first-${second.padLeft(2, '0')}-${third.padLeft(2, '0')}');
+          return DateTime.parse(
+              '$first-${second.padLeft(2, '0')}-${third.padLeft(2, '0')}');
         }
         if (third.length == 4) {
           return DateTime.parse('$third-${second.padLeft(2, '0')}-$first');
@@ -453,13 +462,17 @@ class convocationList extends StatelessWidget {
                                     Align(
                                       alignment: Alignment.centerLeft,
                                       child: FutureBuilder<String>(
-                                        future: StudentServices.getMainStudent(item.CodeEleve),
+                                        future: StudentServices.getMainStudent(
+                                            item.CodeEleve),
                                         builder: (
                                           BuildContext context,
                                           AsyncSnapshot<String> snapshot,
                                         ) {
                                           if (snapshot.data == null) {
-                                            return const Text('loading ...');
+                                            return Text(
+                                              uiText(
+                                                  context, 'loadingEllipsis'),
+                                            );
                                           } else {
                                             return Text(snapshot.data ?? "");
                                           }
@@ -470,7 +483,9 @@ class convocationList extends StatelessWidget {
                                       alignment: Alignment.centerLeft,
                                       child: Text(
                                         item.dateConvocation,
-                                        style: Theme.of(context).textTheme.bodyMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium,
                                       ),
                                     ),
                                   ],
@@ -478,7 +493,14 @@ class convocationList extends StatelessWidget {
                                 children: <Widget>[
                                   ListTile(
                                     title: Text(
-                                      'Convoqué le ${item.dateConvocation} pour ${item.motif}',
+                                      uiText(
+                                        context,
+                                        'convokedOn',
+                                        parameters: <String, String>{
+                                          'date': item.dateConvocation,
+                                          'reason': item.motif,
+                                        },
+                                      ),
                                     ),
                                     trailing: const Icon(Icons.arrow_forward),
                                     onTap: () {
@@ -488,7 +510,8 @@ class convocationList extends StatelessWidget {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ConvocationDetail(
+                                          builder: (context) =>
+                                              ConvocationDetail(
                                             convocation: item,
                                             user: widget.user,
                                           ),
@@ -499,7 +522,9 @@ class convocationList extends StatelessWidget {
                                   ListTile(
                                     title: Text(
                                       "MESSAGE",
-                                      style: Theme.of(context).textTheme.bodyMedium,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
                                     ),
                                     subtitle: Text(item.description),
                                     onTap: () {
@@ -509,7 +534,8 @@ class convocationList extends StatelessWidget {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ConvocationDetail(
+                                          builder: (context) =>
+                                              ConvocationDetail(
                                             convocation: item,
                                             user: widget.user,
                                           ),
@@ -532,10 +558,17 @@ class convocationList extends StatelessWidget {
                 child: PopupMenuButton<String>(
                   onSelected: onSortChanged ?? (_) {},
                   offset: const Offset(0, -140),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'newest', child: Text('Plus récent')),
-                    PopupMenuItem(value: 'oldest', child: Text('Plus ancien')),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'newest',
+                      child: Text(uiText(context, 'newestFirst')),
+                    ),
+                    PopupMenuItem(
+                      value: 'oldest',
+                      child: Text(uiText(context, 'oldestFirst')),
+                    ),
                   ],
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18),

@@ -8,6 +8,7 @@ import 'package:mobischo/components/screens/students/ClassStudents.dart';
 import 'package:mobischo/models/class.dart';
 import 'package:mobischo/models/convocation.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/principal_service.dart';
 import 'package:mobischo/utils/custom_button.dart';
@@ -69,7 +70,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
           dashboardFuture: _dashboardFuture,
           onRetryDashboard: _reloadDashboard,
           onSelectClass: (item) => PrincipalSectionRequest(
-            title: 'Élèves',
+            title: uiText(context, 'studentListNav'),
             screen: ClassStudents(
               user: widget.user,
               classe: _principalClass(item, widget.user.CodeEtablissement),
@@ -174,11 +175,11 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Impossible de charger le tableau de bord.'),
+                  Text(uiText(context, 'principalDashboardLoadError')),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: widget.onRetryDashboard,
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -200,7 +201,7 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Impossible de charger les présences.'),
+                      Text(uiText(context, 'principalAttendanceLoadError')),
                       const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: () {
@@ -210,7 +211,7 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
                                     widget.user);
                           });
                         },
-                        child: const Text('Réessayer'),
+                        child: Text(uiText(context, 'retry')),
                       ),
                     ],
                   ),
@@ -240,36 +241,47 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
     return ListView(padding: const EdgeInsets.all(14), children: [
       _HeaderCard(
           title: widget.user.account_type.toLowerCase() == 'encadreur'
-              ? 'Encadreur'
-              : 'Principal',
+              ? uiText(context, 'encadreur')
+              : uiText(context, 'principal'),
           subtitle: widget.user.account_type.toLowerCase() == 'encadreur'
-              ? 'Classes attribuées'
-              : 'Toutes les classes de votre établissement',
+              ? uiText(context, 'assignedClasses')
+              : uiText(context, 'allSchoolClasses'),
           icon: Icons.admin_panel_settings_outlined),
       const SizedBox(height: 12),
       _DashboardActionCard(
         icon: Icons.class_outlined,
-        title: 'Classes',
-        summary: '${dashboard.classes} classes\n'
-            '${dashboard.classOverview.where((item) => item.sessionsToday > 0).length} avec des séances aujourd’hui',
+        title: uiText(context, 'classes'),
+        summary: '${dashboard.classes} ${uiText(context, 'classes')}\n'
+            '${uiText(context, 'classesWithSessionsToday', parameters: <String, String>{
+              'count':
+                  '${dashboard.classOverview.where((item) => item.sessionsToday > 0).length}'
+            })}',
         onTap: () => PrincipalTabRequest(1).dispatch(context),
       ),
       _DashboardActionCard(
         icon: Icons.groups_outlined,
-        title: 'Élèves',
-        summary: '${dashboard.students} élèves\n'
-            '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.boys)} garçons • '
-            '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.girls)} filles',
+        title: uiText(context, 'studentListNav'),
+        summary: uiText(
+          context,
+          'studentNumbersSummary',
+          parameters: <String, String>{
+            'count': '${dashboard.students}',
+            'boys':
+                '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.boys)}',
+            'girls':
+                '${dashboard.classOverview.fold<int>(0, (total, item) => total + item.girls)}',
+          },
+        ),
         onTap: () => PrincipalSectionRequest(
-          title: 'Élèves',
+          title: uiText(context, 'studentListNav'),
           screen: PrincipalClassesPage(
             dashboardFuture: widget.dashboardFuture,
             onRetryDashboard: widget.onRetryDashboard,
             headerTitle: 'Choisir une classe',
-            headerSubtitle: 'Sélectionnez une classe pour consulter ses élèves',
+            headerSubtitle: uiText(context, 'chooseClassToViewStudents'),
             onSelectClass: (item) {
               PrincipalSectionRequest(
-                title: 'Élèves',
+                title: uiText(context, 'studentListNav'),
                 screen: ClassStudents(
                   user: widget.user,
                   classe: _principalClass(item, widget.user.CodeEtablissement),
@@ -282,11 +294,13 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
       ),
       _DashboardActionCard(
         icon: Icons.person_outline,
-        title: 'Professeurs',
-        summary: '${dashboard.teachers} professeurs\n'
-            '${dashboard.todaySessions.length} appels enregistrés aujourd’hui',
+        title: uiText(context, 'teachers'),
+        summary: '${dashboard.teachers} ${uiText(context, 'teachers')}\n'
+            '${uiText(context, 'teacherCallsRecordedToday', parameters: <String, String>{
+              'count': '${dashboard.todaySessions.length}'
+            })}',
         onTap: () => PrincipalSectionRequest(
-          title: 'Professeurs',
+          title: uiText(context, 'teachers'),
           screen: PrincipalTeacherClassesPage(
             user: widget.user,
             onSelectTeacher: (teacher) {
@@ -304,43 +318,53 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
       ),
       _DashboardActionCard(
         icon: Icons.fact_check_outlined,
-        title: 'Présence',
-        summary:
-            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.present)} présents • '
-            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.absent)} absents • '
-            '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.late)} retards\n'
-            '${dashboard.todayAttendancePercentage == null ? '—' : '${dashboard.todayAttendancePercentage}%'} aujourd’hui',
+        title: uiText(context, 'presence'),
+        summary: uiText(
+          context,
+          'todayAttendanceSummary',
+          parameters: <String, String>{
+            'present':
+                '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.present)}',
+            'absent':
+                '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.absent)}',
+            'late':
+                '${dashboard.todaySessions.fold<int>(0, (total, item) => total + item.late)}',
+            'percentage': dashboard.todayAttendancePercentage == null
+                ? '—'
+                : '${dashboard.todayAttendancePercentage}%',
+          },
+        ),
         onTap: () => PrincipalTabRequest(2).dispatch(context),
       ),
       const SizedBox(height: 14),
-      _SectionTitle('Alertes et notifications'),
+      _SectionTitle(uiText(context, 'alertsAndNotifications')),
       _DashboardRecentAlerts(
         user: widget.user,
         onViewAll: () => PrincipalSectionRequest(
-          title: 'Alertes d’investigation',
+          title: uiText(context, 'investigationAlerts'),
           screen: PrincipalAlertsPage(user: widget.user),
         ).dispatch(context),
       ),
       const SizedBox(height: 14),
-      const _SectionTitle('Justifications récentes'),
+      _SectionTitle(uiText(context, 'recentJustifications')),
       _DashboardRecentJustifications(
         onViewAll: () => PrincipalSectionRequest(
-          title: 'Justifications récentes',
+          title: uiText(context, 'recentJustifications'),
           screen: const DashboardJustificationsPage(),
         ).dispatch(context),
       ),
       const SizedBox(height: 14),
-      _SectionTitle('Appels du jour'),
+      _SectionTitle(uiText(context, 'callsToday')),
       if (dashboard.todaySessions.isEmpty)
-        const _Card(child: Text('Aucune session de présence enregistrée.'))
+        _Card(child: Text(uiText(context, 'noAttendanceSession')))
       else
         ...dashboard.todaySessions.map((session) => _DashboardSessionTile(
               session: session,
             )),
       const SizedBox(height: 14),
-      _SectionTitle('Vue d’ensemble des classes'),
+      _SectionTitle(uiText(context, 'classOverview')),
       if (dashboard.classOverview.isEmpty)
-        const _Card(child: Text('Aucune classe disponible.'))
+        _Card(child: Text(uiText(context, 'noClassAvailable')))
       else
         ...dashboard.classOverview.take(3).map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 20),
@@ -352,14 +376,14 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           child: TextButton.icon(
             onPressed: () => PrincipalTabRequest(1).dispatch(context),
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('Voir plus'),
+            label: Text(uiText(context, 'viewMore')),
           ),
         ),
       const SizedBox(height: 8),
       const SizedBox(height: 8),
-      _SectionTitle('Appels récents des professeurs'),
+      _SectionTitle(uiText(context, 'recentTeacherCalls')),
       if (recentSessions.isEmpty)
-        const _Card(child: Text('Aucune session de présence enregistrée.'))
+        _Card(child: Text(uiText(context, 'noAttendanceSession')))
       else ...[
         ...recentSessions.take(3).toList().asMap().entries.map((entry) {
           final session = entry.value;
@@ -434,7 +458,7 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           child: TextButton.icon(
             onPressed: () => PrincipalTabRequest(2).dispatch(context),
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('Voir plus'),
+            label: Text(uiText(context, 'viewMore')),
           ),
         ),
       ],
@@ -481,11 +505,11 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Impossible de charger les classes.'),
+                  Text(uiText(context, 'classesLoadError')),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: widget.onRetryDashboard,
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -504,22 +528,26 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
           padding: const EdgeInsets.all(14),
           children: [
             _HeaderCard(
-              title: widget.headerTitle,
-              subtitle: widget.headerSubtitle,
+              title: widget.headerTitle == 'Classes'
+                  ? uiText(context, 'classes')
+                  : widget.headerTitle,
+              subtitle: widget.headerSubtitle ==
+                      'Accès à toutes les classes de l’établissement'
+                  ? uiText(context, 'classAccessDescription')
+                  : widget.headerSubtitle,
               icon: Icons.class_outlined,
             ),
             const SizedBox(height: 12),
             TextField(
-              decoration: const InputDecoration(
-                labelText: 'Rechercher une classe',
+              decoration: InputDecoration(
+                labelText: uiText(context, 'searchClass'),
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (value) => setState(() => query = value),
             ),
             const SizedBox(height: 12),
             if (classes.isEmpty)
-              const _Card(
-                  child: Text('Aucune classe ne correspond à la recherche.'))
+              _Card(child: Text(uiText(context, 'classSearchEmpty')))
             else
               ...classes.map((item) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -571,21 +599,25 @@ class _PrincipalTeacherClassesPageState
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return const Center(
-                child: Text('Impossible de charger les classes.'));
+            return Center(child: Text(uiText(context, 'classesLoadError')));
           }
 
           final classes = snapshot.data ?? <PrincipalClassSummary>[];
           return ListView(
             padding: const EdgeInsets.all(14),
             children: classes.isEmpty
-                ? [const _Card(child: Text('Aucun professeur disponible.'))]
+                ? [_Card(child: Text(uiText(context, 'noTeacherAvailable')))]
                 : classes
                     .map((schoolClass) => _Card(
                           child: ExpansionTile(
                             title: Text(schoolClass.name),
-                            subtitle: Text(
-                                '${schoolClass.teachers.length} professeurs'),
+                            subtitle: Text(uiText(
+                              context,
+                              'teacherCount',
+                              parameters: <String, String>{
+                                'count': '${schoolClass.teachers.length}',
+                              },
+                            )),
                             children: schoolClass.teachers
                                 .map((teacher) => ListTile(
                                       leading: const Icon(
@@ -636,8 +668,8 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return const Center(
-              child: Text('Impossible de charger les présences du professeur.'),
+            return Center(
+              child: Text(uiText(context, 'teacherAttendanceLoadError')),
             );
           }
 
@@ -646,10 +678,8 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             children: sessions.isEmpty
                 ? [
-                    const _Card(
-                      child: Text(
-                        'Aucune présence enseignant enregistrée pour ce professeur.',
-                      ),
+                    _Card(
+                      child: Text(uiText(context, 'teacherNoAttendance')),
                     ),
                   ]
                 : sessions
@@ -729,19 +759,19 @@ class _PrincipalMessagesConvocationsPageState
 
     void openClassPicker(BuildContext flowContext) {
       PrincipalSectionRequest(
-        title: 'Choisir une classe',
+        title: uiText(context, 'classSelectionTitle'),
         screen: PrincipalConvocationClassesPage(
           user: user,
           onSelectClass: (classContext, schoolClass) {
             PrincipalSectionRequest(
-              title: 'Convoquer des élèves',
+              title: uiText(context, 'conveneStudents'),
               screen: ChooseStudents(
                 classe: schoolClass,
                 user: user,
                 embedded: true,
                 onCreate: (createContext, selectedStudents) {
                   PrincipalSectionRequest(
-                    title: 'Créer une convocation',
+                    title: uiText(context, 'createConvocation'),
                     screen: CreateEncardreurConvocation(
                       user: user,
                       students: selectedStudents,
@@ -749,7 +779,7 @@ class _PrincipalMessagesConvocationsPageState
                       embedded: true,
                       onSaved: (saveContext) {
                         PrincipalSectionRequest(
-                          title: 'Convocations récentes',
+                          title: uiText(context, 'recentConvocations'),
                           screen: PrincipalMessagesConvocationsPage(user: user),
                         ).dispatch(saveContext);
                       },
@@ -774,26 +804,26 @@ class _PrincipalMessagesConvocationsPageState
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
-            const _HeaderCard(
-              title: 'Convocations récentes',
-              subtitle: 'Suivi des convocations envoyées aux élèves',
+            _HeaderCard(
+              title: uiText(context, 'recentConvocations'),
+              subtitle: uiText(context, 'convocationSentToStudents'),
               icon: Icons.mark_email_unread_outlined,
             ),
             const SizedBox(height: 10),
             Row(
               children: [
-                const Expanded(
-                  child: _SectionTitle('Convocations envoyées'),
+                Expanded(
+                  child: _SectionTitle(uiText(context, 'convocationsSent')),
                 ),
                 IconButton(
-                  tooltip: 'Créer une convocation',
+                  tooltip: uiText(context, 'createConvocationTooltip'),
                   icon: const Icon(Icons.add),
                   onPressed: () => openClassPicker(context),
                 ),
               ],
             ),
             if (convocations.isEmpty)
-              const _Card(child: Text('Aucune convocation envoyée.'))
+              _Card(child: Text(uiText(context, 'noConvocationSent')))
             else
               ...convocations.map((item) => _Card(
                     child: ListTile(
@@ -892,7 +922,7 @@ class PrincipalClassDetailPage extends StatelessWidget {
         body: ListView(padding: const EdgeInsets.all(14), children: [
           _ClassCard(schoolClass: schoolClass),
           const SizedBox(height: 10),
-          _SectionTitle('Appel récent'),
+          _SectionTitle(uiText(context, 'recentCall')),
           ...PrincipalMockService.attendanceSessions
               .where((session) => session.schoolClass.name == schoolClass.name)
               .map((session) => _SessionTile(
@@ -904,7 +934,7 @@ class PrincipalClassDetailPage extends StatelessWidget {
                                 session: session))),
                   )),
           const SizedBox(height: 10),
-          _SectionTitle('Élèves'),
+          _SectionTitle(uiText(context, 'studentListNav')),
           ...schoolClass.students.map((student) => _StudentTile(
               student: student,
               onTap: () => Navigator.push(
@@ -1003,7 +1033,7 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Impossible de charger les présences.'),
+                  Text(uiText(context, 'principalAttendanceLoadError')),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: () => setState(() {
@@ -1013,7 +1043,7 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
                         date: apiDateFilter,
                       );
                     }),
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -1085,15 +1115,15 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
 
         return ListView(padding: const EdgeInsets.all(14), children: [
           _HeaderCard(
-              title: 'Présence',
-              subtitle: 'Suivi de toutes les classes',
+              title: uiText(context, 'presence'),
+              subtitle: uiText(context, 'followAllClasses'),
               icon: Icons.fact_check_outlined),
           if (overallAttendance != null) ...[
             const SizedBox(height: 10),
             _Card(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Présence globale'),
+                title: Text(uiText(context, 'overallAttendance')),
                 trailing: Text(overallAttendance),
               ),
             ),
@@ -1105,12 +1135,12 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
               contentPadding: EdgeInsets.zero,
               leading:
                   const Icon(Icons.calendar_today, color: CustomTheme.blue),
-              title: Text(dateFilter ?? 'Toutes les dates'),
-              subtitle: const Text('Date'),
+              title: Text(dateFilter ?? uiText(context, 'allDates')),
+              subtitle: Text(uiText(context, 'date')),
               trailing: dateFilter == null
                   ? const Icon(Icons.arrow_forward_ios, size: 16)
                   : IconButton(
-                      tooltip: 'Réinitialiser la date',
+                      tooltip: uiText(context, 'resetDate'),
                       icon: const Icon(Icons.clear),
                       onPressed: _clearDate,
                     ),
@@ -1118,13 +1148,19 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
             ),
             DropdownButtonFormField<String>(
                 value: classFilter,
-                decoration: const InputDecoration(labelText: 'Classe'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'className'),
+                ),
                 items: <String>{
                   'Toutes les classes',
                   ...allSessions.map((session) => session.className),
                 }
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Toutes les classes'
+                              ? uiText(context, 'allClasses')
+                              : item),
+                        ))
                     .toList(),
                 onChanged: (value) => setState(() {
                       classFilter = value!;
@@ -1133,10 +1169,16 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
                     })),
             DropdownButtonFormField<String>(
                 value: subjectFilter,
-                decoration: const InputDecoration(labelText: 'Matière'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'subject'),
+                ),
                 items: subjectOptions
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Toutes les matières'
+                              ? uiText(context, 'allSubjects')
+                              : item),
+                        ))
                     .toList(),
                 onChanged: (value) => setState(() {
                       subjectFilter = value!;
@@ -1144,25 +1186,40 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
                     })),
             DropdownButtonFormField<String>(
                 value: teacherFilter,
-                decoration: const InputDecoration(labelText: 'Enseignant'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'teacherName'),
+                ),
                 items: teacherOptions
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Tous les enseignants'
+                              ? uiText(context, 'allTeachers')
+                              : item),
+                        ))
                     .toList(),
                 onChanged: (value) => setState(() => teacherFilter = value!)),
             DropdownButtonFormField<String>(
                 value: statusFilter,
-                decoration: const InputDecoration(labelText: 'Statut'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'status'),
+                ),
                 items: ['Tous les statuts', 'Présent', 'Absent', 'Retard']
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Tous les statuts'
+                              ? uiText(context, 'allStatuses')
+                              : item == 'Présent'
+                                  ? uiText(context, 'presentStatusLabel')
+                                  : item == 'Absent'
+                                      ? uiText(context, 'absentStatusLabel')
+                                      : uiText(context, 'lateStatusLabel')),
+                        ))
                     .toList(),
                 onChanged: (value) => setState(() => statusFilter = value!))
           ])),
           const SizedBox(height: 12),
           if (sessions.isEmpty)
-            const _Card(
-                child: Text('Aucune session ne correspond aux filtres.'))
+            _Card(child: Text(uiText(context, 'sessionFilterEmpty')))
           else
             ...sessions.map((session) => _PrincipalAttendanceSessionTile(
                   session: session,
@@ -1188,7 +1245,7 @@ class PrincipalStudentDetailPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
-          title: const Text('Détail de l’élève'),
+          title: Text(uiText(context, 'studentDetailTitle')),
           backgroundColor: CustomTheme.blue),
       body: ListView(padding: const EdgeInsets.all(14), children: [
         _Card(
@@ -1207,14 +1264,17 @@ class PrincipalStudentDetailPage extends StatelessWidget {
         ])),
         const SizedBox(height: 12),
         _StatsGrid(items: [
-          _StatItem('Présence', '${(student.attendance * 100).round()}%',
-              Icons.percent),
-          _StatItem('Présents', '${student.present}', Icons.check),
-          _StatItem('Absences', '${student.absent}', Icons.close),
-          _StatItem('Retards', '${student.late}', Icons.schedule)
+          _StatItem(uiText(context, 'presence'),
+              '${(student.attendance * 100).round()}%', Icons.percent),
+          _StatItem(
+              uiText(context, 'present'), '${student.present}', Icons.check),
+          _StatItem(
+              uiText(context, 'absences'), '${student.absent}', Icons.close),
+          _StatItem(
+              uiText(context, 'lateLabel'), '${student.late}', Icons.schedule)
         ]),
         const SizedBox(height: 12),
-        _SectionTitle('Historique de présence'),
+        _SectionTitle(uiText(context, 'attendanceHistory')),
         ...PrincipalMockService.attendance
             .where((item) => item.student.code == student.code)
             .map((item) => _Card(
@@ -1235,7 +1295,7 @@ class PrincipalAttendanceSessionPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: CustomTheme.grey,
         appBar: AppBar(
-          title: const Text('Détail de la présence'),
+          title: Text(uiText(context, 'attendanceDetailTitle')),
           backgroundColor: CustomTheme.blue,
         ),
         body: ListView(
@@ -1245,26 +1305,28 @@ class PrincipalAttendanceSessionPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Detail('Date', session.date),
-                  _Detail('Heure', session.time),
-                  _Detail('Classe', session.schoolClass.name),
-                  _Detail('Matière', session.subject),
-                  _Detail('Enseignant', session.teacher),
-                  _Detail('Élèves', '${session.total}'),
-                  _Detail('Présents', '${session.present}'),
-                  _Detail('Absents', '${session.absent}'),
-                  _Detail('Retards', '${session.late}'),
+                  _Detail(uiText(context, 'date'), session.date),
+                  _Detail(uiText(context, 'time'), session.time),
                   _Detail(
-                    'Présence',
+                      uiText(context, 'className'), session.schoolClass.name),
+                  _Detail(uiText(context, 'subject'), session.subject),
+                  _Detail(uiText(context, 'teacherName'), session.teacher),
+                  _Detail(uiText(context, 'students'), '${session.total}'),
+                  _Detail(uiText(context, 'present'), '${session.present}'),
+                  _Detail(
+                      uiText(context, 'absenceListTitle'), '${session.absent}'),
+                  _Detail(uiText(context, 'lateLabel'), '${session.late}'),
+                  _Detail(
+                    uiText(context, 'presence'),
                     session.attendance == null
-                        ? 'Aucune donnée'
+                        ? uiText(context, 'noDataAvailable')
                         : '${(session.attendance! * 100).round()}%',
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            _SectionTitle('Élèves'),
+            _SectionTitle(uiText(context, 'studentListNav')),
             ...session.records.map((record) => _StudentTile(
                   student: record.student,
                   subtitle:
@@ -1350,7 +1412,7 @@ class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
-          title: const Text('Détail du signalement'),
+          title: Text(uiText(context, 'reportDetail')),
           backgroundColor: CustomTheme.blue),
       body: ListView(padding: const EdgeInsets.all(14), children: [
         if (alert.eventType == 'investigation') ...[
@@ -1364,30 +1426,33 @@ class _ParentReportDetailPageState extends State<ParentReportDetailPage> {
         _Card(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _Detail('Élève', studentName),
+          _Detail(uiText(context, 'studentName'), studentName),
           _Detail(
-            'Classe',
+            uiText(context, 'className'),
             alert.className.isNotEmpty ? alert.className : alert.codeClasse,
           ),
           if (alert.codeMatiere.isNotEmpty)
-            _Detail('Matière', alert.codeMatiere),
+            _Detail(uiText(context, 'subject'), alert.codeMatiere),
           if (alert.codeEnseignement.isNotEmpty)
-            _Detail('Enseignement', alert.codeEnseignement),
-          _Detail('Date d’absence', alert.dateAbsence),
-          _Detail('Statut parent', alert.parentStatusLabel),
-          _Detail('Statut professeur', alert.teacherStatusLabel),
-          _Detail('Status', alert.displayStatus),
-          _Detail('Note', alert.notes.isNotEmpty ? alert.notes : 'Aucune note'),
+            _Detail(uiText(context, 'courseCode'), alert.codeEnseignement),
+          _Detail(uiText(context, 'absenceDateLabel'), alert.dateAbsence),
+          _Detail(uiText(context, 'parentStatus'), alert.parentStatusLabel),
+          _Detail(uiText(context, 'teacherStatus'), alert.teacherStatusLabel),
+          _Detail(uiText(context, 'status'), alert.displayStatus),
+          _Detail(
+            uiText(context, 'note'),
+            alert.notes.isNotEmpty ? alert.notes : uiText(context, 'noNote'),
+          ),
         ])),
         const SizedBox(height: 14),
         CustomButton(
-            text: 'Valider la présence du professeur',
+            text: uiText(context, 'validateTeacherAttendance'),
             loading: _submitting,
             onPress: () => _submitStatus('validated')),
         const SizedBox(height: 8),
         OutlinedButton(
             onPressed: _submitting ? null : () => _submitStatus('rejected'),
-            child: const Text('Rejeter la présence du professeur')),
+            child: Text(uiText(context, 'rejectTeacherAttendance'))),
       ]),
     );
   }
@@ -1411,13 +1476,22 @@ class _InvestigationAlertCard extends StatelessWidget {
     final className =
         alert.className.isNotEmpty ? alert.className : alert.codeClasse;
     final subjectDetails = [
-      if (alert.codeMatiere.isNotEmpty) 'Matière ${alert.codeMatiere}',
+      if (alert.codeMatiere.isNotEmpty)
+        uiText(
+          context,
+          'subjectWithCode',
+          parameters: <String, String>{'code': alert.codeMatiere},
+        ),
       if (alert.codeEnseignement.isNotEmpty)
-        'Enseignement ${alert.codeEnseignement}',
+        uiText(
+          context,
+          'courseWithCode',
+          parameters: <String, String>{'code': alert.codeEnseignement},
+        ),
     ].join(' • ');
     final explanation = alert.notes.isNotEmpty
         ? alert.notes
-        : 'Le parent a signalé une absence, mais l’élève a été marqué présent.';
+        : uiText(context, 'parentReportedButMarkedPresent');
     final isPending = alert.status.toLowerCase() == 'pending';
 
     return Card(
@@ -1447,7 +1521,7 @@ class _InvestigationAlertCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Alerte d’investigation',
+                      uiText(context, 'investigationAlert'),
                       style: TextStyle(
                         color: Colors.red.shade900,
                         fontWeight: FontWeight.bold,
@@ -1457,9 +1531,22 @@ class _InvestigationAlertCard extends StatelessWidget {
                     Text(
                       [
                         if (studentName.isNotEmpty) studentName,
-                        if (className.isNotEmpty) 'Classe : $className',
+                        if (className.isNotEmpty)
+                          uiText(
+                            context,
+                            'classWithColon',
+                            parameters: <String, String>{
+                              'className': className
+                            },
+                          ),
                         if (subjectDetails.isNotEmpty) subjectDetails,
-                        'Date : ${alert.dateAbsence}',
+                        uiText(
+                          context,
+                          'dateWithColon',
+                          parameters: <String, String>{
+                            'date': alert.dateAbsence
+                          },
+                        ),
                         explanation,
                       ].join('\n'),
                       maxLines: 5,
@@ -1474,7 +1561,9 @@ class _InvestigationAlertCard extends StatelessWidget {
                         spacing: 4,
                         children: [
                           Text(
-                            isPending ? 'À traiter' : alert.displayStatus,
+                            isPending
+                                ? uiText(context, 'toProcess')
+                                : alert.displayStatus,
                             textAlign: TextAlign.end,
                             style: TextStyle(
                               color: Colors.red.shade800,
@@ -1534,7 +1623,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _Card(
+          return _Card(
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(14),
@@ -1552,7 +1641,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                 TextButton.icon(
                   onPressed: _reload,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Réessayer'),
+                  label: Text(uiText(context, 'retry')),
                 ),
               ],
             ),
@@ -1566,18 +1655,18 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
           return _Card(
             child: Column(
               children: [
-                const ListTile(
+                ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading:
                       Icon(Icons.notifications_none, color: CustomTheme.blue),
-                  title: Text('Aucune alerte d’investigation récente.'),
+                  title: Text(uiText(context, 'noRecentInvestigationAlert')),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: _reload,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Actualiser'),
+                    label: Text(uiText(context, 'refresh')),
                   ),
                 ),
               ],
@@ -1605,8 +1694,8 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                         SnackBar(
                           content: Text(
                             result == 'validated'
-                                ? 'Investigation validée et présence confirmée.'
-                                : 'Investigation mise à jour.',
+                                ? uiText(context, 'investigationValidated')
+                                : uiText(context, 'investigationUpdated'),
                           ),
                         ),
                       );
@@ -1621,7 +1710,7 @@ class _DashboardRecentAlertsState extends State<_DashboardRecentAlerts> {
                 TextButton.icon(
                   onPressed: _reload,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Actualiser'),
+                  label: Text(uiText(context, 'refresh')),
                 ),
                 TextButton.icon(
                   onPressed: widget.onViewAll,
@@ -1673,7 +1762,7 @@ class _DashboardRecentJustificationsState
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _Card(
+          return _Card(
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(14),
@@ -1693,7 +1782,7 @@ class _DashboardRecentJustificationsState
                 TextButton.icon(
                   onPressed: _reload,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Réessayer'),
+                  label: Text(uiText(context, 'retry')),
                 ),
               ],
             ),
@@ -1705,12 +1794,12 @@ class _DashboardRecentJustificationsState
         return Column(
           children: [
             if (justifications.isEmpty)
-              const _Card(
+              _Card(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading:
                       Icon(Icons.event_note_outlined, color: CustomTheme.blue),
-                  title: Text('Aucune justification récente.'),
+                  title: Text(uiText(context, 'noRecentJustification')),
                 ),
               )
             else
@@ -1732,7 +1821,7 @@ class _DashboardRecentJustificationsState
               child: TextButton.icon(
                 onPressed: widget.onViewAll,
                 icon: const Icon(Icons.arrow_forward),
-                label: const Text('Voir plus'),
+                label: Text(uiText(context, 'viewMore')),
               ),
             ),
           ],
@@ -1828,7 +1917,7 @@ class _DashboardJustificationsPageState
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: _reload,
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -1840,19 +1929,19 @@ class _DashboardJustificationsPageState
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
-            const _HeaderCard(
-              title: 'Justifications récentes',
-              subtitle: 'Demandes transmises pour vérification',
+            _HeaderCard(
+              title: uiText(context, 'recentJustifications'),
+              subtitle: uiText(context, 'justificationsForReview'),
               icon: Icons.event_note_outlined,
             ),
             const SizedBox(height: 12),
             if (page.justifications.isEmpty)
-              const _Card(
+              _Card(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading:
                       Icon(Icons.event_note_outlined, color: CustomTheme.blue),
-                  title: Text('Aucune justification récente.'),
+                  title: Text(uiText(context, 'noRecentJustification')),
                 ),
               )
             else
@@ -1870,10 +1959,10 @@ class _DashboardJustificationsPageState
               ),
             if (page.currentPage < page.lastPage) ...[
               if (_loadMoreError != null)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    'Impossible de charger les éléments suivants.',
+                    uiText(context, 'requestFailedTryAgain'),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -1888,7 +1977,9 @@ class _DashboardJustificationsPageState
                         )
                       : const Icon(Icons.expand_more),
                   label: Text(
-                    _loadMoreError == null ? 'Charger plus' : 'Réessayer',
+                    _loadMoreError == null
+                        ? uiText(context, 'viewMore')
+                        : uiText(context, 'retry'),
                   ),
                 ),
               ),
@@ -1909,33 +2000,39 @@ class _DashboardJustificationTile extends StatelessWidget {
     required this.onTap,
   });
 
-  String _displayDate(String value) {
+  String _displayDate(String value, BuildContext context) {
     final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(value);
-    if (match == null) return value.isEmpty ? 'Date non renseignée' : value;
+    if (match == null) {
+      return value.isEmpty ? uiText(context, 'dateNotProvided') : value;
+    }
     return '${match.group(3)}/${match.group(2)}/${match.group(1)}';
   }
 
-  String _displayStatus(String value) {
+  String _displayStatus(String value, BuildContext context) {
     switch (value.toLowerCase()) {
       case 'pending':
       case 'en attente':
-        return 'En attente';
+        return uiText(context, 'pendingStatus');
       case 'validated':
       case 'validée':
-        return 'Absence validée';
+        return uiText(context, 'validatedAbsenceStatus');
       case 'rejected':
-        return 'Rejetée';
+        return uiText(context, 'rejectedStatus');
       default:
-        return value.isEmpty ? 'Non renseigné' : value;
+        return value.isEmpty ? uiText(context, 'notProvided') : value;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final studentName = item.studentName.isEmpty ? 'Élève' : item.studentName;
+    final studentName = item.studentName.isEmpty
+        ? uiText(context, 'studentName')
+        : item.studentName;
     final className = item.className.isNotEmpty
         ? item.className
-        : (item.classCode.isEmpty ? 'Classe non renseignée' : item.classCode);
+        : (item.classCode.isEmpty
+            ? uiText(context, 'classNotProvided')
+            : item.classCode);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1949,12 +2046,12 @@ class _DashboardJustificationTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          '$className • ${item.reason.isEmpty ? 'Motif non renseigné' : item.reason}'
-          '\n${_displayDate(item.absenceDate)}',
+          '$className • ${item.reason.isEmpty ? uiText(context, 'reasonNotProvided') : item.reason}'
+          '\n${_displayDate(item.absenceDate, context)}',
         ),
         isThreeLine: true,
         trailing: Text(
-          _displayStatus(item.status),
+          _displayStatus(item.status, context),
           style: const TextStyle(
             color: CustomTheme.blue,
             fontWeight: FontWeight.w600,
@@ -2015,7 +2112,7 @@ class _DashboardJustificationDetailPageState
         _wasValidated = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Absence validée')),
+        SnackBar(content: Text(uiText(context, 'absenceValidatedMessage'))),
       );
     } on Exception catch (error) {
       if (!mounted) return;
@@ -2031,7 +2128,7 @@ class _DashboardJustificationDetailPageState
     final uri = Uri.tryParse(url);
     if (uri == null || !['http', 'https'].contains(uri.scheme)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document indisponible.')),
+        SnackBar(content: Text(uiText(context, 'documentUnavailable'))),
       );
       return;
     }
@@ -2042,25 +2139,25 @@ class _DashboardJustificationDetailPageState
     if (!mounted) return;
     if (!launched) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’ouvrir le document.')),
+        SnackBar(content: Text(uiText(context, 'documentOpenError'))),
       );
     }
   }
 
-  String _workflowLabel(String status) {
+  String _workflowLabel(String status, BuildContext context) {
     switch (status.trim().toLowerCase()) {
       case 'pending':
       case 'en attente':
-        return 'En attente';
+        return uiText(context, 'pendingStatus');
       case 'validated':
       case 'validée':
-        return 'Absence validée';
+        return uiText(context, 'validatedAbsenceStatus');
       case 'approved':
-        return 'Approuvée';
+        return uiText(context, 'approvedStatus');
       case 'rejected':
-        return 'Rejetée';
+        return uiText(context, 'rejectedStatus');
       default:
-        return status.isEmpty ? 'Non renseigné' : status;
+        return status.isEmpty ? uiText(context, 'notProvided') : status;
     }
   }
 
@@ -2073,7 +2170,7 @@ class _DashboardJustificationDetailPageState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Détail de la justification'),
+          title: Text(uiText(context, 'justificationDetail')),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(_wasValidated),
@@ -2106,8 +2203,10 @@ class _DashboardJustificationDetailPageState
               padding: const EdgeInsets.all(16),
               children: [
                 _HeaderCard(
-                  title: studentName.isEmpty ? 'Élève' : studentName,
-                  subtitle: 'Déclaration du parent : Absent',
+                  title: studentName.isEmpty
+                      ? uiText(context, 'studentName')
+                      : studentName,
+                  subtitle: uiText(context, 'parentReportedAbsent'),
                   icon: Icons.event_note_outlined,
                 ),
                 const SizedBox(height: 12),
@@ -2115,41 +2214,47 @@ class _DashboardJustificationDetailPageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Detail('Code élève', item.studentCode),
+                      _Detail(uiText(context, 'studentCode'), item.studentCode),
                       _Detail(
-                        'Classe',
+                        uiText(context, 'className'),
                         item.className.isEmpty
                             ? item.classCode
                             : '${item.className} (${item.classCode})',
                       ),
                       _Detail(
-                        'Établissement',
+                        uiText(context, 'institution'),
                         item.schoolName.isEmpty
                             ? item.schoolCode
                             : item.schoolName,
                       ),
-                      _Detail('Date d’absence', item.absenceDate),
+                      _Detail(uiText(context, 'absenceDateLabel'),
+                          item.absenceDate),
                       _Detail(
-                        'Motif',
-                        item.reason.isEmpty ? 'Non renseigné' : item.reason,
+                        uiText(context, 'reason'),
+                        item.reason.isEmpty
+                            ? uiText(context, 'notProvided')
+                            : item.reason,
                       ),
                       _Detail(
-                        'Description',
+                        uiText(context, 'description'),
                         item.explanation.isEmpty
-                            ? 'Non renseignée'
+                            ? uiText(context, 'notProvided')
                             : item.explanation,
                       ),
                       if (item.parentName.isNotEmpty)
-                        _Detail('Parent', item.parentName),
+                        _Detail(uiText(context, 'parent'), item.parentName),
                       if (item.parentCode.isNotEmpty)
-                        _Detail('Code parent', item.parentCode),
+                        _Detail(uiText(context, 'parent'), item.parentCode),
                       if (item.parentContacts.isNotEmpty)
-                        _Detail('Contact parent', item.parentContacts),
-                      _Detail('Statut', _workflowLabel(item.status)),
+                        _Detail(uiText(context, 'parent'), item.parentContacts),
                       _Detail(
-                        'Date de soumission',
+                        uiText(context, 'status'),
+                        _workflowLabel(item.status, context),
+                      ),
+                      _Detail(
+                        uiText(context, 'submissionDate'),
                         item.createdAt.isEmpty
-                            ? 'Non renseignée'
+                            ? uiText(context, 'notProvided')
                             : item.createdAt,
                       ),
                       if (item.documentUrl.isNotEmpty)
@@ -2158,7 +2263,8 @@ class _DashboardJustificationDetailPageState
                           child: TextButton.icon(
                             onPressed: () => _openDocument(item.documentUrl),
                             icon: const Icon(Icons.attach_file),
-                            label: const Text('Ouvrir le document joint'),
+                            label:
+                                Text(uiText(context, 'openAttachedDocument')),
                           ),
                         ),
                     ],
@@ -2180,7 +2286,11 @@ class _DashboardJustificationDetailPageState
                               ),
                             )
                           : const Icon(Icons.verified_outlined),
-                      label: Text(_validating ? 'Validation…' : 'Valider'),
+                      label: Text(
+                        _validating
+                            ? uiText(context, 'validationInProgress')
+                            : uiText(context, 'validate'),
+                      ),
                     ),
                   ),
                 ],
@@ -2207,16 +2317,16 @@ Future<void> _showAttendanceEventDetails(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Detail('Élève', studentName),
-          _Detail('Classe',
+          _Detail(uiText(context, 'studentName'), studentName),
+          _Detail(uiText(context, 'className'),
               event.className.isNotEmpty ? event.className : event.codeClasse),
-          _Detail('Date', event.dateAbsence),
+          _Detail(uiText(context, 'date'), event.dateAbsence),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
+          child: Text(uiText(context, 'close')),
         ),
       ],
     ),
@@ -2263,11 +2373,11 @@ class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Impossible de charger les alertes.'),
+                  Text(uiText(context, 'requestFailedTryAgain')),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: _reload,
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -2283,14 +2393,13 @@ class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
           padding: const EdgeInsets.all(14),
           children: [
             _HeaderCard(
-                title: 'Alertes d’investigation',
-                subtitle:
-                    'Consultez ici les présences nécessitant une vérification.',
+                title: uiText(context, 'investigationAlerts'),
+                subtitle: uiText(context, 'reviewAttendanceAlerts'),
                 icon: Icons.info_outline),
             const SizedBox(height: 12),
             if (alerts.isEmpty)
               _Card(
-                child: const Text('Aucune alerte d’investigation à traiter.'),
+                child: Text(uiText(context, 'noAlertsToProcess')),
               )
             else
               ...alerts.map(
@@ -2311,8 +2420,8 @@ class _PrincipalAlertsPageState extends State<PrincipalAlertsPage> {
                       SnackBar(
                         content: Text(
                           result == 'validated'
-                              ? 'Investigation validée et présence confirmée.'
-                              : 'Investigation mise à jour.',
+                              ? uiText(context, 'investigationValidated')
+                              : uiText(context, 'investigationUpdated'),
                         ),
                       ),
                     );
@@ -2362,13 +2471,12 @@ class _PrincipalCallsPageState extends State<PrincipalCallsPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                      'Impossible de charger les appels des professeurs.'),
+                  Text(uiText(context, 'teacherCallsLoadError')),
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: () => setState(() => _future =
                         PrincipalService.getPrincipalAttendance(widget.user)),
-                    child: const Text('Réessayer'),
+                    child: Text(uiText(context, 'retry')),
                   ),
                 ],
               ),
@@ -2405,34 +2513,46 @@ class _PrincipalCallsPageState extends State<PrincipalCallsPage> {
 
         return ListView(padding: const EdgeInsets.all(14), children: [
           _HeaderCard(
-              title: 'Appels des professeurs',
-              subtitle: 'Suivi des appels de présence',
+              title: uiText(context, 'teacherCallsTitle'),
+              subtitle: uiText(context, 'teacherAttendanceTracking'),
               icon: Icons.assignment_outlined),
           const SizedBox(height: 12),
           _Card(
               child: Column(children: [
             DropdownButtonFormField<String>(
                 value: classFilter,
-                decoration: const InputDecoration(labelText: 'Classe'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'classFilter'),
+                ),
                 items: allClasses
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Toutes les classes'
+                              ? uiText(context, 'allClasses')
+                              : item),
+                        ))
                     .toList(),
                 onChanged: (value) =>
                     setState(() => classFilter = value ?? classFilter)),
             DropdownButtonFormField<String>(
                 value: teacherFilter,
-                decoration: const InputDecoration(labelText: 'Enseignant'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'teacherFilter'),
+                ),
                 items: allTeachers
-                    .map((item) =>
-                        DropdownMenuItem(value: item, child: Text(item)))
+                    .map((item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item == 'Tous les enseignants'
+                              ? uiText(context, 'allTeachers')
+                              : item),
+                        ))
                     .toList(),
                 onChanged: (value) =>
                     setState(() => teacherFilter = value ?? teacherFilter)),
           ])),
           const SizedBox(height: 10),
           if (calls.isEmpty)
-            const _Card(child: Text('Aucun appel ne correspond aux filtres.'))
+            _Card(child: Text(uiText(context, 'noSessionMatchesFilters')))
           else
             ...calls.map((session) => _Card(
                   child: ListTile(
@@ -2444,10 +2564,18 @@ class _PrincipalCallsPageState extends State<PrincipalCallsPage> {
                       ),
                     ),
                     title: Text('${session.className} • ${session.subject}'),
-                    subtitle: Text(
-                      '${session.date} à ${session.time} • ${session.teacher}\n'
-                      '${session.present} présents • ${session.absent} absents • ${session.late} retards',
-                    ),
+                    subtitle: Text(uiText(
+                      context,
+                      'sessionSummary',
+                      parameters: <String, String>{
+                        'date': session.date,
+                        'time': session.time,
+                        'teacher': session.teacher,
+                        'present': '${session.present}',
+                        'absent': '${session.absent}',
+                        'late': '${session.late}',
+                      },
+                    )),
                     isThreeLine: true,
                     trailing: Text(
                       session.calculatedAttendancePercentage == null
@@ -2470,20 +2598,21 @@ class PrincipalProfilePage extends StatelessWidget {
   Widget build(BuildContext context) =>
       ListView(padding: const EdgeInsets.all(14), children: [
         _HeaderCard(
-            title: 'Principal — Encadreur',
-            subtitle: 'Toutes les classes',
+            title:
+                '${uiText(context, 'principal')} — ${uiText(context, 'encadreur')}',
+            subtitle: uiText(context, 'allClasses'),
             icon: Icons.person_outline),
         const SizedBox(height: 12),
         _Card(
             child: Column(children: [
           ListTile(
               leading: const Icon(Icons.verified_user_outlined),
-              title: const Text('Accès local temporaire'),
-              subtitle: const Text('Les données affichées sont simulées.')),
+              title: Text(uiText(context, 'temporaryLocalAccess')),
+              subtitle: Text(uiText(context, 'simulatedData'))),
           ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Vérification enseignant'),
-              subtitle: const Text('Préparer un futur appel en classe'),
+              title: Text(uiText(context, 'teacherVerification')),
+              subtitle: Text(uiText(context, 'prepareFutureClassCall')),
               onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -2494,7 +2623,7 @@ class PrincipalProfilePage extends StatelessWidget {
             child: Column(children: [
           ListTile(
               leading: const Icon(Icons.lock_outline),
-              title: const Text('Changer le mot de passe'),
+              title: Text(uiText(context, 'changePassword')),
               onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -2502,7 +2631,7 @@ class PrincipalProfilePage extends StatelessWidget {
                           ChangePassword(user: user, localOnly: true)))),
           ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Déconnexion'),
+              title: Text(uiText(context, 'logout')),
               onTap: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const Welcome()),
                   (route) => false)),
@@ -2524,20 +2653,22 @@ class _KioskTeacherCodePageState extends State<KioskTeacherCodePage> {
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
-          title: const Text('Vérification enseignant'),
+          title: Text(uiText(context, 'teacherVerification')),
           backgroundColor: CustomTheme.blue),
       body: Padding(
         padding: const EdgeInsets.all(18),
         child: _Card(
             child: Column(children: [
           const Icon(Icons.badge_outlined, size: 54, color: CustomTheme.blue),
-          const Text('Code enseignant'),
+          Text(uiText(context, 'teacherCodePrompt')),
           TextField(
               controller: controller,
-              decoration: const InputDecoration(hintText: 'Ex. ENS-001')),
+              decoration: InputDecoration(
+                hintText: uiText(context, 'teacherCodeExample'),
+              )),
           const SizedBox(height: 16),
           CustomButton(
-              text: 'Continuer',
+              text: uiText(context, 'continueButton'),
               onPress: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -2562,7 +2693,7 @@ class _KioskVerificationPageState extends State<KioskVerificationPage> {
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
-          title: const Text('Vérification caméra'),
+          title: Text(uiText(context, 'cameraVerification')),
           backgroundColor: CustomTheme.blue),
       body: Center(
         child: Padding(
@@ -2575,23 +2706,23 @@ class _KioskVerificationPageState extends State<KioskVerificationPage> {
                     backgroundImage:
                         AssetImage('assets/images/avatar-s-19.jpg')),
                 const SizedBox(height: 12),
-                const Text('M. Kouame',
+                Text('M. Kouame',
                     style:
                         TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(verified
-                    ? 'Identité vérifiée'
-                    : 'Vérification caméra simulée'),
+                    ? uiText(context, 'identityVerified')
+                    : uiText(context, 'simulatedCameraVerification')),
                 const SizedBox(height: 18),
                 CustomButton(
-                    text:
-                        verified ? 'Commencer l’appel' : 'Vérifier l’identité',
+                    text: verified
+                        ? uiText(context, 'startAttendanceCall')
+                        : uiText(context, 'verifyIdentity'),
                     onPress: () => setState(() => verified = true)),
                 if (verified)
                   TextButton(
                       onPressed: () => setState(() => verified = false),
-                      child:
-                          const Text('Échec de la vérification / Réessayer')),
+                      child: Text(uiText(context, 'verificationFailedRetry'))),
               ],
             ),
           ),
@@ -2700,13 +2831,19 @@ class _DashboardClassCard extends StatelessWidget {
         ? '—'
         : '${classOverview.attendancePercentage}%';
     final rows = <MapEntry<String, String>>[
-      MapEntry('Effectif', '${classOverview.studentCount}'),
-      MapEntry('Garçons', '${classOverview.boys}'),
-      MapEntry('Filles', '${classOverview.girls}'),
-      MapEntry('Enseignant principal', teacherName ?? 'Non renseigné'),
-      MapEntry('Total matières', '${classOverview.subjectCount}'),
-      MapEntry('Séances du jour', '${classOverview.sessionsToday}'),
-      MapEntry("Présence aujourd'hui", attendanceRate),
+      MapEntry(
+          uiText(context, 'enrollmentCount'), '${classOverview.studentCount}'),
+      MapEntry(uiText(context, 'boysCount'), '${classOverview.boys}'),
+      MapEntry(uiText(context, 'girls'), '${classOverview.girls}'),
+      MapEntry(
+        uiText(context, 'teacherPrincipal'),
+        teacherName ?? uiText(context, 'notProvided'),
+      ),
+      MapEntry(
+          uiText(context, 'subjectsCount'), '${classOverview.subjectCount}'),
+      MapEntry(uiText(context, 'todaySessionsLabel'),
+          '${classOverview.sessionsToday}'),
+      MapEntry(uiText(context, 'attendanceToday'), attendanceRate),
     ];
 
     final greyTextStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -2769,15 +2906,16 @@ class _DashboardClassCard extends StatelessWidget {
                               textAlign: TextAlign.right,
                               overflow: TextOverflow.ellipsis,
                               softWrap: true,
-                              style: row.key == "Présence aujourd'hui"
-                                  ? greyTextStyle?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          _attendancePercentageColor(row.value),
-                                    )
-                                  : greyTextStyle?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                              style:
+                                  row.key == uiText(context, 'attendanceToday')
+                                      ? greyTextStyle?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: _attendancePercentageColor(
+                                              row.value, context),
+                                        )
+                                      : greyTextStyle?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                             ),
                           ),
                         ),
@@ -2791,7 +2929,7 @@ class _DashboardClassCard extends StatelessWidget {
     );
   }
 
-  Color _attendancePercentageColor(String value) {
+  Color _attendancePercentageColor(String value, BuildContext context) {
     if (value == '—') {
       return Colors.grey.shade700;
     }
@@ -2828,18 +2966,20 @@ class _ClassCard extends StatelessWidget {
     final totalStudents =
         daySessions.fold<int>(0, (sum, session) => sum + session.total);
     final attendanceRate = totalStudents == 0
-        ? 'Aucune donnée'
+        ? uiText(context, 'noDataAvailable')
         : '${(totalPresent / totalStudents * 100).round()}%';
 
     final rows = <MapEntry<String, String>>[
-      MapEntry('Effectif', '${schoolClass.students.length}'),
-      MapEntry('Garçons', '${schoolClass.boys}'),
-      MapEntry('Filles', '${schoolClass.girls}'),
-      MapEntry('Enseignant principal', 'Non renseigné'),
-      MapEntry('Total matières',
+      MapEntry(
+          uiText(context, 'enrollmentCount'), '${schoolClass.students.length}'),
+      MapEntry(uiText(context, 'boysCount'), '${schoolClass.boys}'),
+      MapEntry(uiText(context, 'girls'), '${schoolClass.girls}'),
+      MapEntry(
+          uiText(context, 'teacherPrincipal'), uiText(context, 'notProvided')),
+      MapEntry(uiText(context, 'subjectsCount'),
           '${classSessions.map((session) => session.subject).toSet().length}'),
-      MapEntry('Séances du jour', '${daySessions.length}'),
-      MapEntry('Taux de présence', attendanceRate),
+      MapEntry(uiText(context, 'todaySessionsLabel'), '${daySessions.length}'),
+      MapEntry(uiText(context, 'attendanceRateLabel'), attendanceRate),
     ];
 
     final greyTextStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -2901,11 +3041,12 @@ class _ClassCard extends StatelessWidget {
                               textAlign: TextAlign.right,
                               overflow: TextOverflow.ellipsis,
                               softWrap: true,
-                              style: row.key == 'Taux de présence'
+                              style: row.key ==
+                                      uiText(context, 'attendanceRateLabel')
                                   ? greyTextStyle?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          _attendancePercentageColor(row.value),
+                                      color: _attendancePercentageColor(
+                                          row.value, context),
                                     )
                                   : greyTextStyle?.copyWith(
                                       fontWeight: FontWeight.bold,
@@ -2923,8 +3064,8 @@ class _ClassCard extends StatelessWidget {
     );
   }
 
-  Color _attendancePercentageColor(String value) {
-    if (value == 'Aucune donnée') {
+  Color _attendancePercentageColor(String value, BuildContext context) {
+    if (value == uiText(context, 'noDataAvailable')) {
       return Colors.grey.shade700;
     }
 
@@ -3146,15 +3287,25 @@ class _DashboardSessionTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${session.date} à ${session.time} • ${session.teacher}\n'
-            '${session.present} présents • ${session.absent} absents • ${session.late} retards',
+            uiText(
+              context,
+              'sessionSummary',
+              parameters: <String, String>{
+                'date': session.date,
+                'time': session.time,
+                'teacher': session.teacher,
+                'present': '${session.present}',
+                'absent': '${session.absent}',
+                'late': '${session.late}',
+              },
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           isThreeLine: true,
           trailing: Text(
             session.attendancePercentage == null
-                ? 'Aucune donnée'
+                ? uiText(context, 'noDataAvailable')
                 : '${session.attendancePercentage}%',
             style: session.attendancePercentage == null
                 ? null
@@ -3205,8 +3356,18 @@ class _PrincipalAttendanceSessionTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '${session.date} à ${session.time} • ${session.teacher}\n'
-          '${session.present} présents • ${session.absent} absents • ${session.late} retards',
+          uiText(
+            context,
+            'sessionSummary',
+            parameters: <String, String>{
+              'date': session.date,
+              'time': session.time,
+              'teacher': session.teacher,
+              'present': '${session.present}',
+              'absent': '${session.absent}',
+              'late': '${session.late}',
+            },
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -3240,14 +3401,14 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
     this.showRawStatuses = false,
   }) : super(key: key);
 
-  String _statusLabel(String status) {
+  String _statusLabel(String status, BuildContext context) {
     switch (status) {
       case 'P':
-        return 'Présent';
+        return uiText(context, 'presentStatusLabel');
       case 'A':
-        return 'Absent';
+        return uiText(context, 'absentStatusLabel');
       case 'R':
-        return 'Retard';
+        return uiText(context, 'lateStatusLabel');
       default:
         return status;
     }
@@ -3281,7 +3442,7 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
-        title: const Text('Détail de la présence'),
+        title: Text(uiText(context, 'attendanceDetailTitle')),
         backgroundColor: CustomTheme.blue,
       ),
       body: ListView(
@@ -3291,28 +3452,32 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Detail('Date', session.date),
-                _Detail('Heure', session.time),
-                _Detail('Classe', session.className),
-                _Detail('Matière', subjectLabel ?? session.subject),
-                _Detail('Enseignant', session.teacher),
-                _Detail('Présence enseignant', session.teacherPresenceLabel),
+                _Detail(uiText(context, 'date'), session.date),
+                _Detail(uiText(context, 'time'), session.time),
+                _Detail(uiText(context, 'className'), session.className),
+                _Detail(uiText(context, 'subject'),
+                    subjectLabel ?? session.subject),
+                _Detail(uiText(context, 'teacherName'), session.teacher),
+                _Detail(uiText(context, 'teacherPresenceLabel'),
+                    session.teacherPresenceLabel),
                 _Detail(
-                  preferApiAttendancePercentage ? 'Total élèves' : 'Élèves',
+                  preferApiAttendancePercentage
+                      ? uiText(context, 'totalStudents')
+                      : uiText(context, 'studentsCountLabel'),
                   '${session.studentCount}',
                 ),
-                _Detail('Présents', '${session.present}'),
-                _Detail('Absents', '${session.absent}'),
-                _Detail('Retards', '${session.late}'),
+                _Detail(uiText(context, 'present'), '${session.present}'),
+                _Detail(uiText(context, 'absences'), '${session.absent}'),
+                _Detail(uiText(context, 'lateLabel'), '${session.late}'),
                 _Detail(
-                  'Présence',
+                  uiText(context, 'presence'),
                   attendancePercentage == null ? '—' : '$attendancePercentage%',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          _SectionTitle('Élèves'),
+          _SectionTitle(uiText(context, 'studentListNav')),
           ...session.records.map((record) => _Card(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -3322,7 +3487,7 @@ class PrincipalLiveAttendanceSessionPage extends StatelessWidget {
                   subtitle: Text(record.codeEleve),
                   trailing: Text(showRawStatuses
                       ? record.status
-                      : _statusLabel(record.status)),
+                      : _statusLabel(record.status, context)),
                 ),
               )),
         ],
@@ -3350,15 +3515,25 @@ class _SessionTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${session.date} à ${session.time} • ${session.teacher}\n'
-            '${session.present} présents • ${session.absent} absents • ${session.late} retards',
+            uiText(
+              context,
+              'sessionSummary',
+              parameters: <String, String>{
+                'date': session.date,
+                'time': session.time,
+                'teacher': session.teacher,
+                'present': '${session.present}',
+                'absent': '${session.absent}',
+                'late': '${session.late}',
+              },
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           isThreeLine: true,
           trailing: Text(
             session.attendance == null
-                ? 'Aucune donnée'
+                ? uiText(context, 'noDataAvailable')
                 : '${(session.attendance! * 100).round()}%',
             style: session.attendance == null
                 ? null
@@ -3384,7 +3559,7 @@ class _SectionTitle extends StatelessWidget {
 
 class _Card extends StatelessWidget {
   final Widget child;
-  const _Card({required this.child});
+  _Card({required this.child});
   @override
   Widget build(BuildContext context) => Container(
       padding: const EdgeInsets.all(14),

@@ -7,8 +7,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/services/mobile_api_service.dart';
 import 'package:mobischo/services/notification_service.dart';
 import 'package:mobischo/splash.dart';
@@ -45,11 +45,13 @@ Future<void> main() async {
       unawaited(_registerDeviceForStoredSession(notificationService));
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('Firebase Messaging initialization unavailable (${error.code}).');
+        debugPrint(
+            'Firebase Messaging initialization unavailable (${error.code}).');
       }
     } on PlatformException catch (error) {
       if (kDebugMode) {
-        debugPrint('Firebase Messaging initialization unavailable (${error.code}).');
+        debugPrint(
+            'Firebase Messaging initialization unavailable (${error.code}).');
       }
     }
   }
@@ -75,7 +77,8 @@ Future<void> _registerDeviceForStoredSession(
     );
   } on Exception catch (error) {
     if (kDebugMode) {
-      debugPrint('Stored-session device registration skipped (${error.runtimeType}).');
+      debugPrint(
+          'Stored-session device registration skipped (${error.runtimeType}).');
     }
   }
 }
@@ -106,11 +109,14 @@ class _MyAppState extends State<MyApp> {
         debugShowCheckedModeBanner: false,
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
-        localeResolutionCallback: (locale, supportedLocales) {
-          final languageCode = locale?.languageCode;
-          return languageCode == 'en' ? const Locale('en') : const Locale('fr');
-        },
+        localeResolutionCallback: (locale, supportedLocales) =>
+            resolveMobischoLocale(locale),
         theme: CustomTheme.getTheme(),
         home: const Splash());
   }
 }
+
+Locale resolveMobischoLocale(Locale? deviceLocale) =>
+    deviceLocale?.languageCode == 'en'
+        ? const Locale('en')
+        : const Locale('fr');

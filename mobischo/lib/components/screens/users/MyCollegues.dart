@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/users/user_detail.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
@@ -65,7 +66,7 @@ class _MyColleguesState extends State<MyCollegues> {
       if (!mounted) return;
       setState(() {
         _hasError = true;
-        _errorMessage = 'Impossible de charger vos collègues.';
+        _errorMessage = uiText(context, 'colleagueLoadError');
         _loading = false;
       });
     }
@@ -128,7 +129,7 @@ class _MyColleguesState extends State<MyCollegues> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
-                hintText: 'Rechercher un collègue',
+                hintText: uiText(context, 'searchColleague'),
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -167,7 +168,7 @@ class _MyColleguesState extends State<MyCollegues> {
                                   ),
                                   SizedBox(height: 16),
                                   Text(
-                                    'Aucun collègue trouvé',
+                                    uiText(context, 'noColleagueFound'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 18,
@@ -176,7 +177,7 @@ class _MyColleguesState extends State<MyCollegues> {
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    "Aucun autre enseignant n'est actuellement disponible dans votre établissement.",
+                                    uiText(context, 'noOtherTeacherAvailable'),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],

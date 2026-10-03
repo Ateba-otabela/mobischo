@@ -8,6 +8,7 @@ import 'package:mobischo/components/screens/students/students_list.dart';
 import 'package:mobischo/components/screens/teachers.dart/absences_list.dart';
 import 'package:mobischo/components/screens/teachers.dart/mark_lists.dart';
 import 'package:mobischo/models/course.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/school.dart';
@@ -97,7 +98,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               AsyncSnapshot<String> snapshot,
             ) {
               if (snapshot.data == null) {
-                return const Text('loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               } else {
                 return Text(
                   snapshot.data ?? "",
@@ -111,7 +112,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.course.CodeEnseignement),
-            subtitle: const Text('Code Enseignement'),
+            subtitle: Text(uiText(context, 'courseCode')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -119,13 +120,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               future: CourseServices.getMainCourse(widget.course.CodeMatiere),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Matiere'),
+            subtitle: Text(uiText(context, 'subject')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -133,27 +134,27 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               future: CourseServices.getMainClass(widget.course.CodeClasse),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Matiere'),
+            subtitle: Text(uiText(context, 'subject')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.course.Coefficient.trim().isEmpty
-                ? 'Non renseigné'
+                ? uiText(context, 'notProvided')
                 : widget.course.Coefficient),
-            subtitle: const Text("Coefficient"),
+            subtitle: Text(uiText(context, 'coefficient')),
           ),
           ListTile(
             leading: const Icon(Icons.timer, color: CustomTheme.blue),
             title: Text(widget.course.NBRHEURE.trim().isEmpty
-                ? 'Non renseigné'
+                ? uiText(context, 'notProvided')
                 : widget.course.NBRHEURE),
-            subtitle: const Text("Nombre D'Heures"),
+            subtitle: Text(uiText(context, 'hoursCount')),
           ),
           ListTile(
               leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -162,13 +163,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 builder:
                     (BuildContext context, AsyncSnapshot<String> snapshot) {
                   if (snapshot.data == null) {
-                    return const Text('Loading ...');
+                    return Text(uiText(context, 'loadingEllipsis'));
                   } else {
                     return Text(snapshot.data ?? "");
                   }
                 },
               ),
-              subtitle: const Text("Etablissement"))
+              subtitle: Text(uiText(context, 'institution')))
         ],
       ),
     );
@@ -194,7 +195,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       Icons.menu_book,
                       color: CustomTheme.blue,
                     ),
-                    title: const Text('Notes'),
+                    title: Text(uiText(context, 'notes')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -213,7 +214,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       ),
                   ListTile(
                     leading: const Icon(Icons.timer, color: CustomTheme.blue),
-                    title: const Text('Absences'),
+                    title: Text(uiText(context, 'absences')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -233,7 +234,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   ListTile(
                     leading: const Icon(Icons.inventory_outlined,
                         color: CustomTheme.blue),
-                    title: const Text("Liste d'Eleves"),
+                    title: Text(uiText(context, 'courseStudents')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {

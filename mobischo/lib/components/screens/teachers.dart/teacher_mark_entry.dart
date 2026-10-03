@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/mark.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/year.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
@@ -14,7 +15,8 @@ import 'package:mobischo/utils/custom_theme.dart';
 class TeacherMarkEntryScreen extends StatefulWidget {
   final User user;
 
-  const TeacherMarkEntryScreen({Key? key, required this.user}) : super(key: key);
+  const TeacherMarkEntryScreen({Key? key, required this.user})
+      : super(key: key);
 
   @override
   State<TeacherMarkEntryScreen> createState() => _TeacherMarkEntryScreenState();
@@ -63,11 +65,14 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
       final years = results[1] as List<Year>;
       final sequences = results[2] as List<SequenceEvaluation>;
 
-      for (final classCode in courses.map((course) => course.CodeClasse).toSet()) {
+      for (final classCode
+          in courses.map((course) => course.CodeClasse).toSet()) {
         _classLabels[classCode] = await CourseServices.getMainClass(classCode);
       }
-      for (final subjectCode in courses.map((course) => course.CodeMatiere).toSet()) {
-        _subjectLabels[subjectCode] = await CourseServices.getMainCourse(subjectCode);
+      for (final subjectCode
+          in courses.map((course) => course.CodeMatiere).toSet()) {
+        _subjectLabels[subjectCode] =
+            await CourseServices.getMainCourse(subjectCode);
       }
 
       if (!mounted) return;
@@ -87,7 +92,7 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Les notes sont consultables uniquement en lecture.';
+        _error = uiText(context, 'marksReadOnly');
       });
     }
   }
@@ -101,7 +106,8 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
     });
 
     try {
-      final students = await StudentServices.getCourseStudents(course.CodeClasse);
+      final students =
+          await StudentServices.getCourseStudents(course.CodeClasse);
       final year = _selectedYear;
       final sequence = _selectedSequence;
       final marks = year != null && sequence != null
@@ -122,18 +128,16 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
       if (!mounted) return;
       setState(() {
         _loadingStudents = false;
-        _error = 'Impossible de charger les notes pour cette matière.';
+        _error = uiText(context, 'subjectMarksLoadError');
       });
     }
   }
 
-  String _classLabel(String code) => _classLabels[code]?.isNotEmpty == true
-      ? _classLabels[code]!
-      : code;
+  String _classLabel(String code) =>
+      _classLabels[code]?.isNotEmpty == true ? _classLabels[code]! : code;
 
-  String _subjectLabel(String code) => _subjectLabels[code]?.isNotEmpty == true
-      ? _subjectLabels[code]!
-      : code;
+  String _subjectLabel(String code) =>
+      _subjectLabels[code]?.isNotEmpty == true ? _subjectLabels[code]! : code;
 
   void _showReadOnlyDialog(Student student) {
     final mark = _marks.firstWhere(
@@ -155,14 +159,18 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Note existante'),
+          title: Text(uiText(context, 'existingMark')),
           content: Text(
-            'Élève : ${student.Nom} ${student.Prenom}\n\nNote : ${mark.valeur == '—' ? 'Aucune' : mark.valeur}',
+            '${uiText(context, 'studentName')} : ${student.Nom} ${student.Prenom}\n\n${uiText(context, 'noteLabel', parameters: <String, String>{
+                  'value': mark.valeur == '—'
+                      ? uiText(context, 'noMark')
+                      : mark.valeur
+                })}',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Fermer'),
+              child: Text(uiText(context, 'close')),
             ),
           ],
         );
@@ -173,13 +181,14 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: CustomTheme.blue));
+      return const Center(
+          child: CircularProgressIndicator(color: CustomTheme.blue));
     }
     if (_error != null) {
       return Center(child: Text(_error!, textAlign: TextAlign.center));
     }
     if (_courses.isEmpty) {
-      return const Center(child: Text('Aucune matière ne vous est actuellement attribuée.'));
+      return Center(child: Text(uiText(context, 'noAssignedSubjects')));
     }
 
     return Column(
@@ -190,7 +199,9 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
             children: [
               DropdownButtonFormField<String>(
                 value: _selectedClassCode,
-                decoration: const InputDecoration(labelText: 'Classe'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'className'),
+                ),
                 items: _classCodes
                     .map((code) => DropdownMenuItem<String>(
                           value: code,
@@ -210,7 +221,9 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
               const SizedBox(height: 8),
               DropdownButtonFormField<Course>(
                 value: _selectedCourse,
-                decoration: const InputDecoration(labelText: 'Matière'),
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'subject'),
+                ),
                 items: _coursesForSelectedClass
                     .map((course) => DropdownMenuItem<Course>(
                           value: course,
@@ -226,9 +239,13 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
           ),
         ),
         if (_loadingStudents)
-          const Expanded(child: Center(child: CircularProgressIndicator(color: CustomTheme.blue)))
+          const Expanded(
+              child: Center(
+                  child: CircularProgressIndicator(color: CustomTheme.blue)))
         else if (_students.isEmpty)
-          const Expanded(child: Center(child: Text('Aucune note disponible pour cette matière.')))
+          Expanded(
+            child: Center(child: Text(uiText(context, 'noMarksForSubject'))),
+          )
         else
           Expanded(
             child: ListView.builder(
@@ -241,7 +258,8 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
                   orElse: () => Mark(
                     Codeenseignement: _selectedCourse?.CodeEnseignement ?? '',
                     CodeEleve: student.CodeEleve,
-                    CodeEvaluation: _selectedSequence?.CodeEvaluation.toString() ?? '',
+                    CodeEvaluation:
+                        _selectedSequence?.CodeEvaluation.toString() ?? '',
                     CodeAppreciation: '',
                     valeur: '—',
                     coef: _selectedCourse?.Coefficient ?? '',
@@ -252,13 +270,16 @@ class _TeacherMarkEntryScreenState extends State<TeacherMarkEntryScreen> {
                 );
                 return Card(
                   child: ListTile(
-                    leading: const Icon(Icons.person_outline, color: CustomTheme.blue),
+                    leading: const Icon(Icons.person_outline,
+                        color: CustomTheme.blue),
                     title: Text('${student.Nom} ${student.Prenom}'),
                     trailing: Text(
                       mark.valeur == '—' ? '—' : mark.valeur,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    onTap: mark.valeur == '—' ? null : () => _showReadOnlyDialog(student),
+                    onTap: mark.valeur == '—'
+                        ? null
+                        : () => _showReadOnlyDialog(student),
                   ),
                 );
               },

@@ -10,6 +10,7 @@ import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/mark_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class MarkListScreen extends StatefulWidget {
   final Course course;
@@ -126,7 +127,7 @@ class _MarkListScreenState extends State<MarkListScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(
                 snapshot.data!.toUpperCase(),
@@ -187,7 +188,8 @@ class _MarkListScreenState extends State<MarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -204,7 +206,8 @@ class _MarkListScreenState extends State<MarkListScreen> {
                                     AsyncSnapshot<String> snapshot,
                                   ) {
                                     if (snapshot.data == null) {
-                                      return const Text('loading ...');
+                                      return Text(
+                                          uiText(context, 'loadingEllipsis'));
                                     } else {
                                       return Text(
                                         snapshot.data!.toUpperCase(),
@@ -278,7 +281,7 @@ class _MarkListScreenState extends State<MarkListScreen> {
                             });
                           },
                           elevation: 10,
-                          hint: const Text('Sequences Evaluations'),
+                          hint: Text(uiText(context, 'sequencesEvaluations')),
                         ),
                         DropdownButton(
                           items: ListYears,
@@ -294,7 +297,7 @@ class _MarkListScreenState extends State<MarkListScreen> {
                             // Navigator.pop(context);
                           },
                           elevation: 10,
-                          hint: const Text('Annee Scholaires'),
+                          hint: Text(uiText(context, 'schoolYears')),
                         )
                       ],
                     ),
@@ -336,26 +339,27 @@ class markList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: MarkServices.getCourseMarksForNotes(widget.course.CodeEnseignement),
+      future:
+          MarkServices.getCourseMarksForNotes(widget.course.CodeEnseignement),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Text(
-                'Impossible de charger les notes. Veuillez réessayer.',
+                uiText(context, 'marksLoadError'),
                 textAlign: TextAlign.center,
               ),
             ),
           );
         } else if (snapshot.data == null || snapshot.data.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Text(
-                'Aucune note enregistrée pour cette matière.',
+                uiText(context, 'noMarksForSubject'),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -386,7 +390,7 @@ class markList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",
@@ -395,7 +399,10 @@ class markList extends StatelessWidget {
                                 );
                               }
                             }),
-                        subtitle: Text("Note: ${snapshot.data[index].valeur}"),
+                        subtitle:
+                            Text(uiText(context, 'noteLabel', parameters: {
+                          'value': '${snapshot.data[index].valeur}',
+                        })),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {},
                       ),

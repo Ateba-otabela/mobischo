@@ -10,6 +10,7 @@ import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:intl/intl.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class AbsenceDetail extends StatefulWidget {
   final Student student;
@@ -92,7 +93,7 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
               AsyncSnapshot<String> snapshot,
             ) {
               if (snapshot.data == null) {
-                return const Text('loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               } else {
                 return Text(
                   snapshot.data ?? "",
@@ -108,7 +109,7 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
             color: CustomTheme.grey,
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
             child: Text(
-              'Présence validée',
+              uiText(context, 'presentStatusLabel'),
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ),
@@ -122,7 +123,7 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
                   AsyncSnapshot<String> snapshot,
                 ) {
                   if (snapshot.data == null) {
-                    return const Text('loading ...');
+                    return Text(uiText(context, 'loadingEllipsis'));
                   } else {
                     return Text(
                       snapshot.data ?? "",
@@ -130,7 +131,7 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
                     );
                   }
                 }),
-            subtitle: const Text('Élève'),
+            subtitle: Text(uiText(context, 'student')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -138,13 +139,13 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
               future: CourseServices.getMainCourse(widget.absence.CodeMatiere),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Matiere'),
+            subtitle: Text(uiText(context, 'subject')),
           ),
           ListTile(
             leading:
@@ -153,28 +154,28 @@ class _AbsenceDetailState extends State<AbsenceDetail> {
               future: CourseServices.getMainClass(widget.absence.CodeClasse),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Classe'),
+            subtitle: Text(uiText(context, 'className')),
           ),
           ListTile(
             leading: const Icon(Icons.timer, color: CustomTheme.blue),
             title: Text(widget.absence.Nombre),
-            subtitle: const Text("Nombre D'Heures"),
+            subtitle: Text(uiText(context, 'numberOfHours')),
           ),
           ListTile(
               leading:
                   const Icon(Icons.calendar_month, color: CustomTheme.blue),
               title: Text(getDate(widget.absence.DateEnreg)),
-              subtitle: const Text("Date d'Enregistrement")),
+              subtitle: Text(uiText(context, 'dateOfRegistration'))),
           ListTile(
             leading: const Icon(Icons.abc_rounded, color: CustomTheme.blue),
             title: Text(getTime(widget.absence.created_at).toString()),
-            subtitle: const Text("Heure"),
+            subtitle: Text(uiText(context, 'hour')),
           ),
         ],
       ),

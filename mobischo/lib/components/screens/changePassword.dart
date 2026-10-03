@@ -12,11 +12,13 @@ import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_input.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:http/http.dart' as http;
+import 'package:mobischo/l10n/ui_text.dart';
 
 class ChangePassword extends StatefulWidget {
   final User user;
   final bool localOnly;
-  const ChangePassword({Key? key, required this.user, this.localOnly = false}) : super(key: key);
+  const ChangePassword({Key? key, required this.user, this.localOnly = false})
+      : super(key: key);
 
   @override
   State<ChangePassword> createState() => _ChangePasswordState();
@@ -73,7 +75,7 @@ class _ChangePasswordState extends State<ChangePassword> {
         _password.text == '' ||
         _confirm_new_password.text == '') {
       Fluttertoast.showToast(
-          msg: "Les champs ne peuvent pas etre vides !",
+          msg: uiText(cont, 'emptyFields'),
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER,
           fontSize: 16.0);
@@ -82,7 +84,7 @@ class _ChangePasswordState extends State<ChangePassword> {
 
     if (_new_password.text != _confirm_new_password.text) {
       Fluttertoast.showToast(
-          msg: "Le nouveau mot de passe ne correspond pas !",
+          msg: uiText(cont, 'passwordMismatch'),
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER,
           fontSize: 16.0);
@@ -130,7 +132,7 @@ class _ChangePasswordState extends State<ChangePassword> {
 
       if (response.statusCode != 200 || decodedResponse != 'Success') {
         Fluttertoast.showToast(
-          msg: "Erreur de modification du mot de passe",
+          msg: uiText(cont, 'passwordChangeError'),
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.CENTER,
           fontSize: 16.0,
@@ -149,7 +151,7 @@ class _ChangePasswordState extends State<ChangePassword> {
       }
     } catch (_) {
       Fluttertoast.showToast(
-          msg: 'Erreur de Connextion',
+          msg: uiText(cont, 'connectionError'),
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER);
     } finally {
@@ -174,7 +176,7 @@ class _ChangePasswordState extends State<ChangePassword> {
               color: CustomTheme.blue,
             )),
         title: Text(
-          'Mon Compte',
+          uiText(context, 'myAccount'),
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         centerTitle: true,
@@ -214,7 +216,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                         CustomInput(
                             controller: _password,
                             hintText: 'username1234',
-                            labelText: 'Mot de passe',
+                            labelText: uiText(context, 'password'),
                             isPassword: true,
                             prefixIcon: Icons.lock,
                             surfixIcon: Icons.lock_outline_rounded,
@@ -227,7 +229,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                         CustomInput(
                             controller: _new_password,
                             hintText: '********',
-                            labelText: 'Nouveau mot de passe',
+                            labelText: uiText(context, 'newPassword'),
                             isPassword: true,
                             prefixIcon: Icons.lock,
                             surfixIcon: Icons.lock_outline_rounded,
@@ -240,7 +242,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                         CustomInput(
                             controller: _confirm_new_password,
                             hintText: '********',
-                            labelText: 'Confirmez mot de passe',
+                            labelText: uiText(context, 'confirmPassword'),
                             isPassword: true,
                             prefixIcon: Icons.lock,
                             surfixIcon: Icons.lock_outline_rounded,

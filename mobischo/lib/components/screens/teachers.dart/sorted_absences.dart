@@ -12,6 +12,7 @@ import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class SortedAbsenceListScreen extends StatefulWidget {
   final Course course;
@@ -166,7 +167,7 @@ class _SortedAbsenceListScreenState extends State<SortedAbsenceListScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(
                 snapshot.data!.toUpperCase(),
@@ -175,9 +176,9 @@ class _SortedAbsenceListScreenState extends State<SortedAbsenceListScreen> {
             }
           },
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
             preferredSize: Size.zero,
-            child: Text("Cliquez sur l'icone du calendrier pour trier")),
+            child: Text(uiText(context, 'calendarSortHint'))),
         centerTitle: true,
         actions: [
           IconButton(
@@ -224,7 +225,7 @@ class _SortedAbsenceListScreenState extends State<SortedAbsenceListScreen> {
                                 ),
                                 title:
                                     Text(HumanDateFormat(widget.current_date)),
-                                subtitle: const Text("Date D'appel"),
+                                subtitle: Text(uiText(context, 'dateOfCall')),
                                 onTap: () {
                                   _selectSortDate(context);
                                 },
@@ -303,7 +304,7 @@ class absencesList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",

@@ -6,6 +6,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:mobischo/components/screens/teachers.dart/convocation_success.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_button.dart';
@@ -71,14 +72,17 @@ class _CreateAllConvocationState extends State<CreateAllConvocation> {
   List<DropdownMenuItem> motifs() {
     ListMotifs.clear();
     ListMotifs.add(DropdownMenuItem(
-        value: "Insubordination", child: Text('Insurbodination')));
+        value: "Insubordination",
+        child: Text(uiText(context, 'insubordination'))));
     ListMotifs.add(DropdownMenuItem(
-        value: "Retard Abusive", child: Text('Retard Abusive')));
-    ListMotifs.add(
-        DropdownMenuItem(value: "Violence", child: Text('Violence')));
-    ListMotifs.add(
-        DropdownMenuItem(value: "Indiscipline", child: Text('Indiscipline')));
-    ListMotifs.add(DropdownMenuItem(value: "Autre", child: Text('Autre')));
+        value: "Retard Abusive",
+        child: Text(uiText(context, 'excessiveLateness'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Violence", child: Text(uiText(context, 'violence'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Indiscipline", child: Text(uiText(context, 'indiscipline'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Autre", child: Text(uiText(context, 'otherReason'))));
     return ListMotifs;
   }
 
@@ -173,7 +177,7 @@ class _CreateAllConvocationState extends State<CreateAllConvocation> {
                           // Navigator.pop(context);
                         },
                         elevation: 10,
-                        hint: const Text('Motif de convocation'),
+                        hint: Text(uiText(context, 'conveningReason')),
                       ),
                     ),
                     Padding(
@@ -181,7 +185,7 @@ class _CreateAllConvocationState extends State<CreateAllConvocation> {
                       child: TextField(
                         controller: description,
                         decoration: InputDecoration(
-                          labelText: 'Description',
+                          labelText: uiText(context, 'description'),
                           // border: OutlineInputBorder(
 
                           // ),

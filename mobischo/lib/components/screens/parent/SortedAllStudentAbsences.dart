@@ -7,6 +7,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -178,7 +179,7 @@ class _SortedAllStudentAbsencesState extends State<SortedAllStudentAbsences> {
                                 ),
                                 title:
                                     Text(HumanDateFormat(widget.current_date)),
-                                subtitle: const Text("Date D'appel"),
+                                subtitle: Text(uiText(context, 'dateOfCall')),
                                 onTap: () {
                                   if (isLoaded == true) {
                                     _interstitialAd!.show();
@@ -268,7 +269,7 @@ class absencesList extends StatelessWidget {
                               AsyncSnapshot<String> snapshot,
                             ) {
                               if (snapshot.data == null) {
-                                return const Text('loading ...');
+                                return Text(uiText(context, 'loadingEllipsis'));
                               } else {
                                 return Text(
                                   snapshot.data ?? "",

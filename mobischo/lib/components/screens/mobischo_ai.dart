@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/mobischo_ai_service.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -24,33 +25,34 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final MobischoAiService _aiService;
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(
-      text: 'Bonjour 👋 Je suis Mobischo AI.\n'
-          'Je peux vous aider à consulter les informations scolaires, '
-          'comprendre les présences, les élèves, les classes et bien plus encore.',
-      fromUser: false,
-      sentAt: DateTime.now(),
-    ),
-  ];
+  final List<_ChatMessage> _messages = [];
   bool _assistantTyping = false;
   bool _loadingHistory = true;
   int? _conversationId;
   List<Map<String, dynamic>> _conversations = [];
   int _historyPage = 1;
   bool _historyHasMore = false;
-
-  static const _suggestions = [
-    'Voir les présences',
-    'Informations sur ma classe',
-    'Aide',
-  ];
+  String? _resolvedLocaleName;
 
   @override
   void initState() {
     super.initState();
     _aiService = widget.aiService ?? MobischoAiService();
     _loadConversations(openLatest: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final localeName = AppLocalizations.of(context).localeName;
+    if (_messages.isEmpty) {
+      _messages.add(_welcomeMessage());
+    } else if (_resolvedLocaleName != localeName &&
+        _messages.length == 1 &&
+        !_messages.single.fromUser) {
+      _messages[0] = _welcomeMessage();
+    }
+    _resolvedLocaleName = localeName;
   }
 
   @override
@@ -62,6 +64,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
   }
 
   Future<void> _sendMessage([String? suggestedText]) async {
+    final l10n = AppLocalizations.of(context);
     final text = (suggestedText ?? _controller.text).trim();
     if (text.isEmpty || _assistantTyping || _loadingHistory) return;
 
@@ -86,12 +89,12 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=conversation setup; caughtType=${error.runtimeType}; '
-        'caughtMessage=${error.userMessage}',
+        'caughtMessage=service error',
       );
       if (mounted) {
         setState(() => _assistantTyping = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.userMessage)),
+          SnackBar(content: Text(_localizedServiceMessage(error.userMessage))),
         );
       }
       return;
@@ -99,13 +102,12 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=conversation setup; caughtType=${error.runtimeType}; '
-        'caughtMessage=$error',
+        'caughtMessage omitted for safety',
       );
       if (mounted) {
         setState(() => _assistantTyping = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Impossible de créer une conversation.')),
+          SnackBar(content: Text(l10n.createConversationError)),
         );
       }
       return;
@@ -137,22 +139,22 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
         message: text,
         conversation: conversation,
         conversationId: _conversationId,
+        languageCode: l10n.localeName,
       );
     } on MobischoAiServiceException catch (error) {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=chat screen catch; caughtType=${error.runtimeType}; '
-        'caughtMessage=${error.userMessage}',
+        'caughtMessage=service error',
       );
-      reply = error.userMessage;
+      reply = _localizedServiceMessage(error.userMessage);
     } catch (error) {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=chat screen catch; caughtType=${error.runtimeType}; '
-        'caughtMessage=$error',
+        'caughtMessage omitted for safety',
       );
-      reply =
-          'Désolé, je rencontre actuellement un problème de connexion. Veuillez réessayer.';
+      reply = l10n.requestFailed;
     }
     if (!mounted) return;
     setState(() {
@@ -198,7 +200,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=conversation history screen catch; '
-        'caughtType=${error.runtimeType}; caughtMessage=${error.userMessage}',
+        'caughtType=${error.runtimeType}; caughtMessage=service error',
       );
       if (!mounted) return;
       setState(() => _loadingHistory = false);
@@ -206,7 +208,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=conversation history screen catch; '
-        'caughtType=${error.runtimeType}; caughtMessage=$error',
+        'caughtType=${error.runtimeType}; caughtMessage omitted for safety',
       );
       if (!mounted) return;
       setState(() => _loadingHistory = false);
@@ -230,7 +232,11 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                   ) ??
                   DateTime.now();
               return _ChatMessage(
-                text: item['content']?.toString() ?? '',
+                text: item['role'] == 'user'
+                    ? _removeStoredLanguageInstruction(
+                        item['content']?.toString() ?? '',
+                      )
+                    : item['content']?.toString() ?? '',
                 fromUser: item['role'] == 'user',
                 sentAt: createdAt,
               );
@@ -247,7 +253,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=open conversation; caughtType=${error.runtimeType}; '
-        'caughtMessage=${error.userMessage}',
+        'caughtMessage=service error',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -257,12 +263,13 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
       debugPrint(
         '[MobischoAI] role=${widget.user.account_type}; '
         'step=open conversation; caughtType=${error.runtimeType}; '
-        'caughtMessage=$error',
+        'caughtMessage omitted for safety',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Impossible d’ouvrir cette conversation.')),
+        SnackBar(
+            content: Text(_localizedServiceMessage(
+                'Impossible d’ouvrir cette conversation.'))),
       );
     }
   }
@@ -287,20 +294,57 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de créer une conversation.')),
+        SnackBar(
+            content:
+                Text(AppLocalizations.of(context).createConversationError)),
       );
     }
   }
 
   _ChatMessage _welcomeMessage() => _ChatMessage(
-        text: 'Bonjour 👋 Je suis Mobischo AI.\n'
-            'Je peux vous aider à consulter les informations scolaires, '
-            'comprendre les présences, les élèves, les classes et bien plus encore.',
+        text: AppLocalizations.of(context).aiGreeting,
         fromUser: false,
         sentAt: DateTime.now(),
       );
 
+  String _removeStoredLanguageInstruction(String message) {
+    const instructions = [
+      'Please respond in English, regardless of the language of the question.',
+      'Réponds en français, quelle que soit la langue de la question.',
+    ];
+    for (final instruction in instructions) {
+      final suffix = '\n\n$instruction';
+      if (message.endsWith(suffix)) {
+        return message.substring(0, message.length - suffix.length);
+      }
+    }
+    return message;
+  }
+
+  String _localizedServiceMessage(String message) {
+    final l10n = AppLocalizations.of(context);
+    switch (message) {
+      case 'Votre session doit être renouvelée. Veuillez vous reconnecter.':
+        return l10n.sessionExpired;
+      case 'Impossible de créer une conversation.':
+        return l10n.createConversationError;
+      case 'Impossible d’ouvrir cette conversation.':
+        return l10n.openConversationError;
+      case 'Impossible de supprimer cette conversation.':
+        return l10n.deleteConversationError;
+      case 'Désolé, je rencontre actuellement un problème de connexion. Veuillez réessayer.':
+        return l10n.requestFailed;
+      case 'Je n’ai pas reçu de réponse. Veuillez réessayer.':
+        return l10n.emptyAiResponse;
+      case 'La réponse prend trop de temps. Vérifiez votre connexion et réessayez.':
+        return l10n.responseTimeout;
+      default:
+        return message;
+    }
+  }
+
   Future<void> _showConversationList() async {
+    final l10n = AppLocalizations.of(context);
     await _loadConversations();
     if (!mounted) return;
     await showModalBottomSheet<void>(
@@ -320,15 +364,15 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Conversations',
-                          style: TextStyle(
+                          l10n.conversations,
+                          style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w700),
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Nouvelle conversation',
+                        tooltip: l10n.newConversation,
                         onPressed: () async {
                           Navigator.pop(sheetContext);
                           await _startNewConversation();
@@ -343,8 +387,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                   child: _loadingHistory
                       ? const Center(child: CircularProgressIndicator())
                       : _conversations.isEmpty
-                          ? const Center(
-                              child: Text('Aucune conversation enregistrée.'))
+                          ? Center(child: Text(l10n.noConversations))
                           : ListView.builder(
                               itemCount: _conversations.length +
                                   (_historyHasMore ? 1 : 0),
@@ -376,8 +419,7 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                                       });
                                       setSheetState(() {});
                                     },
-                                    child: const Text(
-                                        'Charger les conversations précédentes'),
+                                    child: Text(l10n.loadOlderConversations),
                                   );
                                 }
                                 final item = _conversations[index];
@@ -390,13 +432,13 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                                       const Icon(Icons.chat_bubble_outline),
                                   title: Text(
                                     item['title']?.toString() ??
-                                        'Nouvelle conversation',
+                                        l10n.newConversationFallback,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   subtitle: Text(
                                     updatedAt == null
-                                        ? 'Conversation'
+                                        ? l10n.genericConversation
                                         : '${MaterialLocalizations.of(context).formatMediumDate(updatedAt)} • '
                                             '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}',
                                   ),
@@ -410,7 +452,8 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                                   trailing: id == null
                                       ? null
                                       : IconButton(
-                                          tooltip: 'Supprimer la conversation',
+                                          tooltip:
+                                              l10n.deleteConversationTooltip,
                                           icon:
                                               const Icon(Icons.delete_outline),
                                           onPressed: () async {
@@ -420,26 +463,26 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                                                       builder:
                                                           (dialogContext) =>
                                                               AlertDialog(
-                                                        title: const Text(
-                                                            'Supprimer cette conversation ?'),
-                                                        content: const Text(
-                                                            'Cette action est définitive.'),
+                                                        title: Text(l10n
+                                                            .deleteConversationConfirm),
+                                                        content: Text(l10n
+                                                            .irreversibleAction),
                                                         actions: [
                                                           TextButton(
                                                             onPressed: () =>
                                                                 Navigator.pop(
                                                                     dialogContext,
                                                                     false),
-                                                            child: const Text(
-                                                                'Annuler'),
+                                                            child: Text(
+                                                                l10n.cancel),
                                                           ),
                                                           TextButton(
                                                             onPressed: () =>
                                                                 Navigator.pop(
                                                                     dialogContext,
                                                                     true),
-                                                            child: const Text(
-                                                                'Supprimer'),
+                                                            child: Text(
+                                                                l10n.delete),
                                                           ),
                                                         ],
                                                       ),
@@ -481,13 +524,14 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
     } on MobischoAiServiceException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.userMessage)),
+        SnackBar(content: Text(_localizedServiceMessage(error.userMessage))),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Impossible de supprimer cette conversation.')),
+        SnackBar(
+            content:
+                Text(AppLocalizations.of(context).deleteConversationError)),
       );
     }
   }
@@ -526,7 +570,11 @@ class _MobischoAiScreenState extends State<MobischoAiScreen> {
                 }
                 if (_messages.length == 1) {
                   return _SuggestedActions(
-                    suggestions: _suggestions,
+                    suggestions: [
+                      AppLocalizations.of(context).aiSuggestionAttendance,
+                      AppLocalizations.of(context).aiSuggestionClass,
+                      AppLocalizations.of(context).aiSuggestionHelp,
+                    ],
                     onSelected: _sendMessage,
                   );
                 }
@@ -552,69 +600,72 @@ class _ChatHeader extends StatelessWidget {
   const _ChatHeader({required this.onHistory, required this.onNewChat});
 
   @override
-  Widget build(BuildContext context) => Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const CircleAvatar(
-                  radius: 23,
-                  backgroundColor: Color(0xFFE7F0FA),
-                  child: Icon(Icons.smart_toy_outlined,
-                      color: CustomTheme.blue, size: 26),
-                ),
-                Positioned(
-                  right: -1,
-                  bottom: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF35B879),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const CircleAvatar(
+                radius: 23,
+                backgroundColor: Color(0xFFE7F0FA),
+                child: Icon(Icons.smart_toy_outlined,
+                    color: CustomTheme.blue, size: 26),
+              ),
+              Positioned(
+                right: -1,
+                bottom: 0,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF35B879),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mobischo AI',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: CustomTheme.dark,
+                      ),
+                ),
+                Text(
+                  l10n.aiAssistant,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
                 ),
               ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Mobischo AI',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: CustomTheme.dark,
-                        ),
-                  ),
-                  Text(
-                    'Assistant scolaire',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Historique des conversations',
-              onPressed: onHistory,
-              icon: const Icon(Icons.history),
-            ),
-            IconButton(
-              tooltip: 'Nouvelle conversation',
-              onPressed: onNewChat,
-              icon: const Icon(Icons.add_comment_outlined),
-            ),
-          ],
-        ),
-      );
+          ),
+          IconButton(
+            tooltip: l10n.conversationHistory,
+            onPressed: onHistory,
+            icon: const Icon(Icons.history),
+          ),
+          IconButton(
+            tooltip: l10n.newConversation,
+            onPressed: onNewChat,
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ChatMessage {
@@ -635,12 +686,13 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
 
   void _copyResponse(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     Clipboard.setData(ClipboardData(text: message.text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied'),
+      SnackBar(
+        content: Text(l10n.copied),
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 1),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -800,16 +852,16 @@ class _MessageBubble extends StatelessWidget {
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
+                              children: [
+                                const Icon(
                                   Icons.copy_all_rounded,
                                   size: 13,
                                   color: Colors.grey,
                                 ),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Copier',
-                                  style: TextStyle(
+                                  AppLocalizations.of(context).copy,
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey,
                                   ),
@@ -907,7 +959,7 @@ class _TypingIndicator extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Mobischo AI écrit…',
+                AppLocalizations.of(context).aiTyping,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey.shade700,
                     ),
@@ -930,68 +982,71 @@ class _MessageComposer extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-        top: false,
-        child: Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F5F7),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          textCapitalization: TextCapitalization.sentences,
-                          minLines: 1,
-                          maxLines: 4,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: isSending ? null : onSend,
-                          decoration: const InputDecoration(
-                            hintText: 'Écrire un message...',
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 12,
-                            ),
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return SafeArea(
+      top: false,
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F5F7),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        textCapitalization: TextCapitalization.sentences,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: isSending ? null : onSend,
+                        decoration: InputDecoration(
+                          hintText: l10n.writeMessage,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) {
-                  final hasText = value.text.trim().isNotEmpty;
-                  return Material(
-                    color: CustomTheme.blue,
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                      tooltip: hasText ? 'Envoyer' : 'Microphone indisponible',
-                      onPressed: hasText && !isSending
-                          ? () => onSend(value.text)
-                          : null,
-                      icon: Icon(
-                        hasText ? Icons.send_rounded : Icons.mic_none_rounded,
-                        color: Colors.white,
-                        size: 21,
-                      ),
+            ),
+            const SizedBox(width: 8),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return Material(
+                  color: CustomTheme.blue,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip:
+                        hasText ? l10n.sendTooltip : l10n.microphoneUnavailable,
+                    onPressed:
+                        hasText && !isSending ? () => onSend(value.text) : null,
+                    icon: Icon(
+                      hasText ? Icons.send_rounded : Icons.mic_none_rounded,
+                      color: Colors.white,
+                      size: 21,
                     ),
-                  );
-                },
-              ),
-            ],
-          ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }

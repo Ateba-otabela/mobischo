@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:mobischo/components/screens/teachers.dart/create_absences.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -100,30 +101,18 @@ class _AbsenceListScreenState extends State<AbsenceListScreen> {
     }
   }
 
-  String HumanDateFormat(String date) {
-    return DateFormat.yMMMd().format(DateTime.parse(date));
+  String HumanDateFormat(String date, BuildContext context) {
+    return DateFormat.yMMMd(Localizations.localeOf(context).toString())
+        .format(DateTime.parse(date));
   }
 
-  String _displayDate(String date) {
+  String _displayDate(String date, BuildContext context) {
     final parsed = DateTime.tryParse(date);
     if (parsed == null) {
       return date;
     }
-    const months = [
-      'janvier',
-      'février',
-      'mars',
-      'avril',
-      'mai',
-      'juin',
-      'juillet',
-      'août',
-      'septembre',
-      'octobre',
-      'novembre',
-      'décembre',
-    ];
-    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+    return DateFormat.yMMMMd(Localizations.localeOf(context).toString())
+        .format(parsed);
   }
 
   @override
@@ -147,7 +136,7 @@ class _AbsenceListScreenState extends State<AbsenceListScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(snapshot.data!.toUpperCase(),
                   style: Theme.of(context).textTheme.headlineMedium);
@@ -202,9 +191,12 @@ class _AbsenceListScreenState extends State<AbsenceListScreen> {
                             children: <Widget>[
                               ListTile(
                                 title: Text(_selectedAttendanceDate == null
-                                    ? 'Sélectionnez une date'
-                                    : _displayDate(_selectedAttendanceDate!)),
-                                subtitle: const Text("Date de l'appel"),
+                                    ? uiText(context, 'selectDate')
+                                    : _displayDate(
+                                        _selectedAttendanceDate!,
+                                        context,
+                                      )),
+                                subtitle: Text(uiText(context, 'dateOfCall')),
                                 onTap: () async {
                                   _selectDate(context);
                                 },
@@ -268,8 +260,9 @@ class absencesList extends StatelessWidget {
 
   final AbsenceListScreen widget;
 
-  String HumanDateFormat(String date) {
-    return DateFormat.yMMMd().format(DateTime.parse(date));
+  String HumanDateFormat(String date, BuildContext context) {
+    return DateFormat.yMMMd(Localizations.localeOf(context).toString())
+        .format(DateTime.parse(date));
   }
 
   @override
@@ -291,17 +284,17 @@ class absencesList extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Icon(Icons.error_outline, color: Colors.red, size: 42),
                   SizedBox(height: 12),
                   Text(
-                    'Impossible de charger les présences',
+                    uiText(context, 'attendanceNotLoaded'),
                     textAlign: TextAlign.center,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 6),
                   Text(
-                    'Une erreur est survenue lors du chargement des présences. Veuillez réessayer.',
+                    uiText(context, 'attendanceLoadError'),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -323,8 +316,8 @@ class absencesList extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(
                     current_date == 'Tous'
-                        ? 'Aucun appel enregistré'
-                        : 'Aucun appel pour cette date',
+                        ? uiText(context, 'noCallRecorded')
+                        : uiText(context, 'noCallForDate'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 17),
@@ -332,8 +325,8 @@ class absencesList extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     current_date == 'Tous'
-                        ? 'Aucun appel n\'a encore été enregistré pour cette matière.\nCliquez sur + pour enregistrer le premier appel.'
-                        : 'Aucun appel n\'a été enregistré pour cette matière à la date sélectionnée.\nVous pouvez sélectionner une autre date ou créer un nouvel appel avec +.',
+                        ? uiText(context, 'noCallYetForSubject')
+                        : uiText(context, 'noCallForSubjectDate'),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -379,9 +372,16 @@ class absencesList extends StatelessWidget {
                         Icons.timer,
                         color: CustomTheme.blue,
                       ),
-                      title: Text(HumanDateFormat(date)),
-                      subtitle: Text(
-                          'Présents : $present   Absents : $absent   Retards : $late'),
+                      title: Text(HumanDateFormat(date, context)),
+                      subtitle: Text(uiText(
+                        context,
+                        'presentAbsentLateCount',
+                        parameters: <String, String>{
+                          'present': '$present',
+                          'absent': '$absent',
+                          'late': '$late',
+                        },
+                      )),
                       // subtitle: Text("Note: ${snapshot.data[index].valeur}"),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () async {

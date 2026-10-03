@@ -10,6 +10,7 @@ import 'package:mobischo/components/screens/students/student_detail.dart';
 import 'package:mobischo/models/inscription.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/inscription_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -154,13 +155,12 @@ class _MyChildrenState extends State<MyChildren> {
                                                 'assets/images/avatar-s-19.jpg'),
                                             fit: BoxFit.fill),
                                       )),
-                                  title: Text(
-                                    getStudentDisplayName(student),
-                                    style: const TextStyle(fontSize: 13)),
+                                  title: Text(getStudentDisplayName(student),
+                                      style: const TextStyle(fontSize: 13)),
                                   subtitle: Text(
                                     getGender(student.Sex),
-                                    style:
-                                        const TextStyle(color: CustomTheme.blue),
+                                    style: const TextStyle(
+                                        color: CustomTheme.blue),
                                   ),
                                   trailing: const Icon(Icons.arrow_forward_ios),
                                   onTap: () {
@@ -201,7 +201,8 @@ class _MyChildrenState extends State<MyChildren> {
                         selectedInscription = null;
                       });
                     },
-                    icon: const Icon(Icons.arrow_back_ios, color: CustomTheme.blue),
+                    icon: const Icon(Icons.arrow_back_ios,
+                        color: CustomTheme.blue),
                   ),
                   Expanded(
                     child: Text(
@@ -240,8 +241,8 @@ class _MyChildrenState extends State<MyChildren> {
                               fit: BoxFit.contain,
                             ),
                             const SizedBox(height: 20),
-                            const Text(
-                              'Aucune inscription pour le moment',
+                            Text(
+                              uiText(context, 'noEnrollmentYet'),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Color(0xFF424242),
@@ -250,8 +251,8 @@ class _MyChildrenState extends State<MyChildren> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            const Text(
-                              "Les frais de scolarité de cet enfant n'ont pas encore été enregistrés. Une fois le paiement effectué, les informations d'inscription apparaîtront ici.",
+                            Text(
+                              uiText(context, 'enrollmentDetailsWillAppear'),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Color(0xFF757575),
@@ -307,12 +308,14 @@ class _MyChildrenState extends State<MyChildren> {
                                   const SizedBox(height: 8),
                                   Text(
                                     'N° RECU : ${inscription.NUMFAC}',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     'Date de paiement : ${inscription.DateInscription}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                               ),
@@ -349,7 +352,8 @@ class _MyChildrenState extends State<MyChildren> {
                         selectedInscription = null;
                       });
                     },
-                    icon: const Icon(Icons.arrow_back_ios, color: CustomTheme.blue),
+                    icon: const Icon(Icons.arrow_back_ios,
+                        color: CustomTheme.blue),
                   ),
                   const Text(
                     '← Retour',
@@ -366,57 +370,66 @@ class _MyChildrenState extends State<MyChildren> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.inventory_outlined, color: CustomTheme.blue),
+                    leading: const Icon(Icons.inventory_outlined,
+                        color: CustomTheme.blue),
                     title: Text(inscription.NUMFAC),
-                    subtitle: const Text('Numero de Facture'),
+                    subtitle: Text(uiText(context, 'invoiceNumber')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
+                    leading:
+                        const Icon(Icons.menu_book, color: CustomTheme.blue),
                     title: Text(inscription.libinscrip),
-                    subtitle: const Text('Libelle Inscription'),
+                    subtitle: Text(uiText(context, 'registrationLabel')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
+                    leading:
+                        const Icon(Icons.menu_book, color: CustomTheme.blue),
                     title: Text(inscription.Tranche),
-                    subtitle: const Text('Tranche'),
+                    subtitle: Text(uiText(context, 'installment')),
                   ),
                   ListTile(
                     leading: const Icon(Icons.person, color: CustomTheme.blue),
                     title: FutureBuilder<String>(
-                      future: StudentServices.getMainStudent(inscription.CodeEleve),
+                      future:
+                          StudentServices.getMainStudent(inscription.CodeEleve),
                       builder: (context, snapshot) {
                         if (snapshot.data == null) {
-                          return const Text('Loading ...');
+                          return Text(uiText(context, 'loadingEllipsis'));
                         }
                         return Text(snapshot.data ?? '');
                       },
                     ),
-                    subtitle: const Text('Eleve'),
+                    subtitle: Text(uiText(context, 'studentName')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.monetization_on_sharp, color: CustomTheme.blue),
+                    leading: const Icon(Icons.monetization_on_sharp,
+                        color: CustomTheme.blue),
                     title: Text('${inscription.Montantins} FCFA'),
-                    subtitle: const Text("Montant d'Inscription"),
+                    subtitle: Text(uiText(context, 'registrationAmount')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.monetization_on_rounded, color: CustomTheme.blue),
+                    leading: const Icon(Icons.monetization_on_rounded,
+                        color: CustomTheme.blue),
                     title: Text('${inscription.Avance} FCFA'),
-                    subtitle: const Text('Avance'),
+                    subtitle: Text(uiText(context, 'advance')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.monetization_on_outlined, color: CustomTheme.blue),
+                    leading: const Icon(Icons.monetization_on_outlined,
+                        color: CustomTheme.blue),
                     title: Text('${inscription.Reste} FCFA'),
-                    subtitle: const Text('Reste'),
+                    subtitle: Text(uiText(context, 'remaining')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.monetization_on, color: CustomTheme.blue),
+                    leading: const Icon(Icons.monetization_on,
+                        color: CustomTheme.blue),
                     title: Text('${inscription.Montantt} FCFA'),
-                    subtitle: const Text('Montant Total'),
+                    subtitle: Text(uiText(context, 'totalAmount')),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.calendar_month, color: CustomTheme.blue),
+                    leading: const Icon(Icons.calendar_month,
+                        color: CustomTheme.blue),
                     title: Text(inscription.DateInscription),
-                    subtitle: const Text("Date d'Inscription"),
+                    subtitle: Text(uiText(context, 'enrollmentDate')),
                   ),
                 ],
               ),
@@ -444,7 +457,7 @@ class _MyChildrenState extends State<MyChildren> {
                 children: <Widget>[
                   ListTile(
                     leading: const Icon(Icons.person, color: CustomTheme.blue),
-                    title: const Text('Details'),
+                    title: Text(uiText(context, 'details')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -464,7 +477,7 @@ class _MyChildrenState extends State<MyChildren> {
                   ListTile(
                     leading:
                         const Icon(Icons.menu_book, color: CustomTheme.blue),
-                    title: const Text('Notes'),
+                    title: Text(uiText(context, 'notes')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -485,7 +498,7 @@ class _MyChildrenState extends State<MyChildren> {
                       ),
                   ListTile(
                     leading: const Icon(Icons.timer, color: CustomTheme.blue),
-                    title: const Text('Absences'),
+                    title: Text(uiText(context, 'absences')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -507,7 +520,7 @@ class _MyChildrenState extends State<MyChildren> {
                   ListTile(
                     leading: const Icon(Icons.inventory_outlined,
                         color: CustomTheme.blue),
-                    title: const Text("Inscriptions"),
+                    title: Text(uiText(context, 'enrollmentHistory')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {

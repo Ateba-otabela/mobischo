@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobischo/components/screens/mobischo_ai.dart';
@@ -27,12 +28,20 @@ User _testUser() => User(
     );
 
 void main() {
-  test('posts bearer auth and recent conversation, then parses the reply', () async {
+  test('posts bearer auth and recent conversation, then parses the reply',
+      () async {
     final client = MockClient((request) async {
       expect(request.url.path, '/api/ai/chat');
       expect(request.headers['authorization'], 'Bearer test-session-token');
       final body = jsonDecode(request.body) as Map<String, dynamic>;
-      expect(body['message'], 'Question suivante');
+      expect(body['message'], contains('Question suivante'));
+      expect(body['message'], startsWith('Question suivante'));
+      expect(
+        body['message'],
+        endsWith(
+          'Please respond in English, regardless of the language of the question.',
+        ),
+      );
       final conversation = body['conversation'] as List<dynamic>;
       expect(conversation, hasLength(20));
       expect(conversation.first['text'], 'turn-2');
@@ -47,6 +56,7 @@ void main() {
     final reply = await service.sendMessage(
       user: _testUser(),
       message: 'Question suivante',
+      languageCode: 'en',
       conversation: List.generate(
         21,
         (index) => {'role': 'user', 'text': 'turn-${index + 1}'},
@@ -86,30 +96,37 @@ void main() {
     final responseCompleter = Completer<http.Response>();
     final requestCompleter = Completer<Map<String, dynamic>>();
     final client = MockClient((request) async {
-      if (request.method == 'GET' && request.url.path.endsWith('/conversations')) {
+      if (request.method == 'GET' &&
+          request.url.path.endsWith('/conversations')) {
         return http.Response(
           jsonEncode({'data': [], 'page': 1, 'has_more': false}),
           200,
         );
       }
-      if (request.method == 'POST' && request.url.path.endsWith('/conversations')) {
+      if (request.method == 'POST' &&
+          request.url.path.endsWith('/conversations')) {
         return http.Response(
           jsonEncode({'id': 7, 'title': 'Nouvelle conversation'}),
           201,
         );
       }
-      requestCompleter.complete(jsonDecode(request.body) as Map<String, dynamic>);
+      requestCompleter
+          .complete(jsonDecode(request.body) as Map<String, dynamic>);
       return responseCompleter.future;
     });
     final service = MobischoAiService(client: client);
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: Scaffold(
         body: MobischoAiScreen(user: _testUser(), aiService: service),
       ),
     ));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Bonjour 👋 Je suis Mobischo AI.'), findsOneWidget);
+    expect(
+        find.textContaining('Bonjour 👋 Je suis Mobischo AI.'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'Question de test');
     await tester.pump();
@@ -119,7 +136,10 @@ void main() {
     expect(find.text('Question de test'), findsOneWidget);
     expect(find.text('Mobischo AI écrit…'), findsOneWidget);
     final requestBody = await requestCompleter.future;
-    expect(requestBody['message'], 'Question de test');
+    expect(
+      requestBody['message'],
+      'Question de test\n\nRéponds en français, quelle que soit la langue de la question.',
+    );
 
     responseCompleter.complete(http.Response(
       jsonEncode({'success': true, 'message': 'Réponse IA de test'}),
@@ -136,11 +156,16 @@ void main() {
   testWidgets('loads a saved conversation when the AI screen opens',
       (tester) async {
     final client = MockClient((request) async {
-      if (request.method == 'GET' && request.url.path.endsWith('/conversations')) {
+      if (request.method == 'GET' &&
+          request.url.path.endsWith('/conversations')) {
         return http.Response(
           jsonEncode({
             'data': [
-              {'id': 41, 'title': 'Présence de la semaine', 'updated_at': '2026-09-27T10:00:00Z'}
+              {
+                'id': 41,
+                'title': 'Présence de la semaine',
+                'updated_at': '2026-09-27T10:00:00Z'
+              }
             ],
             'page': 1,
             'has_more': false,
@@ -174,6 +199,9 @@ void main() {
     final service = MobischoAiService(client: client);
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: Scaffold(
         body: MobischoAiScreen(user: _testUser(), aiService: service),
       ),
@@ -190,7 +218,7 @@ void main() {
     expect(find.byIcon(Icons.history), findsOneWidget);
     await tester.tap(find.text('Copier'));
     await tester.pump();
-    expect(find.text('Copied'), findsOneWidget);
+    expect(find.text('Copié'), findsOneWidget);
     client.close();
   });
 }

@@ -9,6 +9,7 @@ import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class CreateAbsenceScreen extends StatefulWidget {
   final Course course;
@@ -147,7 +148,7 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
     } else {
       setState(() => saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("L'appel n'a pas pu être enregistré.")),
+        SnackBar(content: Text(uiText(context, 'attendanceSaveFailed'))),
       );
     }
   }
@@ -161,21 +162,10 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
     if (parsed == null) {
       return date;
     }
-    const months = [
-      'janvier',
-      'février',
-      'mars',
-      'avril',
-      'mai',
-      'juin',
-      'juillet',
-      'août',
-      'septembre',
-      'octobre',
-      'novembre',
-      'décembre',
-    ];
-    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+    return DateFormat(
+      'd MMMM yyyy',
+      Localizations.localeOf(context).toString(),
+    ).format(parsed);
   }
 
   @override
@@ -201,7 +191,7 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(snapshot.data!.toUpperCase(),
                   style: Theme.of(context).textTheme.headlineMedium);
@@ -276,8 +266,8 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : student_list.isEmpty
-                    ? const Center(
-                        child: Text('Aucun élève trouvé pour cette matière'),
+                    ? Center(
+                        child: Text(uiText(context, 'noStudentsForSubject')),
                       )
                     : ListView.builder(
                         itemCount: student_list.length,
@@ -311,12 +301,24 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
-                                        _statusChoice(student.CodeEleve, status,
-                                            'P', 'Présent'),
-                                        _statusChoice(student.CodeEleve, status,
-                                            'A', 'Absent'),
-                                        _statusChoice(student.CodeEleve, status,
-                                            'R', 'En retard'),
+                                        _statusChoice(
+                                          student.CodeEleve,
+                                          status,
+                                          'P',
+                                          uiText(context, 'present'),
+                                        ),
+                                        _statusChoice(
+                                          student.CodeEleve,
+                                          status,
+                                          'A',
+                                          uiText(context, 'absentStatusLabel'),
+                                        ),
+                                        _statusChoice(
+                                          student.CodeEleve,
+                                          status,
+                                          'R',
+                                          uiText(context, 'lateStatusLabel'),
+                                        ),
                                       ],
                                     ),
                                   ),

@@ -11,6 +11,7 @@ import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class ConvocationDetail extends StatefulWidget {
   final Convocation convocation;
@@ -72,7 +73,7 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
           title: Text(widget.convocation.CodeEnseignement),
-          subtitle: const Text('Code Enseignement'),
+          subtitle: Text(uiText(context, 'codeTeaching')),
         ),
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
@@ -81,27 +82,27 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
                 CourseServices.getMainCourse(widget.convocation.CodeMatiere),
             builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
               if (snapshot.data == null) {
-                return const Text('Loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               }
               return Text(snapshot.data ?? '');
             },
           ),
-          subtitle: const Text('Matiere'),
+          subtitle: Text(uiText(context, 'subject')),
         ),
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
           title: Text(widget.convocation.motif),
-          subtitle: const Text('Motif'),
+          subtitle: Text(uiText(context, 'reason')),
         ),
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
           title: Text(widget.convocation.dateConvocation),
-          subtitle: const Text('Date de Convocation'),
+          subtitle: Text(uiText(context, 'convocationDateLabel')),
         ),
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
           title: Text(widget.convocation.created_at),
-          subtitle: const Text("Date de l'envoie"),
+          subtitle: Text(uiText(context, 'sentDate')),
         ),
         ListTile(
           leading: const Icon(Icons.security, color: CustomTheme.blue),
@@ -110,9 +111,9 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
                 (widget.convocation.teacherCode != null &&
                         widget.convocation.teacherCode!.isNotEmpty
                     ? widget.convocation.teacherCode!
-                    : 'Non disponible'),
+                    : uiText(context, 'notProvided')),
           ),
-          subtitle: const Text('Enseignant'),
+          subtitle: Text(uiText(context, 'teacher')),
         ),
       ],
     );
@@ -142,7 +143,7 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
               AsyncSnapshot<String> snapshot,
             ) {
               if (snapshot.data == null) {
-                return const Text('loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               } else {
                 return Text(
                   snapshot.data ?? "",

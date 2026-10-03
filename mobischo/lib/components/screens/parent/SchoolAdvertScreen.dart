@@ -6,6 +6,7 @@ import 'package:mobischo/components/screens/parent/institution_image.dart';
 import 'package:mobischo/models/institution.dart';
 import 'package:mobischo/services/institution_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class SchoolAdvertScreen extends StatefulWidget {
   final String userCode;
@@ -101,10 +102,15 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
 
   Widget _categoryChip(String label) {
     final selected = label == _selectedCategory;
+    final displayLabel = label == 'Tout'
+        ? uiText(context, 'all')
+        : label == 'Universitaires'
+            ? uiText(context, 'universityCategoryPlural')
+            : uiText(context, 'programs');
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
-        label: Text(label),
+        label: Text(displayLabel),
         selected: selected,
         selectedColor: CustomTheme.blue,
         backgroundColor: Colors.white,
@@ -138,8 +144,8 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Type d’établissement',
+                Text(
+                  uiText(context, 'institutionType'),
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
@@ -147,10 +153,10 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                   final isSelected = type == _selectedType;
                   return ListTile(
                     title: Text(type == 'Tout'
-                        ? 'Tout'
+                        ? uiText(context, 'all')
                         : type == 'public'
-                            ? 'Public'
-                            : 'Privé'),
+                            ? uiText(context, 'publicInstitution')
+                            : uiText(context, 'privateInstitution')),
                     trailing: isSelected
                         ? const Icon(Icons.check, color: CustomTheme.blue)
                         : null,
@@ -329,7 +335,9 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            institution.type == 'private' ? 'Privé' : 'Public',
+                            institution.type == 'private'
+                                ? uiText(context, 'privateInstitution')
+                                : uiText(context, 'publicInstitution'),
                             style: const TextStyle(
                                 color: Color(0xff1d7a48),
                                 fontSize: 11,
@@ -341,8 +349,8 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                           institution.category.toLowerCase() == 'secondaire' ||
                                   institution.category.toLowerCase() ==
                                       'secondaires'
-                              ? 'Formations'
-                              : 'Universitaire',
+                              ? uiText(context, 'programs')
+                              : uiText(context, 'universityCategory'),
                           style:
                               const TextStyle(color: Colors.grey, fontSize: 11),
                         ),
@@ -440,7 +448,7 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Rechercher des institutions',
+                        hintText: uiText(context, 'searchInstitutions'),
                         filled: true,
                         fillColor: Colors.white,
                         prefixIcon:
@@ -494,13 +502,12 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                                 const Icon(Icons.error_outline_rounded,
                                     size: 40, color: CustomTheme.blue),
                                 const SizedBox(height: 12),
-                                const Text(
-                                    'Impossible de charger les institutions pour le moment.'),
+                                Text(uiText(context, 'institutionsLoadError')),
                                 const SizedBox(height: 12),
                                 TextButton.icon(
                                   onPressed: _loadInstitutions,
                                   icon: const Icon(Icons.refresh),
-                                  label: const Text('Réessayer'),
+                                  label: Text(uiText(context, 'retry')),
                                 ),
                               ],
                             ),
@@ -538,12 +545,12 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                                     ),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      children: const [
+                                      children: [
                                         Icon(Icons.search_off_rounded,
                                             size: 42, color: CustomTheme.blue),
                                         SizedBox(height: 12),
                                         Text(
-                                          'Aucune institution trouvée',
+                                          uiText(context, 'noInstitutionFound'),
                                           style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w700,
@@ -560,7 +567,7 @@ class _SchoolAdvertScreenState extends State<SchoolAdvertScreen> {
                                   padding:
                                       const EdgeInsets.fromLTRB(16, 12, 16, 0),
                                   child: Text(
-                                    'Institutions à la une',
+                                    uiText(context, 'featuredInstitutions'),
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleLarge

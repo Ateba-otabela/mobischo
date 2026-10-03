@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/parent_absence_submission_service.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -91,7 +92,7 @@ class _NewAbsenceJustificationPageState
       initialDate: _selectedDate ?? today,
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
-      helpText: 'Sélectionnez la date de l’absence',
+      helpText: uiText(context, 'absenceDatePicker'),
     );
     if (picked != null && mounted) {
       setState(() => _selectedDate = DateUtils.dateOnly(picked));
@@ -118,11 +119,11 @@ class _NewAbsenceJustificationPageState
       final bytes = file.bytes;
       if (bytes == null) {
         debugPrint('Supporting document could not be read from the picker.');
-        _showMessage('Le document sélectionné n’a pas pu être lu.');
+        _showMessage(uiText(context, 'documentReadError'));
         return;
       }
       if (file.size > _maxDocumentSize) {
-        _showMessage('Le document ne doit pas dépasser 10 Mo.');
+        _showMessage(uiText(context, 'documentTooLarge'));
         return;
       }
 
@@ -133,12 +134,12 @@ class _NewAbsenceJustificationPageState
     } on PlatformException catch (error) {
       debugPrint('Picking supporting document failed (${error.code}).');
       if (mounted) {
-        _showMessage('Impossible de sélectionner ce document.');
+        _showMessage(uiText(context, 'documentSelectError'));
       }
     } on Exception catch (error) {
       debugPrint('Picking supporting document failed (${error.runtimeType}).');
       if (mounted) {
-        _showMessage('Impossible de sélectionner ce document.');
+        _showMessage(uiText(context, 'documentSelectError'));
       }
     } finally {
       if (mounted) {
@@ -176,12 +177,12 @@ class _NewAbsenceJustificationPageState
             color: CustomTheme.blue,
             size: 48,
           ),
-          title: const Text(
-            'Justification envoyée avec succès',
+          title: Text(
+            uiText(context, 'justificationSentSuccess'),
             textAlign: TextAlign.center,
           ),
-          content: const Text(
-            'Elle est en attente de vérification.',
+          content: Text(
+            uiText(context, 'awaitingVerification'),
             textAlign: TextAlign.center,
           ),
           actions: [
@@ -190,7 +191,7 @@ class _NewAbsenceJustificationPageState
                 Navigator.of(dialogContext).pop();
                 Navigator.of(context).pop(true);
               },
-              child: const Text('Retour à l’historique'),
+              child: Text(uiText(context, 'backToHistory')),
             ),
           ],
         ),
@@ -204,7 +205,7 @@ class _NewAbsenceJustificationPageState
       debugPrint('Justification submission failed (${error.runtimeType}).');
       if (mounted) {
         _showMessage(
-          'La justification n’a pas pu être envoyée. Vérifiez votre connexion et réessayez.',
+          uiText(context, 'justificationSubmissionError'),
         );
       }
     } finally {
@@ -227,7 +228,7 @@ class _NewAbsenceJustificationPageState
       appBar: AppBar(
         backgroundColor: CustomTheme.blue,
         foregroundColor: Colors.white,
-        title: const Text('NOUVELLE JUSTIFICATION'),
+        title: Text(uiText(context, 'newJustification')),
       ),
       body: SafeArea(
         child: Column(
@@ -236,25 +237,28 @@ class _NewAbsenceJustificationPageState
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
                 children: [
-                  const _StepHeading(
+                  _StepHeading(
                     number: '1',
-                    title: 'Sélectionnez votre enfant',
+                    title: uiText(context, 'selectYourChild'),
                   ),
                   const SizedBox(height: 10),
                   _buildChildrenStep(),
                   if (_selectedChild != null) ...[
                     const SizedBox(height: 22),
-                    const _StepHeading(
+                    _StepHeading(
                       number: '2',
-                      title: 'Date de l’absence',
+                      title: uiText(context, 'absenceDate'),
                     ),
                     const SizedBox(height: 10),
                     _buildAbsenceDateStep(),
                   ],
                   if (_selectedDate != null) ...[
                     const SizedBox(height: 22),
-                    const _StepHeading(
-                        number: '3', title: 'Motif et explication'),
+                    _StepHeading(
+                      number: '3',
+                      title:
+                          '${uiText(context, 'reason')} et ${uiText(context, 'explanation')}',
+                    ),
                     const SizedBox(height: 10),
                     _buildReasonForm(),
                   ],
@@ -278,17 +282,17 @@ class _NewAbsenceJustificationPageState
         if (snapshot.hasError) {
           return _ParentMessageCard(
             icon: Icons.cloud_off_outlined,
-            message: 'Impossible de charger vos enfants pour le moment.',
-            actionLabel: 'Réessayer',
+            message: uiText(context, 'childrenLoadError'),
+            actionLabel: uiText(context, 'retry'),
             onAction: _reloadChildren,
           );
         }
 
         final children = snapshot.data ?? const <Student>[];
         if (children.isEmpty) {
-          return const _ParentMessageCard(
+          return _ParentMessageCard(
             icon: Icons.family_restroom,
-            message: 'Aucun enfant n’est associé à votre compte.',
+            message: uiText(context, 'noChildLinked'),
           );
         }
 
@@ -297,7 +301,7 @@ class _NewAbsenceJustificationPageState
             student: _selectedChild!,
             selected: true,
             onTap: _changeChild,
-            trailingLabel: 'Changer',
+            trailingLabel: uiText(context, 'change'),
           );
         }
 
@@ -330,7 +334,7 @@ class _NewAbsenceJustificationPageState
         leading: const Icon(Icons.calendar_month, color: CustomTheme.blue),
         title: Text(
           selectedDate == null
-              ? 'Sélectionner une date'
+              ? uiText(context, 'selectDate')
               : _formatDate(selectedDate),
           style: TextStyle(
             color: selectedDate == null ? Colors.black54 : CustomTheme.dark,
@@ -358,21 +362,34 @@ class _NewAbsenceJustificationPageState
             children: [
               DropdownButtonFormField<String>(
                 value: _selectedReason,
-                decoration: const InputDecoration(
-                  labelText: 'Choisissez un motif *',
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'chooseReason'),
                   border: OutlineInputBorder(),
                 ),
                 items: _reasons
                     .map(
                       (reason) => DropdownMenuItem<String>(
                         value: reason,
-                        child: Text(reason),
+                        child: Text(
+                          uiText(
+                            context,
+                            reason == 'Maladie'
+                                ? 'reasonIllness'
+                                : reason == 'Rendez-vous médical'
+                                    ? 'reasonMedicalAppointment'
+                                    : reason == 'Raisons familiales'
+                                        ? 'reasonFamily'
+                                        : reason == 'Urgence familiale'
+                                            ? 'reasonFamilyEmergency'
+                                            : 'reasonOther',
+                          ),
+                        ),
                       ),
                     )
                     .toList(),
                 onChanged: (reason) => setState(() => _selectedReason = reason),
                 validator: (value) =>
-                    value == null ? 'Sélectionnez un motif.' : null,
+                    value == null ? uiText(context, 'selectReason') : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -381,8 +398,8 @@ class _NewAbsenceJustificationPageState
                 maxLines: 5,
                 maxLength: 500,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Expliquez brièvement la raison de l’absence *',
+                decoration: InputDecoration(
+                  labelText: uiText(context, 'absenceExplanationLabel'),
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                 ),
@@ -390,18 +407,18 @@ class _NewAbsenceJustificationPageState
                   final explanation = value?.trim() ?? '';
                   if (explanation.isEmpty) {
                     return _selectedReason == 'Autre'
-                        ? 'Expliquez le motif choisi.'
-                        : 'Ajoutez une explication.';
+                        ? uiText(context, 'explainChosenReason')
+                        : uiText(context, 'addExplanation');
                   }
                   if (explanation.length < 10) {
-                    return 'Ajoutez quelques détails (10 caractères minimum).';
+                    return uiText(context, 'addSomeDetails');
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 6),
               Text(
-                'Document justificatif (facultatif)',
+                uiText(context, 'optionalSupportingDocument'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -415,7 +432,7 @@ class _NewAbsenceJustificationPageState
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.attach_file),
-                  label: const Text('Ajouter un document ou une photo'),
+                  label: Text(uiText(context, 'addDocumentOrPhoto')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: CustomTheme.blue,
                     side: const BorderSide(color: CustomTheme.blue),
@@ -427,8 +444,8 @@ class _NewAbsenceJustificationPageState
               else
                 _buildSelectedDocument(),
               const SizedBox(height: 4),
-              const Text(
-                'PDF, JPG ou PNG · 10 Mo maximum',
+              Text(
+                uiText(context, 'fileSizeLimit'),
                 style: TextStyle(color: Colors.black54, fontSize: 12),
               ),
             ],
@@ -439,7 +456,7 @@ class _NewAbsenceJustificationPageState
   }
 
   Widget _buildSelectedDocument() {
-    final name = _documentName ?? 'Document sélectionné';
+    final name = _documentName ?? uiText(context, 'selectedDocument');
     final isImage = name.toLowerCase().endsWith('.jpg') ||
         name.toLowerCase().endsWith('.jpeg') ||
         name.toLowerCase().endsWith('.png');
@@ -475,7 +492,7 @@ class _NewAbsenceJustificationPageState
             ),
           ),
           IconButton(
-            tooltip: 'Supprimer le document',
+            tooltip: uiText(context, 'deleteDocument'),
             onPressed: () => setState(() {
               _documentBytes = null;
               _documentName = null;
@@ -513,8 +530,8 @@ class _NewAbsenceJustificationPageState
                     color: Colors.white,
                   ),
                 )
-              : const Text(
-                  'ENVOYER LA JUSTIFICATION',
+              : Text(
+                  uiText(context, 'sendJustification').toUpperCase(),
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
         ),
@@ -616,7 +633,13 @@ class _ChildTile extends StatelessWidget {
         ),
         subtitle: student.CodeClasse.trim().isEmpty
             ? null
-            : Text('Classe ${student.CodeClasse}'),
+            : Text(uiText(
+                context,
+                'classLabel',
+                parameters: <String, String>{
+                  'className': student.CodeClasse,
+                },
+              )),
         trailing: trailingLabel != null
             ? Text(
                 trailingLabel!,

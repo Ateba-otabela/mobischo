@@ -5,6 +5,7 @@ import 'package:flutter/src/foundation/key.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/models/HistoriqueInscription.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
@@ -87,7 +88,7 @@ class _HistoriqueInscriptionDetailsState
               AsyncSnapshot<String> snapshot,
             ) {
               if (snapshot.data == null) {
-                return const Text('loading ...');
+                return Text(uiText(context, 'loadingEllipsis'));
               } else {
                 return Text(
                   snapshot.data ?? "",
@@ -102,12 +103,12 @@ class _HistoriqueInscriptionDetailsState
             leading:
                 const Icon(Icons.inventory_outlined, color: CustomTheme.blue),
             title: Text(widget.inscription.NUMFAC),
-            subtitle: const Text('Numero de Facture'),
+            subtitle: Text(uiText(context, 'invoiceNumber')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
             title: Text(widget.inscription.libinscrip),
-            subtitle: const Text("Libelle Inscription"),
+            subtitle: Text(uiText(context, 'registrationLabel')),
           ),
           ListTile(
             leading: const Icon(Icons.person, color: CustomTheme.blue),
@@ -116,13 +117,13 @@ class _HistoriqueInscriptionDetailsState
                   StudentServices.getMainStudent(widget.inscription.CodeEleve),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Eleve'),
+            subtitle: Text(uiText(context, 'studentName')),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book, color: CustomTheme.blue),
@@ -130,36 +131,36 @@ class _HistoriqueInscriptionDetailsState
               future: CourseServices.getMainClass(widget.student.CodeClasse),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Classe'),
+            subtitle: Text(uiText(context, 'className')),
           ),
           ListTile(
             leading: const Icon(Icons.monetization_on_sharp,
                 color: CustomTheme.blue),
             title: Text("${widget.inscription.Montantins} FCFA"),
-            subtitle: const Text("Montant d'Inscription"),
+            subtitle: Text(uiText(context, 'registrationAmount')),
           ),
           ListTile(
             leading: const Icon(Icons.monetization_on_rounded,
                 color: CustomTheme.blue),
             title: Text("${widget.inscription.Avance} FCFA"),
-            subtitle: const Text("Avance"),
+            subtitle: Text(uiText(context, 'advance')),
           ),
           ListTile(
             leading: const Icon(Icons.monetization_on_outlined,
                 color: CustomTheme.blue),
             title: Text("${widget.inscription.Reste} FCFA"),
-            subtitle: const Text("Reste"),
+            subtitle: Text(uiText(context, 'remaining')),
           ),
           ListTile(
             leading: const Icon(Icons.monetization_on, color: CustomTheme.blue),
             title: Text("${widget.inscription.Montantt} FCFA"),
-            subtitle: const Text("Montant Total"),
+            subtitle: Text(uiText(context, 'totalAmount')),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_month, color: CustomTheme.blue),
@@ -168,24 +169,24 @@ class _HistoriqueInscriptionDetailsState
                   AcademicServices.getMainYear(widget.inscription.codeannee),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text("Annee Scholaire"),
+            subtitle: Text(uiText(context, 'schoolYear')),
           ),
           ListTile(
             leading: const Icon(Icons.timer, color: CustomTheme.blue),
             title: Text("${widget.inscription.heure} FCFA"),
-            subtitle: const Text("Heure D'inscription"),
+            subtitle: Text(uiText(context, 'time')),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_month_rounded,
                 color: CustomTheme.blue),
             title: Text("${widget.inscription.DateInscription} FCFA"),
-            subtitle: const Text("Date d'Inscription"),
+            subtitle: Text(uiText(context, 'enrollmentDate')),
           ),
         ],
       ),

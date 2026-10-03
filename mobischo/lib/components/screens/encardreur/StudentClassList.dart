@@ -4,6 +4,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/students/ClassStudents.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:flutter/material.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
@@ -87,11 +88,11 @@ class _StudentClassListScreenState extends State<StudentClassListScreen> {
                         children: <Widget>[
                           ListTile(
                             title: Text(
-                              "CHOISISEZ UNE CLASSE",
+                              uiText(context, 'chooseClass'),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             subtitle: Text(
-                              "Cliquez sur la classe pour continuer",
+                              uiText(context, 'tapClassToContinue'),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             trailing: const Image(
@@ -121,7 +122,14 @@ class _StudentClassListScreenState extends State<StudentClassListScreen> {
                               ),
                               title: Text(snapshot.data[index].LibelleClasse),
                               subtitle: Text(
-                                'Code Classe : ${snapshot.data[index].CodeClasse}',
+                                uiText(
+                                  context,
+                                  'classCode',
+                                  parameters: {
+                                    'code':
+                                        '${snapshot.data[index].CodeClasse}',
+                                  },
+                                ),
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                               trailing: const Icon(Icons.arrow_forward_ios),

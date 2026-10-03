@@ -11,6 +11,7 @@ import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class CreateConvocation extends StatefulWidget {
   final User user;
@@ -83,12 +84,15 @@ class _CreateConvocationState extends State<CreateConvocation> {
   List<DropdownMenuItem> motifs() {
     ListMotifs.clear();
     ListMotifs.add(DropdownMenuItem(
-        value: "Insubordination", child: Text('Insurbodination')));
+        value: "Insubordination",
+        child: Text(uiText(context, 'insubordination'))));
     ListMotifs.add(DropdownMenuItem(
-        value: "Retards Abusive", child: Text('Retard Abusive')));
-    ListMotifs.add(
-        DropdownMenuItem(value: "Indiscipline", child: Text('Indiscipline')));
-    ListMotifs.add(DropdownMenuItem(value: "Autre", child: Text('Autre')));
+        value: "Retards Abusive",
+        child: Text(uiText(context, 'excessiveLateness'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Indiscipline", child: Text(uiText(context, 'indiscipline'))));
+    ListMotifs.add(DropdownMenuItem(
+        value: "Autre", child: Text(uiText(context, 'otherReason'))));
     return ListMotifs;
   }
 
@@ -116,7 +120,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                 AsyncSnapshot<String> snapshot,
               ) {
                 if (snapshot.data == null) {
-                  return const Text('loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(
                     snapshot.data ?? "",
@@ -186,17 +190,17 @@ class _CreateConvocationState extends State<CreateConvocation> {
               height: MediaQuery.of(context).size.height * 0.8,
               child: Column(
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-                    child: Text('Sélectionner les élèves'),
+                    child: Text(uiText(context, 'selectStudents')),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: TextField(
                       controller: searchController,
                       onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Rechercher par nom',
+                      decoration: InputDecoration(
+                        labelText: uiText(context, 'searchByName'),
                         prefixIcon: Icon(Icons.search),
                       ),
                     ),
@@ -207,7 +211,10 @@ class _CreateConvocationState extends State<CreateConvocation> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${_selectedStudentCodes.length} / ${_availableStudents.length} élèves sélectionnés',
+                          uiText(context, 'selectedStudentsCount', parameters: {
+                            'selected': '${_selectedStudentCodes.length}',
+                            'total': '${_availableStudents.length}',
+                          }),
                         ),
                         TextButton(
                           onPressed: () {
@@ -224,8 +231,8 @@ class _CreateConvocationState extends State<CreateConvocation> {
                           child: Text(
                             _selectedStudentCodes.length ==
                                     _availableStudents.length
-                                ? 'Tout désélectionner'
-                                : 'Tout sélectionner',
+                                ? uiText(context, 'deselectAll')
+                                : uiText(context, 'selectAll'),
                           ),
                         ),
                       ],
@@ -263,7 +270,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                                   .contains(student.CodeEleve))
                               .toList(),
                         ),
-                        child: const Text('Continuer'),
+                        child: Text(uiText(context, 'continueButton')),
                       ),
                     ),
                   ),
@@ -314,10 +321,16 @@ class _CreateConvocationState extends State<CreateConvocation> {
                     Image(image: AssetImage('assets/images/avatar-s-19.jpg')),
                 title: Text(
                   _selectedStudentCodes.isEmpty
-                      ? '0 / ${_availableStudents.length} élèves sélectionnés'
-                      : '${_selectedStudentCodes.length} / ${_availableStudents.length} élèves sélectionnés',
+                      ? uiText(context, 'selectedStudentsCount', parameters: {
+                          'selected': '0',
+                          'total': '${_availableStudents.length}',
+                        })
+                      : uiText(context, 'selectedStudentsCount', parameters: {
+                          'selected': '${_selectedStudentCodes.length}',
+                          'total': '${_availableStudents.length}',
+                        }),
                 ),
-                subtitle: const Text('Sélectionner les élèves',
+                subtitle: Text(uiText(context, 'selectStudents'),
                     style: TextStyle(
                       color: CustomTheme.blue,
                     )),
@@ -343,7 +356,9 @@ class _CreateConvocationState extends State<CreateConvocation> {
                   children: [
                     ListTile(
                       leading: Icon(Icons.calendar_month),
-                      title: Text(date.isEmpty ? 'Date de convocation' : date),
+                      title: Text(date.isEmpty
+                          ? uiText(context, 'conveningDate')
+                          : date),
                       onTap: () {
                         _selectDate(context);
                       },
@@ -364,7 +379,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                           // Navigator.pop(context);
                         },
                         elevation: 10,
-                        hint: const Text('Matiere'),
+                        hint: Text(uiText(context, 'subject')),
                       ),
                     ),
                     Padding(
@@ -382,7 +397,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                           // Navigator.pop(context);
                         },
                         elevation: 10,
-                        hint: const Text('Motif de convocation'),
+                        hint: Text(uiText(context, 'conveningReason')),
                       ),
                     ),
                     Padding(
@@ -390,7 +405,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                       child: TextField(
                         controller: description,
                         decoration: InputDecoration(
-                          labelText: 'Description',
+                          labelText: uiText(context, 'description'),
                           // border: OutlineInputBorder(),
                         ),
                         maxLines: 5, // <-- SEE HERE
@@ -401,7 +416,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
                       padding:
                           const EdgeInsets.only(left: 17, right: 17, top: 30),
                       child: CustomButton(
-                        text: "Convoquer",
+                        text: uiText(context, 'convoke'),
                         loading: _isSaving,
                         onPress: () {
                           if (motif == null ||
@@ -410,8 +425,8 @@ class _CreateConvocationState extends State<CreateConvocation> {
                               date.isEmpty ||
                               _selectedStudentCodes.isEmpty) {
                             Fluttertoast.showToast(
-                              msg:
-                                  "Sélectionnez au moins un élève et remplissez tous les champs",
+                              msg: uiText(
+                                  context, 'selectStudentAndCompleteFields'),
                               toastLength: Toast.LENGTH_LONG,
                               gravity: ToastGravity.BOTTOM,
                               fontSize: 16.0,
@@ -454,13 +469,13 @@ class _CreateConvocationState extends State<CreateConvocation> {
       _isSaving = false;
     });
     if (widget.returnToList && success) {
-      Fluttertoast.showToast(msg: 'Convocation enregistrée avec succès');
+      Fluttertoast.showToast(msg: uiText(context, 'convocationSaved'));
       Navigator.pop(context, true);
       return;
     }
     if (!success) {
       Fluttertoast.showToast(
-        msg: 'Échec de l’enregistrement. Vérifiez les champs et réessayez.',
+        msg: uiText(context, 'convocationSaveFailed'),
         toastLength: Toast.LENGTH_LONG,
       );
       return;

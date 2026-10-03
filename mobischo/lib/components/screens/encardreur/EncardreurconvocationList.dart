@@ -8,6 +8,7 @@ import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class EncardreurConvocationList extends StatefulWidget {
   final User user;
@@ -143,7 +144,8 @@ class _EncardreurConvocationListState extends State<EncardreurConvocationList> {
                                   image:
                                       AssetImage('assets/images/landing5.png'),
                                 ),
-                                title: const Text('Eleves Convoques'),
+                                title:
+                                    Text(uiText(context, 'studentsToConvene')),
                                 subtitle: Text(
                                   'Cliquez pour plus de details',
                                   style: Theme.of(context).textTheme.bodyMedium,
@@ -237,7 +239,8 @@ class convocationList extends StatelessWidget {
                                           AsyncSnapshot<String> snapshot,
                                         ) {
                                           if (snapshot.data == null) {
-                                            return const Text('loading ...');
+                                            return Text(uiText(
+                                                context, 'loadingEllipsis'));
                                           } else {
                                             return Text(
                                               snapshot.data ?? "",
@@ -260,8 +263,15 @@ class convocationList extends StatelessWidget {
                               ),
                               children: <Widget>[
                                 ListTile(
-                                  title: Text(
-                                      'Convoqué le ${snapshot.data[index].dateConvocation} pour ${snapshot.data[index].motif}'),
+                                  title: Text(uiText(
+                                    context,
+                                    'convocationDateReason',
+                                    parameters: {
+                                      'date':
+                                          snapshot.data[index].dateConvocation,
+                                      'reason': snapshot.data[index].motif,
+                                    },
+                                  )),
                                   trailing: const Icon(Icons.arrow_forward),
                                   onTap: () {
                                     Navigator.push(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
 class UserDetailScreen extends StatefulWidget {
@@ -72,7 +73,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios),
         ),
         centerTitle: true,
-        title: const Text('Details Utilisateur'),
+        title: Text(uiText(context, 'userDetails')),
         // actions: [
         //   IconButton(
         //     onPressed: () {},
@@ -97,7 +98,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     widget.user.code,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  subtitle: const Text('Code Enseignant',
+                  subtitle: Text(uiText(context, 'teacherCode'),
                       style: TextStyle(color: Colors.grey)),
                   // trailing: const Icon(Icons.edit),
                   onTap: () {},
@@ -155,7 +156,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     '${widget.user.nom} ${widget.user.prenom}',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  subtitle: const Text('Noms et Prenoms',
+                  subtitle: Text(uiText(context, 'firstAndLastNames'),
                       style: TextStyle(color: Colors.grey)),
                   // trailing: const Icon(Icons.edit),
                   onTap: () {},
@@ -177,8 +178,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     getGender(widget.user.sex),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  subtitle:
-                      const Text('Genre', style: TextStyle(color: Colors.grey)),
+                  subtitle: Text(uiText(context, 'gender'),
+                      style: const TextStyle(color: Colors.grey)),
                   // trailing: const Icon(Icons.edit),
                   onTap: () {},
                 ),

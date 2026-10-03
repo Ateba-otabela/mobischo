@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/devoir.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/devoir_service.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -45,12 +46,16 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
 
   Future<void> _loadCourses() async {
     try {
-      final courses = await CourseServices.getTeacherCoursesForNotes(widget.user.code);
-      for (final classCode in courses.map((course) => course.CodeClasse).toSet()) {
+      final courses =
+          await CourseServices.getTeacherCoursesForNotes(widget.user.code);
+      for (final classCode
+          in courses.map((course) => course.CodeClasse).toSet()) {
         _classLabels[classCode] = await CourseServices.getMainClass(classCode);
       }
-      for (final subjectCode in courses.map((course) => course.CodeMatiere).toSet()) {
-        _subjectLabels[subjectCode] = await CourseServices.getMainCourse(subjectCode);
+      for (final subjectCode
+          in courses.map((course) => course.CodeMatiere).toSet()) {
+        _subjectLabels[subjectCode] =
+            await CourseServices.getMainCourse(subjectCode);
       }
       if (!mounted) return;
       setState(() {
@@ -64,7 +69,7 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Impossible de charger vos classes et matières.';
+        _error = uiText(context, 'courseLoadError');
       });
     }
   }
@@ -100,7 +105,7 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
       if (!mounted) return;
       setState(() {
         _loadingDevoirs = false;
-        _error = 'Impossible de charger les devoirs.';
+        _error = uiText(context, 'requestFailedTryAgain');
       });
     }
   }
@@ -117,28 +122,33 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
       context: context,
       builder: (dialogContext) {
         bool submitting = false;
-        final dialogNavigator = Navigator.of(dialogContext, rootNavigator: true);
+        final dialogNavigator =
+            Navigator.of(dialogContext, rootNavigator: true);
         final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Nouveau devoir'),
+            title: Text(uiText(context, 'newHomework')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Titre'),
+                    decoration: InputDecoration(
+                      labelText: uiText(context, 'title'),
+                    ),
                   ),
                   TextField(
                     controller: descriptionController,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Description'),
+                    decoration: InputDecoration(
+                      labelText: uiText(context, 'description'),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Date limite de remise'),
+                    title: Text(uiText(context, 'homeworkDueDate')),
                     subtitle: Text(_formatDate(selectedDate)),
                     trailing: const Icon(Icons.calendar_today_outlined),
                     onTap: submitting
@@ -160,8 +170,10 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: submitting ? null : () => Navigator.pop(dialogContext, false),
-                child: const Text('Annuler'),
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: Text(uiText(context, 'cancel')),
               ),
               ElevatedButton(
                 onPressed: submitting
@@ -170,12 +182,16 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
                         if (titleController.text.trim().isEmpty) {
                           if (!mounted) return;
                           scaffoldMessenger?.showSnackBar(
-                            const SnackBar(content: Text('Le titre est obligatoire.')),
+                            SnackBar(
+                              content: Text(
+                                  uiText(context, 'homeworkTitleRequired')),
+                            ),
                           );
                           return;
                         }
                         setDialogState(() => submitting = true);
-                        final success = await DevoirServices.createTeacherDevoir(
+                        final success =
+                            await DevoirServices.createTeacherDevoir(
                           teacherCode: widget.user.code,
                           codeEnseignement: course.CodeEnseignement,
                           titre: titleController.text.trim(),
@@ -189,7 +205,10 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
                           setDialogState(() => submitting = false);
                           if (!mounted) return;
                           scaffoldMessenger?.showSnackBar(
-                            const SnackBar(content: Text('Le devoir n\'a pas pu être créé.')),
+                            SnackBar(
+                              content: Text(
+                                  uiText(context, 'homeworkCreationFailed')),
+                            ),
                           );
                         }
                       },
@@ -199,7 +218,7 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Enregistrer'),
+                    : Text(uiText(context, 'save')),
               ),
             ],
           ),
@@ -212,7 +231,7 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
 
     if (created == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Devoir créé avec succès.')),
+        SnackBar(content: Text(uiText(context, 'homeworkCreated'))),
       );
       await _loadDevoirs();
     }
@@ -224,24 +243,23 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
     return '${date.year}-$month-$day';
   }
 
-  String _classLabel(String code) => _classLabels[code]?.isNotEmpty == true
-      ? _classLabels[code]!
-      : code;
+  String _classLabel(String code) =>
+      _classLabels[code]?.isNotEmpty == true ? _classLabels[code]! : code;
 
-  String _subjectLabel(String code) => _subjectLabels[code]?.isNotEmpty == true
-      ? _subjectLabels[code]!
-      : code;
+  String _subjectLabel(String code) =>
+      _subjectLabels[code]?.isNotEmpty == true ? _subjectLabels[code]! : code;
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: CustomTheme.blue));
+      return const Center(
+          child: CircularProgressIndicator(color: CustomTheme.blue));
     }
     if (_error != null && _courses.isEmpty) {
       return Center(child: Text(_error!, textAlign: TextAlign.center));
     }
     if (_courses.isEmpty) {
-      return const Center(child: Text('Aucune classe ne vous est actuellement attribuée.'));
+      return Center(child: Text(uiText(context, 'noAssignedClasses')));
     }
 
     return Scaffold(
@@ -261,11 +279,13 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
               children: [
                 DropdownButtonFormField<String?>(
                   value: _selectedClassCode,
-                  decoration: const InputDecoration(labelText: 'Classe'),
+                  decoration: InputDecoration(
+                    labelText: uiText(context, 'className'),
+                  ),
                   items: [
-                        const DropdownMenuItem<String?>(
+                        DropdownMenuItem<String?>(
                           value: null,
-                          child: Text('Sélectionnez une classe'),
+                          child: Text(uiText(context, 'selectClass')),
                         ),
                       ] +
                       _classCodes
@@ -296,11 +316,13 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<Course?>(
                   value: _selectedCourse,
-                  decoration: const InputDecoration(labelText: 'Matière'),
+                  decoration: InputDecoration(
+                    labelText: uiText(context, 'subject'),
+                  ),
                   items: [
-                    const DropdownMenuItem<Course?>(
+                    DropdownMenuItem<Course?>(
                       value: null,
-                      child: Text('Sélectionnez une matière'),
+                      child: Text(uiText(context, 'selectSubject')),
                     ),
                     ...(_selectedClassCode == null
                             ? <Course>[]
@@ -332,20 +354,24 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
             ),
           ),
           if (_loadingDevoirs)
-            const Expanded(child: Center(child: CircularProgressIndicator(color: CustomTheme.blue)))
-          else if (_error != null)
-            Expanded(child: Center(child: Text(_error!, textAlign: TextAlign.center)))
-          else if (_selectedCourse == null)
             const Expanded(
+                child: Center(
+                    child: CircularProgressIndicator(color: CustomTheme.blue)))
+          else if (_error != null)
+            Expanded(
+                child:
+                    Center(child: Text(_error!, textAlign: TextAlign.center)))
+          else if (_selectedCourse == null)
+            Expanded(
               child: Center(
-                child: Text('Sélectionnez une matière pour afficher les devoirs récents.'),
+                child: Text(uiText(context, 'selectSubjectForHomework')),
               ),
             )
           else if (_devoirs.isEmpty)
             Expanded(
               child: Center(
                 child: Text(
-                  'Aucun devoir précédent pour cette classe et cette matière.',
+                  uiText(context, 'noPreviousHomework'),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -359,10 +385,13 @@ class _TeacherDevoirsScreenState extends State<TeacherDevoirsScreen> {
                   final devoir = _devoirs[index];
                   return Card(
                     child: ListTile(
-                      leading: const Icon(Icons.assignment_outlined, color: CustomTheme.blue),
+                      leading: const Icon(Icons.assignment_outlined,
+                          color: CustomTheme.blue),
                       title: Text(devoir.titre),
                       subtitle: Text(
-                        'Date limite de remise : ${devoir.dateDuDevoir}\n${devoir.description}',
+                        '${uiText(context, 'dueDate', parameters: <String, String>{
+                              'date': devoir.dateDuDevoir
+                            })}\n${devoir.description}',
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),

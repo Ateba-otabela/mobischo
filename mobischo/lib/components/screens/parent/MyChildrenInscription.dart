@@ -7,6 +7,7 @@ import 'package:mobischo/components/screens/parent/InscriptionDetails.dart';
 import 'package:mobischo/models/inscription.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/inscription_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/utils/student_display_name.dart';
@@ -164,7 +165,10 @@ class _MyChildrenInscriptionsState extends State<MyChildrenInscriptions> {
                                           AsyncSnapshot<String> snapshot,
                                         ) {
                                           if (snapshot.data == null) {
-                                            return const Text('loading ...');
+                                            return Text(
+                                              uiText(
+                                                  context, 'loadingEllipsis'),
+                                            );
                                           } else {
                                             return Text(
                                                 "Montant : ${snapshot.data!.toUpperCase()} FCFA",
@@ -220,7 +224,7 @@ class _MyChildrenInscriptionsState extends State<MyChildrenInscriptions> {
                       Icons.person,
                       color: CustomTheme.blue,
                     ),
-                    title: const Text('Details'),
+                    title: Text(uiText(context, 'details')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {
@@ -242,7 +246,7 @@ class _MyChildrenInscriptionsState extends State<MyChildrenInscriptions> {
                       Icons.inventory_outlined,
                       color: CustomTheme.blue,
                     ),
-                    title: const Text("Historique de Paiements"),
+                    title: Text(uiText(context, 'paymentHistory')),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       if (isLoaded == true) {

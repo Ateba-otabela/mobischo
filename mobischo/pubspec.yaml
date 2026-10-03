@@ -29,11 +29,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   animated_splash_screen:
   http: ^0.13.3
   fluttertoast: ^8.2.5
   bottom_bar_with_sheet: ^2.4.0
-  intl: ^0.18.1
+  intl: ^0.17.0
   curved_navigation_bar: ^1.0.3 #latest version
   flutter_launcher_icons: "^0.10.0"
   google_mobile_ads: ^0.13.5

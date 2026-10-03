@@ -7,12 +7,15 @@ import 'package:mobischo/home.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/welcome.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class ChangePasswordSuccess extends StatefulWidget {
   final User user;
   final bool returnToLogin;
   // final Course course;
-  const ChangePasswordSuccess({Key? key, required this.user, this.returnToLogin = false}) : super(key: key);
+  const ChangePasswordSuccess(
+      {Key? key, required this.user, this.returnToLogin = false})
+      : super(key: key);
 
   @override
   State<ChangePasswordSuccess> createState() => _ChangePasswordSuccessState();
@@ -76,12 +79,12 @@ class _ChangePasswordSuccessState extends State<ChangePasswordSuccess> {
             child: Column(
               children: [
                 Text(
-                  "MOT DE PASSE MODIFIÉ AVEC SUCCES",
+                  uiText(context, 'passwordUpdatedSuccess'),
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
                 Text(
-                  "Cliquez sur Aceuil pour retourner",
+                  uiText(context, 'pageHome'),
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),

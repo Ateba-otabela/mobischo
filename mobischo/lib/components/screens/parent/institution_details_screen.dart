@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobischo/components/screens/parent/institution_image.dart';
 import 'package:mobischo/models/institution.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,9 +25,7 @@ class InstitutionDetailsScreen extends StatelessWidget {
     if (!await launchUrl(parsed, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Impossible d’ouvrir le site web de l’établissement.')),
+          SnackBar(content: Text(uiText(context, 'institutionWebsiteError'))),
         );
       }
     }
@@ -34,12 +33,13 @@ class InstitutionDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final typeLabel =
-        institution.type.toLowerCase() == 'private' ? 'Privée' : 'Publique';
+    final typeLabel = institution.type.toLowerCase() == 'private'
+        ? uiText(context, 'privateInstitution')
+        : uiText(context, 'publicInstitution');
     final category = institution.category.toLowerCase();
     final categoryLabel = category == 'secondaire' || category == 'secondaires'
-        ? 'Formations'
-        : 'Universitaire';
+        ? uiText(context, 'programs')
+        : uiText(context, 'universityCategory');
 
     return Scaffold(
       backgroundColor: const Color(0xfff7faf7),
@@ -47,7 +47,7 @@ class InstitutionDetailsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
-        title: const Text('Institution',
+        title: Text(uiText(context, 'institution'),
             style: TextStyle(fontWeight: FontWeight.w700)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -114,16 +114,16 @@ class InstitutionDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   if (institution.location.isNotEmpty)
-                    _infoRow(Icons.location_on_outlined, 'Situé à',
-                        institution.location),
+                    _infoRow(Icons.location_on_outlined,
+                        uiText(context, 'locatedAt'), institution.location),
                   if (institution.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Description',
+                          Text(
+                            uiText(context, 'description'),
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -142,7 +142,7 @@ class InstitutionDetailsScreen extends StatelessWidget {
                     ),
                   const SizedBox(height: 18),
                   if (institution.programs.isNotEmpty)
-                    _sectionTitle('Filières'),
+                    _sectionTitle(uiText(context, 'programs')),
                   if (institution.programs.isNotEmpty)
                     Wrap(
                       spacing: 8,
@@ -155,7 +155,7 @@ class InstitutionDetailsScreen extends StatelessWidget {
                     ),
                   if (institution.languages.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    _sectionTitle('Langues'),
+                    _sectionTitle(uiText(context, 'languages')),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -173,7 +173,7 @@ class InstitutionDetailsScreen extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: () => _openWebsite(context),
                         icon: const Icon(Icons.language_rounded),
-                        label: const Text('Visiter le site'),
+                        label: Text(uiText(context, 'viewInstitutionWebsite')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: CustomTheme.blue,
                           foregroundColor: Colors.white,

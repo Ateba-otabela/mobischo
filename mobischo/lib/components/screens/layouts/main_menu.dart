@@ -14,6 +14,7 @@ import 'package:mobischo/home.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/services/students_services.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 // ignore: unused_import
 import 'package:mobischo/utils/custom_theme.dart';
 
@@ -73,9 +74,9 @@ class _MainMenuState extends State<MainMenu> {
       setState(() {
         courseNum = courses.length;
         if (widget.user.account_type == 'enseignant') {
-          title = "Nombre de Matieres";
+          title = uiText(context, 'mainMenuSubjectCount');
         } else {
-          title = "Nombre d'Enfants";
+          title = uiText(context, 'mainMenuChildrenCount');
         }
       });
     });
@@ -148,14 +149,15 @@ class _MainMenuState extends State<MainMenu> {
                                   ),
                                   ListTile(
                                     title: Text(
-                                      "REGISTRE D'APPEL",
+                                      uiText(
+                                          context, 'mainMenuAttendanceTitle'),
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context)
                                           .textTheme
                                           .headlineSmall,
                                     ),
                                     subtitle: Text(
-                                      'Ajoutez & Consultez',
+                                      uiText(context, 'mainMenuAddAndView'),
                                       textAlign: TextAlign.center,
                                       style:
                                           Theme.of(context).textTheme.bodySmall,
@@ -209,14 +211,15 @@ class _MainMenuState extends State<MainMenu> {
                                   ),
                                   ListTile(
                                     title: Text(
-                                      "MESSAGES",
+                                      uiText(context, 'mainMenuMessagesTitle'),
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context)
                                           .textTheme
                                           .headlineSmall,
                                     ),
-                                    subtitle: const Text(
-                                      'Messages aux parents',
+                                    subtitle: Text(
+                                      uiText(
+                                          context, 'mainMenuMessagesParents'),
                                       textAlign: TextAlign.center,
                                     ),
                                   ),
@@ -278,14 +281,14 @@ class _MainMenuState extends State<MainMenu> {
                                   ),
                                   ListTile(
                                     title: Text(
-                                      "NOTES",
+                                      uiText(context, 'mainMenuGradesTitle'),
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context)
                                           .textTheme
                                           .headlineSmall,
                                     ),
                                     subtitle: Text(
-                                      'Ajoutez & Consultez',
+                                      uiText(context, 'mainMenuAddAndView'),
                                       textAlign: TextAlign.center,
                                       style:
                                           Theme.of(context).textTheme.bodySmall,
@@ -340,14 +343,14 @@ class _MainMenuState extends State<MainMenu> {
                                   ),
                                   ListTile(
                                     title: Text(
-                                      'MATIERES',
+                                      uiText(context, 'mainMenuSubjectsTitle'),
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context)
                                           .textTheme
                                           .headlineSmall,
                                     ),
-                                    subtitle: const Text(
-                                      'Consultez',
+                                    subtitle: Text(
+                                      uiText(context, 'mainMenuView'),
                                       textAlign: TextAlign.center,
                                     ),
                                   ),
@@ -399,12 +402,12 @@ class _MainMenuState extends State<MainMenu> {
                         ),
                         ListTile(
                           title: Text(
-                            'DEVOIRS',
+                            uiText(context, 'mainMenuHomeworkTitle'),
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                          subtitle: const Text(
-                            'Ajoutez et consultez',
+                          subtitle: Text(
+                            uiText(context, 'mainMenuAddAndView'),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -475,14 +478,15 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "DEVOIR & MESSAGE",
+                                        uiText(context,
+                                            'mainMenuHomeworkAndMessagesTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
                                       subtitle: Text(
-                                        'Ajoutez & Consultez',
+                                        uiText(context, 'mainMenuAddAndView'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
@@ -545,14 +549,15 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "RETARD ET ABSENCE",
+                                        uiText(context,
+                                            'mainMenuLateAndAbsenceTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
-                                      subtitle: const Text(
-                                        'consultez',
+                                      subtitle: Text(
+                                        uiText(context, 'mainMenuView'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -619,14 +624,14 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "NOTES",
+                                        uiText(context, 'mainMenuGradesTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
                                       subtitle: Text(
-                                        'Consultez',
+                                        uiText(context, 'mainMenuView'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
@@ -687,14 +692,15 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "SCOLARITE",
+                                        uiText(
+                                            context, 'mainMenuSchoolingTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
-                                      subtitle: const Text(
-                                        'Consultez',
+                                      subtitle: Text(
+                                        uiText(context, 'mainMenuView'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -754,7 +760,8 @@ class _MainMenuState extends State<MainMenu> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'JUSTIFIER UNE ABSENCE',
+                                    uiText(
+                                        context, 'mainMenuJustifyAbsenceTitle'),
                                     style: Theme.of(context)
                                         .textTheme
                                         .headlineSmall,
@@ -826,13 +833,13 @@ class _MainMenuState extends State<MainMenu> {
                               ),
                             ),
                             Text(
-                              'ÉCOLE / UNIVERSITÉ',
+                              uiText(context, 'mainMenuSchoolTitle'),
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Découvrez les écoles, universités et opportunités de formation.',
+                              uiText(context, 'mainMenuSchoolDescription'),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -895,14 +902,16 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "ENVOYER DES MESSAGES",
+                                        uiText(context,
+                                            'mainMenuSendMessagesTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
                                       subtitle: Text(
-                                        'Convoquez des parents',
+                                        uiText(
+                                            context, 'mainMenuConveneParents'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
@@ -958,14 +967,16 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "CONSULTEZ DES MESSAGES",
+                                        uiText(context,
+                                            'mainMenuViewMessagesTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
-                                      subtitle: const Text(
-                                        'Consultez les messages envoyees',
+                                      subtitle: Text(
+                                        uiText(context,
+                                            'mainMenuViewMessagesDescription'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -1027,14 +1038,15 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "LISTE D'ELEVES",
+                                        uiText(context,
+                                            'mainMenuStudentListTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
                                       subtitle: Text(
-                                        'Consultez',
+                                        uiText(context, 'mainMenuView'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
@@ -1088,14 +1100,14 @@ class _MainMenuState extends State<MainMenu> {
                                     ),
                                     ListTile(
                                       title: Text(
-                                        "MON COMPTE",
+                                        uiText(context, 'mainMenuAccountTitle'),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall,
                                       ),
-                                      subtitle: const Text(
-                                        'Consultez',
+                                      subtitle: Text(
+                                        uiText(context, 'mainMenuView'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),

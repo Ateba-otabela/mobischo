@@ -3,6 +3,7 @@ import 'package:mobischo/components/screens/parent/ParentConvocation.dart';
 import 'package:mobischo/models/devoir.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/devoir_service.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
@@ -60,7 +61,7 @@ class _DevoirsMessagesScreenState extends State<DevoirsMessagesScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: IconButton(
-                tooltip: 'Retour au tableau de bord',
+                tooltip: uiText(context, 'homeDashboardTooltip'),
                 icon: const Icon(Icons.arrow_back_ios),
                 color: CustomTheme.blue,
                 onPressed: widget.onBack ?? () => Navigator.of(context).pop(),
@@ -80,7 +81,7 @@ class _DevoirsMessagesScreenState extends State<DevoirsMessagesScreen> {
                   ? _HomeworkAssignments(
                       future: assignmentsFuture,
                       sortDirection: _homeworkSort,
-                      sortLabel: 'Trier les devoirs',
+                      sortLabel: uiText(context, 'sortHomework'),
                       onSortChanged: (sortDirection) {
                         setState(() => _homeworkSort = sortDirection);
                       },
@@ -90,7 +91,7 @@ class _DevoirsMessagesScreenState extends State<DevoirsMessagesScreen> {
                       isLoaded: false,
                       interstitialAd: null,
                       sortKey: _messagesSort.name,
-                      sortLabel: 'Trier les messages',
+                      sortLabel: uiText(context, 'sortMessages'),
                       onSortChanged: (sortKey) {
                         setState(() {
                           _messagesSort = sortKey == 'oldest'
@@ -131,9 +132,21 @@ class _Tabs extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
-          Expanded(child: _Tab(label: 'Devoirs', active: selectedTab == 0, onTap: () => onChanged(0))),
+          Expanded(
+            child: _Tab(
+              label: uiText(context, 'homeworkTab'),
+              active: selectedTab == 0,
+              onTap: () => onChanged(0),
+            ),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: _Tab(label: 'Messages', active: selectedTab == 1, onTap: () => onChanged(1))),
+          Expanded(
+            child: _Tab(
+              label: uiText(context, 'messages'),
+              active: selectedTab == 1,
+              onTap: () => onChanged(1),
+            ),
+          ),
         ],
       ),
     );
@@ -199,8 +212,9 @@ class _ChildFilter extends StatelessWidget {
           shrinkWrap: true,
           children: [
             ListTile(
-              title: const Text('Tous mes enfants'),
-              leading: const Icon(Icons.groups_outlined, color: CustomTheme.blue),
+              title: Text(uiText(context, 'allMyChildren')),
+              leading:
+                  const Icon(Icons.groups_outlined, color: CustomTheme.blue),
               onTap: () {
                 onSelected(null);
                 Navigator.pop(context);
@@ -209,7 +223,8 @@ class _ChildFilter extends StatelessWidget {
             ...students.map(
               (student) => ListTile(
                 title: Text(getStudentDisplayName(student)),
-                leading: const Icon(Icons.person_outline, color: CustomTheme.blue),
+                leading:
+                    const Icon(Icons.person_outline, color: CustomTheme.blue),
                 onTap: () {
                   onSelected(student);
                   Navigator.pop(context);
@@ -236,7 +251,7 @@ class _ChildFilter extends StatelessWidget {
                 children: [
                   Text(
                     selectedStudent == null
-                        ? 'Tous mes enfants'
+                        ? uiText(context, 'allMyChildren')
                         : getStudentDisplayName(selectedStudent!),
                     style: const TextStyle(
                       color: Color(0xFF1A1A1A),
@@ -245,8 +260,8 @@ class _ChildFilter extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Trier en fonction des enfants',
+                  Text(
+                    uiText(context, 'sortByChildren'),
                     style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 12),
                   ),
                 ],
@@ -267,7 +282,8 @@ class _HomeworkEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final illustrationSize = (constraints.maxWidth * 0.46).clamp(140.0, 180.0);
+        final illustrationSize =
+            (constraints.maxWidth * 0.46).clamp(140.0, 180.0);
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Container(
@@ -282,8 +298,8 @@ class _HomeworkEmptyState extends StatelessWidget {
                 children: [
                   _HomeworkIllustration(size: illustrationSize),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Aucun devoir disponible pour le moment.',
+                  Text(
+                    uiText(context, 'noHomeworkAvailable'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF424242),
@@ -294,8 +310,8 @@ class _HomeworkEmptyState extends StatelessWidget {
                   const SizedBox(height: 8),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 280),
-                    child: const Text(
-                      'Les devoirs de vos enfants apparaîtront ici dès qu\'ils seront publiés.',
+                    child: Text(
+                      uiText(context, 'homeworkWillAppear'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13),
                     ),
@@ -304,7 +320,7 @@ class _HomeworkEmptyState extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.tune, size: 18),
-                    label: const Text('Trier les devoirs'),
+                    label: Text(uiText(context, 'sortHomework')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: CustomTheme.blue,
                       foregroundColor: Colors.white,
@@ -366,7 +382,8 @@ class _HomeworkAssignments extends StatelessWidget {
       final third = parts[2];
       try {
         if (first.length == 4) {
-          return DateTime.parse('$first-${second.padLeft(2, '0')}-${third.padLeft(2, '0')}');
+          return DateTime.parse(
+              '$first-${second.padLeft(2, '0')}-${third.padLeft(2, '0')}');
         }
         if (third.length == 4) {
           return DateTime.parse('$third-${second.padLeft(2, '0')}-$first');
@@ -448,7 +465,11 @@ class _AssignmentCard extends StatelessWidget {
             if (assignment.dateDuDevoir.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(
-                'Date limite de remise : ${assignment.dateDuDevoir}',
+                uiText(
+                  context,
+                  'dueDate',
+                  parameters: <String, String>{'date': assignment.dateDuDevoir},
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -456,7 +477,14 @@ class _AssignmentCard extends StatelessWidget {
                 assignment.CodeClasse.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
-                'Matière : ${assignment.CodeMatiere}   Classe : ${assignment.CodeClasse}',
+                uiText(
+                  context,
+                  'subjectAndClass',
+                  parameters: <String, String>{
+                    'subject': assignment.CodeMatiere,
+                    'className': assignment.CodeClasse,
+                  },
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -484,14 +512,14 @@ class _SortButton extends StatelessWidget {
       onSelected: onSortChanged,
       offset: const Offset(0, -140),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      itemBuilder: (context) => const [
+      itemBuilder: (context) => [
         PopupMenuItem(
           value: _SortDirection.newest,
-          child: Text('Plus récent'),
+          child: Text(uiText(context, 'newestFirst')),
         ),
         PopupMenuItem(
           value: _SortDirection.oldest,
-          child: Text('Plus ancien'),
+          child: Text(uiText(context, 'oldestFirst')),
         ),
       ],
       child: Container(
@@ -541,24 +569,31 @@ class _HomeworkIllustration extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               boxShadow: const [
-                BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 4)),
+                BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 4)),
               ],
             ),
-            child: Icon(Icons.desktop_windows_outlined, size: size * 0.32, color: const Color(0xFF2E7D32)),
+            child: Icon(Icons.desktop_windows_outlined,
+                size: size * 0.32, color: const Color(0xFF2E7D32)),
           ),
           Positioned(
             bottom: size * 0.05,
-            child: Icon(Icons.school_outlined, size: size * 0.42, color: const Color(0xFF616161)),
+            child: Icon(Icons.school_outlined,
+                size: size * 0.42, color: const Color(0xFF616161)),
           ),
           Positioned(
             top: size * 0.03,
             right: size * 0.02,
-            child: Icon(Icons.chat_bubble_outline, size: size * 0.2, color: const Color(0xFF2E7D32)),
+            child: Icon(Icons.chat_bubble_outline,
+                size: size * 0.2, color: const Color(0xFF2E7D32)),
           ),
           Positioned(
             bottom: size * 0.02,
             left: size * 0.03,
-            child: Icon(Icons.local_florist_outlined, size: size * 0.22, color: const Color(0xFF66BB6A)),
+            child: Icon(Icons.local_florist_outlined,
+                size: size * 0.22, color: const Color(0xFF66BB6A)),
           ),
         ],
       ),

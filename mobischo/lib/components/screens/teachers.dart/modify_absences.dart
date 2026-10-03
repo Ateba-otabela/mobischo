@@ -8,6 +8,7 @@ import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/conduite_service.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 
 class ModifyAbsenceScreen extends StatefulWidget {
   final Course course;
@@ -154,7 +155,7 @@ class _ModifyAbsenceScreenState extends State<ModifyAbsenceScreen> {
             AsyncSnapshot<String> snapshot,
           ) {
             if (snapshot.data == null) {
-              return const Text('loading ...');
+              return Text(uiText(context, 'loadingEllipsis'));
             } else {
               return Text(
                 snapshot.data!.toUpperCase(),
@@ -165,7 +166,9 @@ class _ModifyAbsenceScreenState extends State<ModifyAbsenceScreen> {
         ),
         bottom: PreferredSize(
             preferredSize: Size.zero,
-            child: Text("Date : ${widget.currentDate}")),
+            child: Text(uiText(context, 'dateLabel', parameters: {
+              'date': widget.currentDate,
+            }))),
         centerTitle: true,
       ),
       body: Column(
@@ -200,7 +203,7 @@ class _ModifyAbsenceScreenState extends State<ModifyAbsenceScreen> {
                                 leading: const Image(
                                   image: AssetImage('assets/images/menu4.png'),
                                 ),
-                                title: const Text("MODIFIER LES ABSENCES"),
+                                title: Text(uiText(context, 'editAbsences')),
                                 subtitle: const Text(
                                     "Ne cochez que les eleves absents"),
                                 onTap: () {

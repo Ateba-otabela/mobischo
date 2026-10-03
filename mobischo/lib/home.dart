@@ -10,14 +10,17 @@ import 'package:mobischo/components/screens/teachers.dart/marks.dart';
 import 'package:mobischo/components/screens/users/user_list.dart';
 import 'package:mobischo/landing.dart';
 import 'package:mobischo/models/user.dart';
-import 'package:mobischo/utils/custom_theme.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class Home extends StatefulWidget {
   final User user;
   int selectedPage;
   final Widget? initialBody;
-  Home({Key? key, required this.user, required this.selectedPage, this.initialBody})
+  Home(
+      {Key? key,
+      required this.user,
+      required this.selectedPage,
+      this.initialBody})
       : super(key: key);
 
   @override

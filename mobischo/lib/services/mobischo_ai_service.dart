@@ -72,6 +72,7 @@ class MobischoAiService {
     required User user,
     required String message,
     required List<Map<String, String>> conversation,
+    String languageCode = 'fr',
     int? conversationId,
   }) async {
     final token = user.aiToken.trim();
@@ -91,8 +92,11 @@ class MobischoAiService {
       final recentConversation = conversation.length <= 20
           ? conversation
           : conversation.sublist(conversation.length - 20);
+      final languageInstruction = languageCode == 'en'
+          ? 'Please respond in English, regardless of the language of the question.'
+          : 'Réponds en français, quelle que soit la langue de la question.';
       final requestBody = <String, dynamic>{
-        'message': message,
+        'message': '$message\n\n$languageInstruction',
         'conversation': recentConversation,
         if (conversationId != null) 'conversation_id': conversationId,
       };

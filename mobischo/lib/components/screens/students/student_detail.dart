@@ -10,6 +10,7 @@ import 'package:mobischo/components/screens/students/StudentCourseList.dart';
 import 'package:mobischo/components/screens/teachers.dart/CreateConvocation.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/courses.dart';
 // ignore: unused_import
 import 'package:mobischo/services/services.dart';
@@ -106,17 +107,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         children: [
           ListTile(
             leading: const Icon(Icons.person, color: CustomTheme.blue),
-            subtitle: const Text('Noms et Prenoms'),
+            subtitle: Text(uiText(context, 'firstAndLastNames')),
           ),
           ListTile(
             leading: const Icon(Icons.male_outlined, color: CustomTheme.blue),
             title: Text(getGender(widget.student.Sex)),
-            subtitle: const Text('Genre'),
+            subtitle: Text(uiText(context, 'gender')),
           ),
           ListTile(
             leading: const Icon(Icons.code, color: CustomTheme.blue),
             title: Text(widget.student.CodeEleve),
-            subtitle: const Text('Code Eleve'),
+            subtitle: Text(uiText(context, 'studentCode')),
           ),
           ListTile(
             leading: const Icon(Icons.home_filled, color: CustomTheme.blue),
@@ -124,29 +125,29 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               future: CourseServices.getMainClass(widget.student.CodeClasse),
               builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
                 if (snapshot.data == null) {
-                  return const Text('Loading ...');
+                  return Text(uiText(context, 'loadingEllipsis'));
                 } else {
                   return Text(snapshot.data ?? "");
                 }
               },
             ),
-            subtitle: const Text('Classe'),
+            subtitle: Text(uiText(context, 'className')),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_month, color: CustomTheme.blue),
             title: Text(widget.student.DateNaissance),
-            subtitle: const Text("Date de Naissance"),
+            subtitle: Text(uiText(context, 'birthDate')),
           ),
           ListTile(
             leading: const Icon(Icons.gps_fixed, color: CustomTheme.blue),
             title: Text(widget.student.LieuNaissance),
-            subtitle: const Text("Lieu de Naissance"),
+            subtitle: Text(uiText(context, 'birthPlace')),
           ),
           ListTile(
               leading: const Icon(Icons.calendar_month_outlined,
                   color: CustomTheme.blue),
               title: Text(widget.student.dateinscription),
-              subtitle: const Text("Date d'Inscription"))
+              subtitle: Text(uiText(context, 'enrollmentDate')))
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -177,7 +178,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.menu_book, color: CustomTheme.blue),
-                      title: const Text('Notes'),
+                      title: Text(uiText(context, 'notes')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -197,7 +198,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ),
                     ListTile(
                       leading: const Icon(Icons.timer, color: CustomTheme.blue),
-                      title: const Text('Absences'),
+                      title: Text(uiText(context, 'absences')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -218,7 +219,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                         leading: const Icon(Icons.inventory_outlined,
                             color: CustomTheme.blue),
-                        title: const Text("Historiques d'Inscriptions"),
+                        title: Text(uiText(context, 'enrollmentHistory')),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
                           if (isLoaded == true) {
@@ -237,7 +238,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.menu_book, color: CustomTheme.blue),
-                      title: const Text("Matieres"),
+                      title: Text(uiText(context, 'subjectsLabel')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -254,7 +255,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.security, color: CustomTheme.blue),
-                      title: const Text("Couper une convocation"),
+                      title: Text(uiText(context, 'convoke')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -285,7 +286,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.menu_book, color: CustomTheme.blue),
-                      title: const Text('Notes'),
+                      title: Text(uiText(context, 'notes')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -309,7 +310,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         Icons.timer,
                         color: CustomTheme.blue,
                       ),
-                      title: const Text('Absences'),
+                      title: Text(uiText(context, 'absences')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -331,7 +332,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading: const Icon(Icons.inventory_outlined,
                           color: CustomTheme.blue),
-                      title: const Text("Historiques d'Inscriptions"),
+                      title: Text(uiText(context, 'enrollmentHistory')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -352,7 +353,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.menu_book, color: CustomTheme.blue),
-                      title: const Text("Matieres"),
+                      title: Text(uiText(context, 'subjectsLabel')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {
@@ -369,7 +370,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ListTile(
                       leading:
                           const Icon(Icons.security, color: CustomTheme.blue),
-                      title: const Text("Consulter les convocations"),
+                      title: Text(uiText(context, 'consultConvocations')),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         if (isLoaded == true) {

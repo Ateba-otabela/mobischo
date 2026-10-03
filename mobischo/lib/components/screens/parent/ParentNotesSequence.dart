@@ -3,6 +3,7 @@ import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/mark.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/models/student.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/year.dart';
 import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/services/courses.dart';
@@ -44,7 +45,8 @@ class ParentNotesYearScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _NotesHeader(title: 'Sélectionner une année', onBack: onBack),
+        _NotesHeader(
+            title: uiText(context, 'chooseSchoolYear'), onBack: onBack),
         Expanded(
           child: FutureBuilder<List<Year>>(
             future: AcademicServices.getYears(),
@@ -57,9 +59,9 @@ class ParentNotesYearScreen extends StatelessWidget {
                 snapshot.data ?? <Year>[],
               );
               if (years.isEmpty) {
-                return const _NotesMessage(
-                  title: 'Aucune année disponible',
-                  subtitle: 'Les années scolaires apparaîtront ici lorsqu’elles seront disponibles.',
+                return _NotesMessage(
+                  title: uiText(context, 'noSchoolYearAvailable'),
+                  subtitle: uiText(context, 'yearsWillAppear'),
                 );
               }
 
@@ -85,7 +87,7 @@ class ParentNotesYearScreen extends StatelessWidget {
                         year.Libelle,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Consulter les notes de cette année'),
+                      subtitle: Text(uiText(context, 'consultYearGrades')),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                       onTap: () => onYearSelected(year),
                     ),
@@ -112,8 +114,7 @@ class ParentNotesSequenceScreen extends StatefulWidget {
     required this.year,
     required this.onBack,
     required this.onSequenceSelected,
-  })
-      : super(key: key);
+  }) : super(key: key);
 
   @override
   State<ParentNotesSequenceScreen> createState() =>
@@ -135,7 +136,8 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
 
   Future<Map<int, bool>> _loadAvailability() async {
     final sequences = await _sequencesFuture;
-    final courses = await CourseServices.getClassCourses(widget.student.CodeClasse);
+    final courses =
+        await CourseServices.getClassCourses(widget.student.CodeClasse);
     final availability = <int, bool>{};
 
     await Future.wait(
@@ -164,7 +166,8 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
       unavailableSequence = null;
     });
 
-    final courses = await CourseServices.getClassCourses(widget.student.CodeClasse);
+    final courses =
+        await CourseServices.getClassCourses(widget.student.CodeClasse);
     final markLists = await Future.wait(
       courses.map(
         (course) => MarkServices.getSortedStudentMarks(
@@ -197,7 +200,7 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
       return Column(
         children: [
           _NotesHeader(
-            title: 'Sélectionner une séquence',
+            title: uiText(context, 'chooseSequence'),
             onBack: widget.onBack,
           ),
           const Expanded(
@@ -227,94 +230,95 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
     return Column(
       children: [
         _NotesHeader(
-          title: 'Sélectionner une séquence',
+          title: uiText(context, 'chooseSequence'),
           onBack: widget.onBack,
         ),
         Expanded(
           child: FutureBuilder<List<SequenceEvaluation>>(
-          future: _sequencesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final sequences = snapshot.data ?? <SequenceEvaluation>[];
-          if (sequences.isEmpty) {
-            return const _NotesMessage(
-              title: 'Aucune séquence disponible',
-              subtitle: 'Les séquences apparaîtront ici lorsqu’elles seront disponibles.',
-            );
-          }
-
-          return FutureBuilder<Map<int, bool>>(
-            future: _availabilityFuture,
-            builder: (context, availabilitySnapshot) {
-              if (availabilitySnapshot.connectionState ==
-                  ConnectionState.waiting) {
+            future: _sequencesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final availability = availabilitySnapshot.data ?? <int, bool>{};
-              return ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: sequences.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final sequence = sequences[index];
-                  final isAvailable =
-                      availability[sequence.CodeEvaluation] ?? false;
-                  final mutedColor = Colors.grey.shade600;
+              final sequences = snapshot.data ?? <SequenceEvaluation>[];
+              if (sequences.isEmpty) {
+                return _NotesMessage(
+                  title: uiText(context, 'noSequencesAvailable'),
+                  subtitle: uiText(context, 'sequencesWillAppear'),
+                );
+              }
 
-                  return Card(
-                    margin: EdgeInsets.zero,
-                    elevation: 1,
-                    color: isAvailable ? null : Colors.grey.shade100,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      leading: CircleAvatar(
-                        backgroundColor: isAvailable
-                            ? CustomTheme.blue
-                            : Colors.grey.shade400,
-                        child: Icon(
-                          isAvailable
-                              ? Icons.check_circle_outline
-                              : Icons.remove_circle_outline,
-                          color: Colors.white,
+              return FutureBuilder<Map<int, bool>>(
+                future: _availabilityFuture,
+                builder: (context, availabilitySnapshot) {
+                  if (availabilitySnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final availability =
+                      availabilitySnapshot.data ?? <int, bool>{};
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: sequences.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final sequence = sequences[index];
+                      final isAvailable =
+                          availability[sequence.CodeEvaluation] ?? false;
+                      final mutedColor = Colors.grey.shade600;
+
+                      return Card(
+                        margin: EdgeInsets.zero,
+                        elevation: 1,
+                        color: isAvailable ? null : Colors.grey.shade100,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: isAvailable
+                                ? CustomTheme.blue
+                                : Colors.grey.shade400,
+                            child: Icon(
+                              isAvailable
+                                  ? Icons.check_circle_outline
+                                  : Icons.remove_circle_outline,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(
+                            sequence.LibelleEvaluation,
+                            style: TextStyle(
+                              fontWeight: FontWeight.normal,
+                              color: isAvailable ? null : mutedColor,
+                            ),
+                          ),
+                          subtitle: Text(
+                            isAvailable
+                                ? 'Consulter les notes de ${sequence.LibelleEvaluation.toLowerCase()}'
+                                : 'Aucune note disponible',
+                            style: TextStyle(
+                              color: isAvailable ? null : mutedColor,
+                            ),
+                          ),
+                          trailing: Icon(
+                            isAvailable
+                                ? Icons.arrow_forward_ios
+                                : Icons.info_outline,
+                            size: 18,
+                            color: isAvailable ? null : mutedColor,
+                          ),
+                          onTap: () => _selectSequence(sequence),
                         ),
-                      ),
-                      title: Text(
-                        sequence.LibelleEvaluation,
-                        style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          color: isAvailable ? null : mutedColor,
-                        ),
-                      ),
-                      subtitle: Text(
-                        isAvailable
-                            ? 'Consulter les notes de ${sequence.LibelleEvaluation.toLowerCase()}'
-                            : 'Aucune note disponible',
-                        style: TextStyle(
-                          color: isAvailable ? null : mutedColor,
-                        ),
-                      ),
-                      trailing: Icon(
-                        isAvailable
-                            ? Icons.arrow_forward_ios
-                            : Icons.info_outline,
-                        size: 18,
-                        color: isAvailable ? null : mutedColor,
-                      ),
-                      onTap: () => _selectSequence(sequence),
-                    ),
+                      );
+                    },
                   );
                 },
               );
             },
-          );
-        },
           ),
         ),
       ],
@@ -339,77 +343,77 @@ class ParentSequenceMarksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-        children: [
-          _NotesHeader(title: sequence.LibelleEvaluation, onBack: onBack),
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            child: Text(
-              getStudentDisplayName(student),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+      children: [
+        _NotesHeader(title: sequence.LibelleEvaluation, onBack: onBack),
+        Container(
+          width: double.infinity,
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Text(
+            getStudentDisplayName(student),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          Expanded(
-            child: FutureBuilder<List<Course>>(
-              future: CourseServices.getClassCourses(student.CodeClasse),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+        ),
+        Expanded(
+          child: FutureBuilder<List<Course>>(
+            future: CourseServices.getClassCourses(student.CodeClasse),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                final courses = snapshot.data ?? <Course>[];
-                if (courses.isEmpty) {
-                  return const _NotesMessage(
-                    title: 'Aucune matière disponible',
-                    subtitle: 'Les matières de cet élève apparaîtront ici.',
-                  );
-                }
+              final courses = snapshot.data ?? <Course>[];
+              if (courses.isEmpty) {
+                return _NotesMessage(
+                  title: uiText(context, 'noSubjectsAvailable'),
+                  subtitle: uiText(context, 'subjectsWillAppear'),
+                );
+              }
 
-                return FutureBuilder<List<List<Mark>>>(
-                  future: Future.wait(
-                    courses.map(
-                      (course) => MarkServices.getSortedStudentMarks(
-                        student.CodeEleve,
-                        course.CodeEnseignement,
-                        sequence.CodeEvaluation.toString(),
-                        year.CodeAnnee.toString(),
-                      ),
+              return FutureBuilder<List<List<Mark>>>(
+                future: Future.wait(
+                  courses.map(
+                    (course) => MarkServices.getSortedStudentMarks(
+                      student.CodeEleve,
+                      course.CodeEnseignement,
+                      sequence.CodeEvaluation.toString(),
+                      year.CodeAnnee.toString(),
                     ),
                   ),
-                  builder: (context, marksSnapshot) {
-                    if (marksSnapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                ),
+                builder: (context, marksSnapshot) {
+                  if (marksSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                    final marksByCourse =
-                        marksSnapshot.data ?? <List<Mark>>[];
-                    final allMarks = marksByCourse.expand((marks) => marks).toList();
+                  final marksByCourse = marksSnapshot.data ?? <List<Mark>>[];
+                  final allMarks =
+                      marksByCourse.expand((marks) => marks).toList();
 
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: courses.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        if (index == courses.length) {
-                          return _MarksSummary(marks: allMarks);
-                        }
-                        return _CourseMarkCard(
-                          course: courses[index],
-                          marks: marksByCourse.length > index
-                              ? marksByCourse[index]
-                              : <Mark>[],
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: courses.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      if (index == courses.length) {
+                        return _MarksSummary(marks: allMarks);
+                      }
+                      return _CourseMarkCard(
+                        course: courses[index],
+                        marks: marksByCourse.length > index
+                            ? marksByCourse[index]
+                            : <Mark>[],
+                      );
+                    },
+                  );
+                },
+              );
+            },
           ),
-        ],
-      );
+        ),
+      ],
+    );
   }
 }
 
@@ -471,15 +475,15 @@ class _UnavailableSequenceMessage extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            const Text(
-              "Les notes de cette séquence n'ont pas encore été enregistrées.\nVeuillez revenir plus tard.",
+            Text(
+              uiText(context, 'sequenceMarksNotRecorded'),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back),
-              label: const Text('Retour'),
+              label: Text(uiText(context, 'returnBack')),
             ),
           ],
         ),
@@ -507,7 +511,7 @@ class _CourseMarkCard extends StatelessWidget {
         child: FutureBuilder<String>(
           future: CourseServices.getMainCourse(course.CodeMatiere),
           builder: (context, subjectSnapshot) {
-            final subject = subjectSnapshot.data ?? 'Matière';
+            final subject = subjectSnapshot.data ?? uiText(context, 'subject');
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -518,7 +522,7 @@ class _CourseMarkCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 if (marks.isEmpty)
                   Text(
-                    'Aucune note enregistrée',
+                    uiText(context, 'noMarksRecorded'),
                     style: Theme.of(context).textTheme.bodyMedium,
                   )
                 else
@@ -562,11 +566,11 @@ class _MarksSummary extends StatelessWidget {
     }
 
     if (usableMarks == 0 || totalCoefficients == 0) {
-      return const Card(
+      return Card(
         margin: EdgeInsets.zero,
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Aucune note disponible pour cette séquence.'),
+          padding: const EdgeInsets.all(16),
+          child: Text(uiText(context, 'noMarksForSubject')),
         ),
       );
     }
@@ -581,12 +585,30 @@ class _MarksSummary extends StatelessWidget {
           children: [
             const Divider(height: 1),
             const SizedBox(height: 14),
-            Text('Total coefficients : ${totalCoefficients.toStringAsFixed(2)}'),
+            Text(uiText(
+              context,
+              'totalCoefficients',
+              parameters: <String, String>{
+                'value': totalCoefficients.toStringAsFixed(2),
+              },
+            )),
             const SizedBox(height: 6),
-            Text('Total points       : ${totalPoints.toStringAsFixed(2)}'),
+            Text(uiText(
+              context,
+              'totalPoints',
+              parameters: <String, String>{
+                'value': totalPoints.toStringAsFixed(2),
+              },
+            )),
             const SizedBox(height: 6),
             Text(
-              'Average            : ${average.toStringAsFixed(2)} / 20',
+              uiText(
+                context,
+                'average',
+                parameters: <String, String>{
+                  'value': average.toStringAsFixed(2),
+                },
+              ),
               style: TextStyle(
                 color: average < 10 ? Colors.red : null,
                 fontWeight: FontWeight.bold,
@@ -655,7 +677,8 @@ class _NotesMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.event_note_outlined, size: 42, color: CustomTheme.blue),
+            const Icon(Icons.event_note_outlined,
+                size: 42, color: CustomTheme.blue),
             const SizedBox(height: 12),
             Text(
               title,

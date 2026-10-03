@@ -8,6 +8,7 @@ import 'package:mobischo/components/screens/parent/studentMarkList.dart';
 import 'package:mobischo/models/course.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/services/courses.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/utils/student_display_name.dart';
@@ -104,7 +105,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(snapshot.data ?? "");
                             }
@@ -118,7 +119,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                             AsyncSnapshot<String> snapshot,
                           ) {
                             if (snapshot.data == null) {
-                              return const Text('loading ...');
+                              return Text(uiText(context, 'loadingEllipsis'));
                             } else {
                               return Text(snapshot.data ?? "");
                             }
@@ -163,7 +164,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                 children: <Widget>[
                   ListTile(
                     leading: const Icon(Icons.inventory_outlined),
-                    title: const Text("Details"),
+                    title: Text(uiText(context, 'details')),
                     subtitle: const Text(
                       'Cliquez pour consulter',
                       style: TextStyle(color: CustomTheme.blue),
@@ -187,7 +188,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.menu_book),
-                    title: const Text('Notes'),
+                    title: Text(uiText(context, 'notes')),
                     subtitle: const Text(
                       'Cliquez pour consulter',
                       style: TextStyle(color: CustomTheme.blue),
@@ -212,7 +213,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.timer),
-                    title: const Text('Absences'),
+                    title: Text(uiText(context, 'absences')),
                     subtitle: const Text(
                       'Cliquez pour consulter',
                       style: TextStyle(color: CustomTheme.blue),

@@ -7,8 +7,11 @@ use App\Models\Eleve;
 use App\Models\EncadreurClasse;
 use App\Models\Enseignement;
 use App\Models\Convocation;
+use App\Models\Note;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EncadreurPrincipalScopeApiTest extends TestCase
@@ -201,6 +204,100 @@ class EncadreurPrincipalScopeApiTest extends TestCase
         $this->assertEquals('CL-A', $details->json('CodeClasse'));
     }
 
+    public function test_student_year_notes_are_filtered_to_the_requested_child_and_year(): void
+    {
+        Note::create([
+            'CodeEleve' => 'CHILD-A',
+            'CodeEnseignement' => 'COURSE-A',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-1',
+            'valeur' => '15',
+        ]);
+        Note::create([
+            'CodeEleve' => 'CHILD-B',
+            'CodeEnseignement' => 'COURSE-A',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-1',
+            'valeur' => '18',
+        ]);
+        Note::create([
+            'CodeEleve' => 'CHILD-A',
+            'CodeEnseignement' => 'COURSE-A',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-2',
+            'valeur' => '12',
+        ]);
+
+        $response = $this->postJson('/api/school_manager', [
+            'action' => 'GET_STUDENT_YEAR_MARKS',
+            'codeEleve' => 'CHILD-A',
+            'codeAnnee' => 'YEAR-1',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.CodeEleve', 'CHILD-A')
+            ->assertJsonPath('0.CodeAnnee', 'YEAR-1');
+    }
+
+    public function test_course_year_notes_are_filtered_to_the_requested_course_and_year(): void
+    {
+        Note::create([
+            'CodeEleve' => 'CHILD-A',
+            'CodeEnseignement' => 'COURSE-A',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-1',
+            'valeur' => '15',
+        ]);
+        Note::create([
+            'CodeEleve' => 'CHILD-B',
+            'CodeEnseignement' => 'COURSE-B',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-1',
+            'valeur' => '18',
+        ]);
+        Note::create([
+            'CodeEleve' => 'CHILD-A',
+            'CodeEnseignement' => 'COURSE-A',
+            'CodeEvaluation' => 'SEQ-1',
+            'CodeAnnee' => 'YEAR-2',
+            'valeur' => '12',
+        ]);
+
+        $response = $this->postJson('/api/school_manager', [
+            'action' => 'GET_COURSE_YEAR_MARKS',
+            'codeEnseignement' => 'COURSE-A',
+            'codeAnnee' => 'YEAR-1',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.CodeEnseignement', 'COURSE-A')
+            ->assertJsonPath('0.CodeAnnee', 'YEAR-1');
+    }
+
+    public function test_notes_loading_returns_an_empty_array_when_there_are_no_notes(): void
+    {
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_STUDENT_YEAR_MARKS',
+            'codeEleve' => 'CHILD-WITH-NO-NOTES',
+            'codeAnnee' => 'YEAR-1',
+        ])->assertOk()->assertExactJson([]);
+    }
+
+    public function test_bulk_notes_actions_reject_missing_scope_fields(): void
+    {
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_STUDENT_YEAR_MARKS',
+            'codeEleve' => 'CHILD-A',
+        ])->assertUnprocessable();
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_COURSE_YEAR_MARKS',
+            'codeAnnee' => 'YEAR-1',
+        ])->assertUnprocessable();
+    }
+
     public function test_principal_can_create_convocation_for_any_class_in_own_school_only(): void
     {
         [, $classB, $classOut] = $this->createSchoolClasses();
@@ -278,6 +375,7 @@ class EncadreurPrincipalScopeApiTest extends TestCase
             'CodeEleve' => 'ELE-B',
             'CodeEnseignement' => 'ENS-B',
             'CodeMatiere' => 'MAT-B',
+            'document_path' => null,
         ]);
 
         $crossSchoolResponse = $this->postJson('/api/school_manager', [
@@ -293,6 +391,69 @@ class EncadreurPrincipalScopeApiTest extends TestCase
 
         $crossSchoolResponse->assertForbidden();
         $this->assertSame(1, Convocation::where('code', 'PR-CONV')->count());
+    }
+
+    public function test_principal_convocation_attachment_is_stored_and_returned_in_listing(): void
+    {
+        [, $classB] = $this->createSchoolClasses();
+        Storage::fake('public');
+
+        User::create([
+            'code' => 'PR-FILE',
+            'nom' => 'Principal',
+            'prenom' => 'File',
+            'sex' => 'M',
+            'login' => 'principalfile',
+            'contacts' => '111',
+            'password' => bcrypt('secret'),
+            'account_type' => 'principal',
+            'admin' => false,
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+        Enseignement::create([
+            'CodeEnseignement' => 'ENS-FILE',
+            'CodeMatiere' => 'MAT-FILE',
+            'code' => 'TEACHER-FILE',
+            'CodeClasse' => $classB->CodeClasse,
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+        Eleve::create([
+            'CodeEleve' => 'ELE-FILE',
+            'CodeAnnee' => 'AN-1',
+            'CodeClasse' => $classB->CodeClasse,
+            'dateinscription' => '2024-09-01',
+            'Nom' => 'Student',
+            'Prenom' => 'Attachment',
+        ]);
+
+        $this->post('/api/school_manager', [
+            'action' => 'INSERT_CONVOCATION',
+            'code' => 'PR-FILE',
+            'CodeEleves' => json_encode(['ELE-FILE']),
+            'CodeClasse' => $classB->CodeClasse,
+            'CodeEnseignement' => 'ENS-FILE',
+            'motif' => 'Indiscipline',
+            'description' => 'Convocation with attachment',
+            'dateConvocation' => '2026-10-01',
+            'document' => UploadedFile::fake()->create(
+                'convocation.pdf',
+                16,
+                'application/pdf'
+            ),
+        ])->assertOk()->assertJsonPath('status', 'success');
+
+        $convocation = Convocation::where('code', 'PR-FILE')->firstOrFail();
+        $this->assertNotEmpty($convocation->document_path);
+        Storage::disk('public')->assertExists($convocation->document_path);
+
+        $listing = $this->postJson('/api/school_manager', [
+            'action' => 'GET_TEACHER_CONVOCATIONS',
+            'code' => 'PR-FILE',
+        ])->assertOk()->assertJsonCount(1);
+        $this->assertStringEndsWith(
+            Storage::disk('public')->url($convocation->document_path),
+            $listing->json('0.document_url')
+        );
     }
 
     public function test_encadreur_cannot_access_unassigned_class_details_or_cross_school_data(): void

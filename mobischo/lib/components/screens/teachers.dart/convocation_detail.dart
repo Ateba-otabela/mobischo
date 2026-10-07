@@ -12,6 +12,7 @@ import 'package:mobischo/services/services.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/l10n/ui_text.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ConvocationDetail extends StatefulWidget {
   final Convocation convocation;
@@ -34,6 +35,32 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
   int maxFailedLoadAttempts = 3;
 
   bool isLoaded = false;
+
+  Future<void> _openAttachedDocument() async {
+    final rawUrl = widget.convocation.documentUrl?.trim() ?? '';
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || !['http', 'https'].contains(uri.scheme.toLowerCase())) {
+      _showDocumentError();
+      return;
+    }
+
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        _showDocumentError();
+      }
+    } on Exception catch (error) {
+      debugPrint(
+          'Opening convocation attachment failed (${error.runtimeType}).');
+      _showDocumentError();
+    }
+  }
+
+  void _showDocumentError() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(uiText(context, 'documentOpenError'))),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -115,6 +142,12 @@ class _ConvocationDetailState extends State<ConvocationDetail> {
           ),
           subtitle: Text(uiText(context, 'teacher')),
         ),
+        if ((widget.convocation.documentUrl ?? '').trim().isNotEmpty)
+          ListTile(
+            leading: const Icon(Icons.attach_file, color: CustomTheme.blue),
+            title: Text(uiText(context, 'openAttachedDocument')),
+            onTap: _openAttachedDocument,
+          ),
       ],
     );
 

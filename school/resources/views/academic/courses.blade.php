@@ -2,6 +2,14 @@
 
 @section('body')
 
+@if ($errors->any())
+    <div class="alert alert-warning" role="alert">
+        @foreach ($errors->all() as $error)
+            <div>{{ $error }}</div>
+        @endforeach
+    </div>
+@endif
+
 @if (session()->has('message') )
 <div class="alert {{session('alert') ?? 'border-primary'}} alert-dismissible mb-2" role="alert">
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -106,7 +114,7 @@
             </thead>
             <tbody>
 
-                @foreach ($school->courses as $course)
+                @forelse ($school->courses as $course)
                 <tr>
                     <td>
                         {{ $course->CodeMatiere }}
@@ -345,7 +353,9 @@
                         </div> --}}
                     </td>
                 </tr>                
-                @endforeach
+                @empty
+                <tr><td colspan="4">Aucune matière enregistrée pour cet établissement.</td></tr>
+                @endforelse
 
 
             </tbody>

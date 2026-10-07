@@ -3,6 +3,7 @@
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/encardreur/createConvocation.dart';
 import 'package:mobischo/models/class.dart';
+import 'package:mobischo/models/student.dart';
 import 'package:mobischo/services/students_services.dart';
 import 'package:flutter/material.dart';
 import 'package:mobischo/models/user.dart';
@@ -14,6 +15,7 @@ class ChooseStudents extends StatefulWidget {
   final User user;
   final bool embedded;
   final void Function(BuildContext, List<Map>)? onCreate;
+  final void Function(BuildContext, List<Student>)? onCreateStudents;
 
   const ChooseStudents({
     Key? key,
@@ -21,6 +23,7 @@ class ChooseStudents extends StatefulWidget {
     required this.user,
     this.embedded = false,
     this.onCreate,
+    this.onCreateStudents,
   }) : super(key: key);
 
   @override
@@ -39,11 +42,13 @@ class _ChooseStudentsState extends State<ChooseStudents> {
 
   List<Map> students = [];
   List<Map> student_list = [];
+  List<Student> _loadedStudents = [];
 
   List<Map> create_list() {
     StudentServices.getCourseStudents(widget.classe.CodeClasse)
         .then((students) {
       print(students.length);
+      _loadedStudents = students;
       for (int i = 0; i < students.length; i++) {
         Map<String, dynamic> map = <String, dynamic>{
           "name": "${students[i].Nom} ${students[i].Prenom}",
@@ -69,6 +74,7 @@ class _ChooseStudentsState extends State<ChooseStudents> {
     StudentServices.getCourseStudents(widget.classe.CodeClasse)
         .then((students) {
       print(students.length);
+      _loadedStudents = students;
       for (int i = 0; i < students.length; i++) {
         Map<String, dynamic> map = <String, dynamic>{
           "name": "${students[i].Nom} ${students[i].Prenom}",
@@ -171,6 +177,23 @@ class _ChooseStudentsState extends State<ChooseStudents> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(uiText(context, 'selectAtLeastOneStudent'))),
       );
+      return;
+    }
+
+    if (widget.onCreateStudents != null) {
+      final selectedCodes = selectedStudents
+          .map((student) => student['CodeEleve']?.toString() ?? '')
+          .toSet();
+      final selectedRecords = _loadedStudents
+          .where((student) => selectedCodes.contains(student.CodeEleve))
+          .toList();
+      if (selectedRecords.length != selectedCodes.length) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(uiText(context, 'noStudentsAvailable'))),
+        );
+        return;
+      }
+      widget.onCreateStudents!(context, selectedRecords);
       return;
     }
 

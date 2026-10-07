@@ -12,6 +12,7 @@ class Convocation {
   String created_at;
   String? teacherCode;
   String? teacherName;
+  String? documentUrl;
 
   Convocation({
     required this.id,
@@ -25,6 +26,7 @@ class Convocation {
     required this.created_at,
     this.teacherCode,
     this.teacherName,
+    this.documentUrl,
   });
 
   factory Convocation.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,7 @@ class Convocation {
       created_at: json['created_at'] as String? ?? '',
       teacherCode: json['teacher_code']?.toString(),
       teacherName: json['teacher_name']?.toString(),
+      documentUrl: json['document_url']?.toString(),
     );
   }
 }

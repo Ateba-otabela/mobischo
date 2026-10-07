@@ -9,278 +9,248 @@ use App\Models\Classe;
 use Illuminate\Http\Request;
 use App\Models\Etablissement;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class EleveController extends Controller
 {
     //
 
-    public function add_student_home()
+    public function add_student_home(Request $request)
     {
-        $schools = Etablissement::all();
+        $schools = Etablissement::orderBy('Nom')->get();
+        $selectedSchoolCode = $request->query('CodeEtablissement');
         return view('students.add_student_home',compact(
-            'schools'
+            'schools',
+            'selectedSchoolCode'
         ));
     }
     public function add_student(Request $request)
     {
-        $students = array();
-        // $year = '';
-        // $class = '';
         $school = Etablissement::find($request->CodeEtablissement);
+        if (!$school) {
+            return redirect()->route('add_student_home')
+                ->withErrors(['CodeEtablissement' => 'Veuillez choisir un établissement existant.']);
+        }
+
         $years = Annee::all();
         $year = $years->first();
+        $classes = $school->classes()->orderBy('LibelleClasse')->get();
+        $class = null;
 
-        if($request->class){
-            $class = Classe::find($request->CodeClasse);
+        if ($classes->isEmpty()) {
+            return redirect()->route('add_student_home', [
+                'CodeEtablissement' => $school->CodeEtablissement,
+            ])
+                ->withErrors(['CodeEtablissement' => 'Aucune classe n’est enregistrée pour cet établissement.']);
         }
-        else{
-            $class = $school->classes->first();
+
+        if ($request->filled('CodeClasse')) {
+            $class = $classes->firstWhere('CodeClasse', $request->CodeClasse);
+            if (!$class) {
+                return redirect()->route('add_student_home')
+                    ->withErrors(['CodeClasse' => 'La classe choisie ne fait pas partie de cet établissement.']);
+            }
+        } else {
+            $class = $classes->first();
         }
-        
-        foreach($school->classes->first()->students as $student){
-            $students[] = $student;
-        } 
+
+        $students = $class
+            ? $class->students()->with(['classe', 'parent'])->get()
+            : collect();
 
         return view('students.add_student',compact(
             'class',
             'school',
             'years',
             'year',
-            'students'
+            'students',
+            'classes'
         ));
 
     }
 
     public function sorted_students(Request $request)
     {
-        // $students = array();
-        // dd($request);
-        $class = Classe::find($request->CodeClasse);
-        $year = Annee::find($request->CodeAnnee);
-
-        // dd($year);
-        $students = Eleve::where('CodeAnnee','=',$request->CodeAnnee)->where('CodeClasse','=',$class->CodeClasse)->get();
         $school = Etablissement::find($request->CodeEtablissement);
-        $years = Annee::all(); 
+        if (!$school) {
+            return redirect()->route('add_student_home')
+                ->withErrors(['CodeEtablissement' => 'Veuillez choisir un établissement existant.']);
+        }
+
+        $class = $school->classes()->where('CodeClasse', $request->CodeClasse)->first();
+        if (!$class) {
+            return redirect()->route('add_student_home')
+                ->withErrors(['CodeClasse' => 'La classe choisie ne fait pas partie de cet établissement.']);
+        }
+
+        $year = Annee::find($request->CodeAnnee);
+        if (!$year) {
+            return redirect()->route('add_student', [
+                'CodeEtablissement' => $school->CodeEtablissement,
+                'CodeClasse' => $class->CodeClasse,
+            ])->withErrors(['CodeAnnee' => 'Veuillez choisir une année scolaire existante.']);
+        }
+
+        $students = Eleve::where('CodeAnnee', $year->CodeAnnee)
+            ->where('CodeClasse', $class->CodeClasse)
+            ->whereHas('classe', function ($query) use ($school) {
+                $query->where('CodeEtablissement', $school->CodeEtablissement);
+            })
+            ->with(['classe', 'parent'])
+            ->get();
+        $years = Annee::all();
+        $classes = $school->classes()->orderBy('LibelleClasse')->get();
 
         return view('students.add_student',compact(
             'class',
             'year',
             'school',
             'years',
-            'students'
+            'students',
+            'classes'
         ));
 
     }
 
     public function import_students(Request $request)
     {
-        if($request->csv_file){
-            // dd('yes');
-            $filename = time().'.'.$request->csv_file->extension();
-            $path = $request->file('csv_file')->storeAs(
-                'eleves_imports',
-                $filename,
-                'public'
-            );
-            $new_path = Storage::url($path);
-
-            if (($open = fopen(public_path($new_path), "r")) !== FALSE){
-                $i=0;
-                while (($data = fgetcsv($open, 1000, ";")) !== FALSE){
-                    $current_student = Eleve::find(trim($data[0]));
-                    if($current_student){
-                        $current_student->delete();
-                    }
-                    
-                    if(isset($data[1])) {
-                        try{
-                            $codeannee = trim((int)$data[1]);   
-                        }catch(Exception $e){
-                            $codeannee = $i;
-                        }
-                        
-                    }else{
-                        $codeannee = $i;
-                    }
-
-                    if(isset($data[6])) {
-                        $date_of_birth = trim($data[6]);   
-                    }else{
-                        $date_of_birth = "";
-                    }
-                    
-                    if(isset($data[7])) {
-                        $place_of_birth = trim($data[7]);   
-                    }else{
-                        $place_of_birth = "";
-                    }
-
-                    if(isset($data[8])) {
-                        $sex = trim($data[8]);   
-                    }else{
-                        $sex = "";
-                    }
-
-                    if(isset($data[9])) {
-                        $nationalite = trim($data[9]);   
-                    }else{
-                        $nationalite = "";
-                    }
-                    if(isset($data[10])) {
-                        $date_inscription = trim($data[10]);   
-                    }else{
-                        $date_inscription = '2022-09-20 03:36:41';
-                    }
-                    if(isset($data[11])) {
-                        $photo = trim($data[11]);   
-                    }else{
-                        $photo = "";
-                    }
-                    if(isset($data[12])) {
-                        $excl = trim($data[12]);   
-                    }else{
-                        $excl = "";
-                    }
-                    if(isset($data[13])) {
-                        $nomp = trim($data[13]);   
-                    }else{
-                        $nomp = "";
-                    }
-                    if(isset($data[14])) {
-                        $telp = trim($data[14]);   
-                    }else{
-                        $telp = "";
-                    }
-                    if(isset($data[15])) {
-                        $nomm = trim($data[15]);   
-                    }else{
-                        $nomm = "";
-                    }
-                    if(isset($data[16])) {
-                        $region = trim($data[16]);   
-                    }else{
-                        $region = "";
-                    }
-                    if(isset($data[17])) {
-                        $depart = trim($data[17]);   
-                    }else{
-                        $depart = "";
-                    }
-                    if(isset($data[18])) {
-                        $religion = trim($data[18]);   
-                    }else{
-                        $religion = "";
-                    }
-                    if(isset($data[19])) {
-                        $sitreg = trim($data[19]);   
-                    }else{
-                        $sitreg = "";
-                    }
-                    if(isset($data[23])) {
-                        $activeeps = trim($data[23]);   
-                    }else{
-                        $activeeps = "";
-                    }
-                    if(isset($data[24])) {
-                        $profp = trim($data[14]);   
-                    }else{
-                        $profp = "";
-                    }
-                    if(isset($data[25])) {
-                        $nomt = trim($data[25]);   
-                    }else{
-                        $nomt = "";
-                    }
-                    if(isset($data[28])) {
-                        $profm = trim($data[28]);   
-                    }else{
-                        $profm = "";
-                    }
-                    if(isset($data[29])) {
-                        $address = trim($data[29]);   
-                    }else{
-                        $address = "";
-                    }
-                    if(isset($data[30])) {
-                        $telt = trim($data[30]);   
-                    }else{
-                        $telt = "";
-                    }
-                    if(isset($data[31])) {
-                        $personcon = trim($data[31]);   
-                    }else{
-                        $personcon = "";
-                    }
-                    if(isset($data[32])) {
-                        $reserve1 = trim($data[32]);   
-                    }else{
-                        $reserve1 = "";
-                    }
-                    if(isset($data[33])) {
-                        $reserve2 = trim($data[33]);   
-                    }else{
-                        $reserve2 = "";
-                    }
-                    if(isset($data[34])) {
-                        $reserve3 = trim($data[34]);   
-                    }else{
-                        $reserve3 = "";
-                    }
-                    if(isset($data[35])) {
-                        $reserve4 = trim($data[35]);   
-                    }else{
-                        $reserve4 = "";
-                    }
-                    
-
-                    $eleve = Eleve::create([
-                        'CodeEleve'=>trim($data[0]),
-                        'CodeAnnee'=>$codeannee,
-                        'CodeClasse'=>trim($data[2]),
-                        'CodeConduite'=>trim($data[3]),
-                        'Nom'=>trim($data[4]),
-                        'Prenom'=>trim($data[5]),
-                        'DateNaissance'=>$date_of_birth,
-                        'LieuNaissance'=>$place_of_birth,
-                        'Sex'=>$sex,
-                        'Nationalite'=>$nationalite,
-                        'dateinscription'=>$date_inscription,
-                        'photo'=>$photo,
-                        'Excl'=>$excl,
-                        'Nomp'=>$nomp,
-                        'TelP'=>$telp,
-                        'Image'=>'',
-                        'strimage'=>'',
-                        'Nomm'=>$nomm,
-                        'REGION'=>$region,
-                        'DEPART'=>$depart,
-                        'RELIGION'=>$religion,
-                        'SITREG'=>$sitreg,
-                        'ACTIVEEPS'=>$activeeps,
-                        'PROFP'=>$profp,
-                        'NOMT'=>$nomt,
-                        'PROFM'=>$profm,
-                        'ADRESSE'=>$address,
-                        'RESIDENT'=>'',
-                        'TELM'=>'',
-                        'TELT'=>$telt,
-                        'PERSONCON'=>$personcon,
-                        'RESERVE1'=>'',
-                        'RESERVE2'=>'',
-                        'RESERVE3'=>'',
-                        'RESERVE4'=>''
-                    ]);
-                    $i+=1;
-                    $eleve->save();       
-                    // dd(trim($data[0]));
-                    // $array[] = $data;
-                }
-                fclose($open);
+        $rows = $this->validateLegacyCsvRows($this->readLegacyCsvRows($request, 6, 36, [
+            0 => 'CodeEleve',
+            1 => 'CodeAnnee',
+            2 => 'CodeClasse',
+            3 => 'CodeConduite',
+            4 => 'Nom',
+            5 => 'Prenom',
+            6 => 'DateNaissance',
+            7 => 'LieuNaissance',
+            8 => 'Sex',
+            9 => 'Nationalite',
+            10 => 'dateinscription',
+            11 => 'photo',
+            12 => 'Excl',
+            13 => 'Nomp',
+            14 => 'TelP',
+            15 => 'Nomm',
+            16 => 'REGION',
+            17 => 'DEPART',
+            18 => 'RELIGION',
+            19 => 'SITREG',
+            23 => 'ACTIVEEPS',
+            24 => 'PROFP',
+            25 => 'NOMT',
+            28 => 'PROFM',
+            29 => 'ADRESSE',
+            30 => 'TELT',
+            31 => 'PERSONCON',
+            32 => 'RESERVE1',
+            33 => 'RESERVE2',
+            34 => 'RESERVE3',
+            35 => 'RESERVE4',
+        ]), [
+            0 => 'required|string|max:255',
+            1 => 'required|string|max:255',
+            2 => 'required|string|max:255',
+            3 => 'nullable|string|max:255',
+            4 => 'nullable|string|max:255',
+            5 => 'nullable|string|max:255',
+            6 => 'nullable|string|max:255',
+            7 => 'nullable|string|max:255',
+            8 => 'nullable|string|max:255',
+            9 => 'nullable|string|max:255',
+            10 => 'nullable|string|max:255',
+            11 => 'nullable|string|max:255',
+            12 => 'nullable|string|max:255',
+            13 => 'nullable|string|max:255',
+            14 => 'nullable|string|max:255',
+            15 => 'nullable|string|max:255',
+            16 => 'nullable|string|max:255',
+            17 => 'nullable|string|max:255',
+            18 => 'nullable|string|max:255',
+            19 => 'nullable|string|max:255',
+            20 => 'nullable|string|max:255',
+            21 => 'nullable|string|max:255',
+            22 => 'nullable|string|max:255',
+            23 => 'nullable|string|max:255',
+            24 => 'nullable|string|max:255',
+            25 => 'nullable|string|max:255',
+            26 => 'nullable|string|max:255',
+            27 => 'nullable|string|max:255',
+            28 => 'nullable|string|max:255',
+            29 => 'nullable|string|max:255',
+            30 => 'nullable|string|max:255',
+            31 => 'nullable|string|max:255',
+            32 => 'nullable|string|max:255',
+            33 => 'nullable|string|max:255',
+            34 => 'nullable|string|max:255',
+            35 => 'nullable|string|max:255',
+        ]);
+        foreach ($rows as $index => $row) {
+            if (!Annee::where('CodeAnnee', trim($row[1]))->exists()) {
+                return redirect('add_student_home')
+                    ->withErrors(['csv_file' => 'L’année scolaire de la ligne '.($index + 1).' n’existe pas.']);
             }
-        } 
-        return redirect('add_student')->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
+
+            if (!Classe::where('CodeClasse', trim($row[2]))->exists()) {
+                return redirect('add_student_home')
+                    ->withErrors(['csv_file' => 'La classe de la ligne '.($index + 1).' n’existe pas.']);
+            }
+        }
+
+        DB::transaction(function () use ($rows): void {
+            foreach ($rows as $data) {
+                $student = Eleve::firstOrNew(['CodeEleve' => $data[0]]);
+                $student->fill([
+                    'CodeAnnee' => $data[1],
+                    'CodeClasse' => $data[2],
+                ]);
+
+                $legacyFields = [
+                    3 => 'CodeConduite',
+                    4 => 'Nom',
+                    5 => 'Prenom',
+                    6 => 'DateNaissance',
+                    7 => 'LieuNaissance',
+                    8 => 'Sex',
+                    9 => 'Nationalite',
+                    10 => 'dateinscription',
+                    11 => 'photo',
+                    12 => 'Excl',
+                    13 => 'Nomp',
+                    14 => 'TelP',
+                    15 => 'Nomm',
+                    16 => 'REGION',
+                    17 => 'DEPART',
+                    18 => 'RELIGION',
+                    19 => 'SITREG',
+                    23 => 'ACTIVEEPS',
+                    24 => 'PROFP',
+                    25 => 'NOMT',
+                    28 => 'PROFM',
+                    29 => 'ADRESSE',
+                    30 => 'TELT',
+                    31 => 'PERSONCON',
+                    32 => 'RESERVE1',
+                    33 => 'RESERVE2',
+                    34 => 'RESERVE3',
+                    35 => 'RESERVE4',
+                ];
+
+                foreach ($legacyFields as $column => $field) {
+                    if (array_key_exists($column, $data)
+                        && (!$student->exists || $data[$column] !== '')) {
+                        $student->{$field} = $data[$column];
+                    }
+                }
+
+                if (!$student->exists && !array_key_exists(10, $data)) {
+                    $student->dateinscription = '2022-09-20 03:36:41';
+                }
+
+                $student->save();
+            }
+        });
+
+        return redirect('add_student_home')->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
     }
 
 }

@@ -93,11 +93,11 @@ class _teacherClassListState extends State<teacherClassList> {
                         children: <Widget>[
                           ListTile(
                             title: Text(
-                              "CHOISISEZ UNE CLASSE",
+                              uiText(context, 'chooseClassTitle').toUpperCase(),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             subtitle: Text(
-                              "Cliquez sur la classe pour continuer",
+                              uiText(context, 'selectClassToContinue'),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             trailing: const Image(

@@ -56,6 +56,14 @@ String uiText(
       return l10n.retryLoadingStudents;
     case 'noStudentsInClass':
       return l10n.noStudentsInClass;
+    case 'searchStudents':
+      return l10n.searchStudents;
+    case 'filterByGender':
+      return l10n.filterByGender;
+    case 'allStudents':
+      return l10n.allStudents;
+    case 'studentSearchEmpty':
+      return l10n.studentSearchEmpty;
     case 'searchColleague':
       return l10n.searchColleague;
     case 'noColleagueFound':
@@ -229,6 +237,10 @@ String uiText(
       return l10n.noStudentsForSubject;
     case 'present':
       return l10n.present;
+    case 'absentAttendance':
+      return l10n.absentAttendance;
+    case 'lateAttendance':
+      return l10n.lateAttendance;
     case 'absenceValidated':
       return l10n.absenceValidated;
     case 'dateOfCall':
@@ -424,6 +436,20 @@ String uiText(
       return l10n.allClasses;
     case 'notificationsEmpty':
       return l10n.notificationsEmpty;
+    case 'markNotificationRead':
+      return l10n.markNotificationRead;
+    case 'markAllNotificationsRead':
+      return l10n.markAllNotificationsRead;
+    case 'notificationUnread':
+      return l10n.notificationUnread;
+    case 'notificationRead':
+      return l10n.notificationRead;
+    case 'notificationLoadError':
+      return l10n.notificationLoadError;
+    case 'notificationClass':
+      return l10n.notificationClass;
+    case 'notificationBellTooltip':
+      return l10n.notificationBellTooltip;
     case 'messagesEmpty':
       return l10n.messagesEmpty;
     case 'requestFailedTryAgain':

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\PrincipalTeacherController;
 use App\Http\Controllers\NotificationDeviceController;
+use App\Http\Controllers\MobileNotificationController;
 use App\Services\FcmNotificationService;
 use App\Services\PrincipalContextService;
 
@@ -43,6 +44,15 @@ Route::post('/notifications/devices', [NotificationDeviceController::class, 'reg
     ->middleware(['auth:sanctum', 'throttle:60,1']);
 
 Route::delete('/notifications/devices', [NotificationDeviceController::class, 'revoke'])
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+
+Route::get('/notifications', [MobileNotificationController::class, 'index'])
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+
+Route::post('/notifications/read-all', [MobileNotificationController::class, 'markAllAsRead'])
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+
+Route::patch('/notifications/{notificationId}/read', [MobileNotificationController::class, 'markAsRead'])
     ->middleware(['auth:sanctum', 'throttle:60,1']);
 
 Route::get('/notification-diagnostic', function (Request $request, FcmNotificationService $fcm) {

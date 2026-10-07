@@ -78,12 +78,12 @@ class _AbsenceSuccessState extends State<AbsenceSuccess> {
                   child: Column(
                     children: [
                       Text(
-                        "ABSENCES ENREGISTREES AVEC SUCCES",
+                        uiText(context, 'absencesRecordedSuccessfully'),
                         style: Theme.of(context).textTheme.titleMedium,
                         textAlign: TextAlign.center,
                       ),
                       Text(
-                        "Cliquez sur Consulter pour voir la liste des absents",
+                        uiText(context, 'clickConsultToSeeAbsences'),
                         style: Theme.of(context).textTheme.bodySmall,
                         textAlign: TextAlign.center,
                       ),
@@ -91,7 +91,7 @@ class _AbsenceSuccessState extends State<AbsenceSuccess> {
                         height: 20,
                       ),
                       CustomButton(
-                          text: "Consulter",
+                          text: uiText(context, 'consult'),
                           onPress: () {
                             Navigator.push(
                                 context,
@@ -122,13 +122,13 @@ class _AbsenceSuccessState extends State<AbsenceSuccess> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                "Ca ne vous interesse pas ?",
+                                uiText(context, 'notInterested'),
                                 style: Theme.of(context).textTheme.bodySmall,
                                 textAlign: TextAlign.center,
                               ),
-                              const Text(
-                                'Aceuil',
-                                style: TextStyle(color: CustomTheme.blue),
+                              Text(
+                                uiText(context, 'home'),
+                                style: const TextStyle(color: CustomTheme.blue),
                               ),
                             ],
                           ),

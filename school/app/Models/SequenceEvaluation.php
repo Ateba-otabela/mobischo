@@ -10,6 +10,8 @@ class SequenceEvaluation extends Model
 {
     use HasFactory;
     protected $primaryKey = 'CodeEvaluation';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'CodeEvaluation',

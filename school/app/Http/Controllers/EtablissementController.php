@@ -8,6 +8,8 @@ use App\Models\Classroom;
 use Illuminate\Http\Request;
 use App\Models\Etablissement;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class EtablissementController extends Controller
 {
@@ -34,7 +36,7 @@ class EtablissementController extends Controller
     
     public function delete_school($school_id)
     {   
-        $school = Etablissement::find($school_id);
+        $school = Etablissement::findOrFail($school_id);
         $school->delete();
         return redirect('add_school')->with(['message'=>"L'etablissement a été supprimée avec succès",'alert'=>'border-info']);
     }
@@ -42,31 +44,32 @@ class EtablissementController extends Controller
     public function add_school_complete(Request $request)
     {   
         $validated = $request->validate([
-            'Nom' => 'required',
-            'Tel' => 'required',
-            'CodeEtablissement' => 'required',
-            'Adresse' => 'required',
-            'Fax' => 'required',
+            'Nom' => 'required|string',
+            'Tel' => 'required|string',
+            'CodeEtablissement' => 'required|string|unique:etablissements,CodeEtablissement',
+            'Adresse' => 'required|string',
+            'Fax' => 'required|string',
+            'RepPhoto' => 'nullable|image',
         ]);
 
         $school = Etablissement::create([
-            'Nom'=>$request->Nom,
-            'Tel'=>$request->Tel,
-            'CodeEtablissement'=>$request->CodeEtablissement,
-            'Adresse'=>$request->Adresse,
-            'Fax'=>$request->Fax,
+            'Nom' => $validated['Nom'],
+            'Tel' => $validated['Tel'],
+            'CodeEtablissement' => $validated['CodeEtablissement'],
+            'Adresse' => $validated['Adresse'],
+            'Fax' => $validated['Fax'],
                     
         ]);
         $school->save();
 
         if($request->RepPhoto){
-            $filename = time().'.'.$request->RepPhoto->extension();
+            $filename = time().'.'.$request->file('RepPhoto')->extension();
             $path = $request->file('RepPhoto')->storeAs(
                 'logo',
                 $filename,
                 'public'
             );
-            $school->RepPhoto=$path;
+            $school->REPPHOTO = $path;
             $school->save();
         }
 
@@ -75,16 +78,28 @@ class EtablissementController extends Controller
 
     public function save_school($school_id,Request $request)
     {   
-        $school = Etablissement::find($school_id);
-        $school->Nom = $request->Nom;
-        $school->Tel = $request->Tel;
-        $school->Adresse = $request->Adresse;
-        $school->Fax = $request->Fax;
-        $school->CodeEtablissement = $request->CodeEtablissement;
+        $school = Etablissement::findOrFail($school_id);
+        $validated = $request->validate([
+            'Nom' => 'required|string',
+            'Tel' => 'required|string',
+            'Adresse' => 'required|string',
+            'Fax' => 'required|string',
+            'CodeEtablissement' => [
+                'required',
+                'string',
+                Rule::unique('etablissements', 'CodeEtablissement')->ignore($school_id, 'CodeEtablissement'),
+            ],
+            'REPPHOTO' => 'nullable|image',
+        ]);
+        $school->Nom = $validated['Nom'];
+        $school->Tel = $validated['Tel'];
+        $school->Adresse = $validated['Adresse'];
+        $school->Fax = $validated['Fax'];
+        $school->CodeEtablissement = $validated['CodeEtablissement'];
         $school->save();
 
         if($request->REPPHOTO){
-            $filename = time().'.'.$request->REPPHOTO->extension();
+            $filename = time().'.'.$request->file('REPPHOTO')->extension();
             $path = $request->file('REPPHOTO')->storeAs(
                 'REPPHOTO',
                 $filename,
@@ -99,39 +114,31 @@ class EtablissementController extends Controller
 
     public function import_schools(Request $request)
     {
-        if($request->csv_file){
-            $filename = time().'.'.$request->csv_file->extension();
-            $path = $request->file('csv_file')->storeAs(
-                'etablissement_imports',
-                $filename,
-                'public'
-            );
-            $new_path = Storage::url($path);
-            // dd($new_path);
-            if (($open = fopen(public_path($new_path), "r")) !== FALSE){
-                while (($data = fgetcsv($open, 1000, ";")) !== FALSE){
-                    $current_school = Etablissement::find(trim($data[0]));
-                    if($current_school){
-                        $current_school->delete();
-                    }
-                    $school = Etablissement::create([
-                        'CodeEtablissement'=>trim($data[0]),
-                        'Pays'=>trim($data[1]),
-                        'Nom'=>trim($data[2]),
-                        'Adresse'=>'Yaounde',
-                        'Tel'=>trim($data[4]),
-                        'Fax'=>trim($data[3]),
-                        'REPPHOTO'=>NULL
-                    ]);
+        $rows = $this->validateLegacyCsvRows($this->readLegacyCsvRows($request, 5, 5, [
+            'CodeEtablissement', 'Pays', 'Nom', 'Fax', 'Tel',
+        ]), [
+            0 => 'required|string|max:255',
+            1 => 'required|string|max:255',
+            2 => 'required|string|max:255',
+            3 => 'required|string|max:255',
+            4 => 'required|string|max:255',
+        ]);
 
-                    $school->save();       
-                    // dd(trim($data[0]));
-                    // $array[] = $data;
-                }
-                fclose($open);
+        DB::transaction(function () use ($rows): void {
+            foreach ($rows as $data) {
+                Etablissement::updateOrCreate(
+                    ['CodeEtablissement' => $data[0]],
+                    [
+                        'Pays' => $data[1],
+                        'Nom' => $data[2],
+                        'Adresse' => 'Yaounde',
+                        'Fax' => $data[3],
+                        'Tel' => $data[4],
+                    ]
+                );
             }
-            
-        } 
+        });
+
         return redirect('add_school')->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
     }
 }

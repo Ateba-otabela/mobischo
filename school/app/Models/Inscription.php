@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Inscription extends Model
 {
     use HasFactory;
-    protected $primaryKey = 'CodeInscription';
+    protected $primaryKey = 'NUMFAC';
     public $incrementing = false;
 
     // In Laravel 6.0+ make sure to also set $keyType
@@ -40,7 +40,7 @@ class Inscription extends Model
 
     public function historique_inscriptions()
     {
-        return $this->hasMany(HistoriqueInscription::class,'NUMFAC');
+        return $this->hasMany(HistoriqueInscription::class, 'NUMFAC', 'NUMFAC');
     }
     /**
      * Get the tranche associated with the Inscription

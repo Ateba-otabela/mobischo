@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Classe;
-use App\Models\TeacherAttendance;
 use App\Models\User;
 use App\Services\EncadreurClassScope;
 use App\Services\PrincipalContextService;
@@ -123,6 +122,12 @@ class PrincipalTeacherController extends Controller
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
 
+        $teacherCode = trim($teacherCode);
+        $selectedClassCode = trim((string) $request->query('CodeClasse', ''));
+        if ($selectedClassCode === '') {
+            return response()->json(['message' => 'CodeClasse is required.'], 422);
+        }
+
         $schoolCode = (string) $context['school_code'];
         $classCodes = $context['role'] === 'encadreur'
             ? app(EncadreurClassScope::class)->assignedClassCodesForEncadreur($user)
@@ -131,11 +136,14 @@ class PrincipalTeacherController extends Controller
                 ->pluck('CodeClasse')
                 ->map(fn ($value) => (string) $value)
                 ->all();
+        if (!in_array($selectedClassCode, $classCodes, true)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
 
         $assignments = DB::table('enseignements as en')
             ->join('classes as cl', 'cl.CodeClasse', '=', 'en.CodeClasse')
             ->where('cl.CodeEtablissement', $schoolCode)
-            ->whereIn('en.CodeClasse', $classCodes)
+            ->where('en.CodeClasse', $selectedClassCode)
             ->where(function ($query) use ($schoolCode) {
                 $query->where('en.CodeEtablissement', $schoolCode)
                     ->orWhereNull('en.CodeEtablissement')
@@ -155,40 +163,58 @@ class PrincipalTeacherController extends Controller
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
 
-        $attendanceQuery = TeacherAttendance::query()
-            ->leftJoin('classes as cl', 'cl.CodeClasse', '=', 'teacher_attendances.CodeClasse')
-            ->leftJoin('matieres as ma', 'ma.CodeMatiere', '=', 'teacher_attendances.CodeMatiere')
-            ->where('teacher_attendances.CodeEtablissement', $schoolCode)
-            ->where('teacher_attendances.teacher_code', $teacherCode)
-            ->whereIn('teacher_attendances.CodeClasse', $classCodes)
+        $attendanceQuery = DB::table('conduites as co')
+            ->join('classes as cl', 'cl.CodeClasse', '=', 'co.CodeClasse')
+            ->leftJoin('matieres as ma', 'ma.CodeMatiere', '=', 'co.CodeMatiere')
+            ->leftJoin('eleves as el', function ($join) {
+                $join->on('el.CodeEleve', '=', 'co.CodeEleve')
+                    ->on('el.CodeClasse', '=', 'co.CodeClasse');
+            })
+            ->where('cl.CodeEtablissement', $schoolCode)
+            ->where('co.CodeClasse', $selectedClassCode)
+            ->whereIn('co.CodeEnseignement', $assignments->pluck('CodeEnseignement'))
             ->where(function ($query) use ($assignments) {
                 foreach ($assignments as $assignment) {
                     $query->orWhere(function ($assignmentQuery) use ($assignment) {
                         $assignmentQuery
-                            ->where('teacher_attendances.CodeEnseignement', $assignment->CodeEnseignement)
-                            ->where('teacher_attendances.CodeClasse', $assignment->CodeClasse);
+                            ->where('co.CodeEnseignement', $assignment->CodeEnseignement)
+                            ->where('co.CodeClasse', $assignment->CodeClasse);
 
                         if ($assignment->CodeMatiere === null || $assignment->CodeMatiere === '') {
-                            $assignmentQuery->whereNull('teacher_attendances.CodeMatiere');
+                            $assignmentQuery->whereNull('co.CodeMatiere');
                         } else {
-                            $assignmentQuery->where('teacher_attendances.CodeMatiere', $assignment->CodeMatiere);
+                            $assignmentQuery->where('co.CodeMatiere', $assignment->CodeMatiere);
                         }
                     });
                 }
             })
-            ->orderByDesc('teacher_attendances.attendance_date')
-            ->orderBy('teacher_attendances.session')
+            ->orderByDesc('co.DateEnreg')
+            ->orderBy('co.HeureMatiere')
             ->get([
-                'teacher_attendances.teacher_code',
-                'teacher_attendances.CodeEnseignement',
-                'teacher_attendances.CodeClasse',
-                'teacher_attendances.CodeMatiere',
-                'teacher_attendances.attendance_date',
-                'teacher_attendances.session',
-                'teacher_attendances.presence_status',
+                'co.CodeEnseignement',
+                'co.CodeClasse',
+                'co.CodeMatiere',
+                'co.CodeAnnee',
+                'co.CodeEleve as student_code',
+                'el.Nom as student_nom',
+                'el.Prenom as student_prenom',
+                'co.DateEnreg as attendance_date',
+                'co.HeureMatiere as session',
+                'co.created_at as recorded_at',
+                'co.CodeEtatCond as presence_status',
                 'cl.LibelleClasse as class_name',
                 'ma.LibelleMatiere as subject_name',
-            ]);
+            ])
+            ->map(function ($attendance) use ($teacherCode) {
+                $attendance->teacher_code = $teacherCode;
+                $attendance->student_name = trim(
+                    (string) ($attendance->student_nom ?? '').' '.
+                    (string) ($attendance->student_prenom ?? '')
+                );
+                unset($attendance->student_nom, $attendance->student_prenom);
+
+                return $attendance;
+            });
 
         return response()->json($attendanceQuery);
     }

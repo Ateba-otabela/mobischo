@@ -16,6 +16,7 @@ class Convocation extends Model
         'CodeEnseignement',
         'CodeMatiere',
         'dateConvocation',
-        'timeConvocation'
+        'timeConvocation',
+        'document_path',
     ];
 }

@@ -2,6 +2,14 @@
 
 @section('body')
 
+@if ($errors->any())
+    <div class="alert alert-warning" role="alert">
+        @foreach ($errors->all() as $error)
+            <div>{{ $error }}</div>
+        @endforeach
+    </div>
+@endif
+
 @if (session()->has('message') )
 <div class="alert {{session('alert') ?? 'border-primary'}} alert-dismissible mb-2" role="alert">
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -93,13 +101,16 @@
                         <div class="col-lg-10 col-12">
                             
                                 <select name="CodeEtablissement" class="form-control">
+                                    @if ($schools->isEmpty())
+                                        <option value="">Aucun établissement disponible</option>
+                                    @endif
                                     @foreach ($schools as $school)
                                         <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
                                     @endforeach
                                 </select>
                         </div>
                         <div class="col-lg-2 col-12 text-lg-right">
-                            <button type="submit" class="btn btn-primary" data-toggle="modal" data-target="#primary">
+                            <button type="submit" class="btn btn-primary" data-toggle="modal" data-target="#primary" {{ $schools->isEmpty() ? 'disabled' : '' }}>
                                 Liste
                             </button>
                         </div>

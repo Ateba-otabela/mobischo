@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\Eleve;
+use App\Models\Conduite;
+use App\Models\Classe;
 use App\Models\EncadreurClasse;
 use App\Models\Enseignement;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
@@ -30,19 +33,74 @@ class NotificationDispatchService
 
         $classCode = trim((string) ($context['class_code'] ?? (string) ($student->CodeClasse ?? '')));
         $schoolCode = trim((string) ($context['school_code'] ?? ''));
+        $class = null;
         if ($schoolCode === '' && $classCode !== '') {
-            $class = \App\Models\Classe::query()->where('CodeClasse', $classCode)->first();
+            $class = Classe::query()->where('CodeClasse', $classCode)->first();
             $schoolCode = trim((string) ($class?->CodeEtablissement ?? ''));
         }
+        if ($class === null && $classCode !== '') {
+            $class = Classe::query()
+                ->where('CodeClasse', $classCode)
+                ->when($schoolCode !== '', fn ($query) => $query->where('CodeEtablissement', $schoolCode))
+                ->first();
+        }
+        $className = trim((string) ($class?->LibelleClasse ?? ''));
 
         $studentName = trim((string) (($student->Nom ?? '') . ' ' . ($student->Prenom ?? '')));
         $parentCode = trim((string) ($student->code ?? ''));
 
+        $attendanceTitle = null;
+        $attendanceBody = null;
+        if (in_array($normalizedStatus, ['A', 'R'], true)) {
+            $teachingCode = trim((string) ($context['teaching_code'] ?? ''));
+            if ($teachingCode !== '') {
+                $teaching = Enseignement::query()
+                    ->with('matiere')
+                    ->where('CodeEnseignement', $teachingCode)
+                    ->first();
+                $attendance = Conduite::query()
+                    ->where('CodeEleve', $studentCode)
+                    ->where('CodeEnseignement', $teachingCode)
+                    ->where('DateEnreg', $attendanceDate)
+                    ->orderByDesc('created_at')
+                    ->first();
+                $subjectName = trim((string) ($teaching?->matiere?->LibelleMatiere ?? ''));
+
+                if ($subjectName !== '' && $attendance?->created_at) {
+                    $dateLabel = Carbon::parse($attendance->DateEnreg)
+                        ->locale('fr')
+                        ->translatedFormat('j F Y');
+                    $timeLabel = Carbon::parse($attendance->created_at)->format('H:i');
+                    $subjectPhrase = $this->subjectPhrase($subjectName);
+
+                    if ($normalizedStatus === 'A') {
+                        $attendanceTitle = 'Absence scolaire';
+                        $attendanceBody = sprintf(
+                            '%s n’était pas présent au cours %s le %s à %s.',
+                            $studentName !== '' ? $studentName : 'L’élève',
+                            $subjectPhrase,
+                            $dateLabel,
+                            $timeLabel
+                        );
+                    } else {
+                        $attendanceTitle = 'Retard scolaire';
+                        $attendanceBody = sprintf(
+                            '%s a été en retard au cours %s le %s à %s.',
+                            $studentName !== '' ? $studentName : 'L’élève',
+                            $subjectPhrase,
+                            $dateLabel,
+                            $timeLabel
+                        );
+                    }
+                }
+            }
+        }
+
         $summary = ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
 
         if ($parentCode !== '' && $parentCode !== $actorCode) {
-            $parentTitle = 'Absence de votre enfant';
-            $parentBody = sprintf(
+            $parentTitle = $attendanceTitle ?? 'Absence de votre enfant';
+            $parentBody = $attendanceBody ?? sprintf(
                 '%s a été marqué(e) %s le %s.',
                 $studentName !== '' ? $studentName : 'Votre enfant',
                 $this->statusLabel($normalizedStatus),
@@ -52,7 +110,6 @@ class NotificationDispatchService
             $parentResult = $this->notifyUser($parentCode, $parentTitle, $parentBody, [
                 'type' => 'attendance',
                 'student_code' => $studentCode,
-                'class_code' => $classCode,
                 'school_code' => $schoolCode,
                 'attendance_date' => $attendanceDate,
                 'status' => $normalizedStatus,
@@ -65,37 +122,47 @@ class NotificationDispatchService
         }
 
         if ($schoolCode !== '') {
-            $principalCodes = User::query()
-                ->whereIn('account_type', ['principal', 'principal_encadreur'])
+            $encadreurCodes = EncadreurClasse::query()
+                ->where('CodeClasse', $classCode)
                 ->where('CodeEtablissement', $schoolCode)
-                ->where('code', '!=', $actorCode)
                 ->pluck('code')
                 ->filter()
-                ->unique();
+                ->unique()
+                ->values();
+            $encadreurs = User::query()
+                ->whereIn('code', $encadreurCodes)
+                ->where('account_type', 'encadreur')
+                ->where('CodeEtablissement', $schoolCode)
+                ->where('code', '!=', $actorCode)
+                ->get(['code']);
 
-            $principalTitle = $normalizedStatus === 'A'
+            $staffTitle = $attendanceTitle ?? ($normalizedStatus === 'A'
                 ? 'Élève absent'
-                : 'Élève en retard';
-            $principalBody = sprintf(
+                : 'Élève en retard');
+            $staffBody = $attendanceBody ?? sprintf(
                 '%s a été marqué(e) %s le %s.',
                 $studentName !== '' ? $studentName : 'Un élève',
                 $this->statusLabel($normalizedStatus),
                 $attendanceDate
             );
+            if ($className !== '') {
+                $staffBody .= ' Classe : '.$className.'.';
+            }
 
-            foreach ($principalCodes as $principalCode) {
-                $principalResult = $this->notifyUser((string) $principalCode, $principalTitle, $principalBody, [
+            foreach ($encadreurs as $encadreur) {
+                $staffResult = $this->notifyUser((string) $encadreur->code, $staffTitle, $staffBody, [
                     'type' => 'attendance',
                     'student_code' => $studentCode,
                     'class_code' => $classCode,
+                    'class_name' => $className,
                     'school_code' => $schoolCode,
                     'attendance_date' => $attendanceDate,
                     'status' => $normalizedStatus,
-                    'recipient_role' => 'principal',
+                    'recipient_role' => 'encadreur',
                 ]);
 
                 foreach (['sent', 'attempted', 'failed', 'invalidated'] as $key) {
-                    $summary[$key] += (int) ($principalResult[$key] ?? 0);
+                    $summary[$key] += (int) ($staffResult[$key] ?? 0);
                 }
             }
         }
@@ -103,27 +170,29 @@ class NotificationDispatchService
         return $summary;
     }
 
-    public function dispatchHomeworkNotification(string $classCode, string $subjectLabel, string $teacherCode, string $schoolCode, ?string $homeworkId = null, ?string $assignmentTitle = null): array
+    public function dispatchHomeworkNotification(string $classCode, string $subjectLabel, string $teacherCode, string $schoolCode, ?string $homeworkId = null, ?string $assignmentTitle = null, ?string $deadline = null): array
     {
         $parentCodes = $this->parentCodesForClass($classCode, $schoolCode);
         if ($parentCodes->isEmpty()) {
             return ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
         }
 
-        $title = 'Nouveau devoir';
+        $title = 'Devoir à remettre';
+        $deadline = trim((string) $deadline);
+        $subjectLabel = trim($subjectLabel);
+        if ($deadline === '' || $subjectLabel === '') {
+            throw new \InvalidArgumentException('A homework subject and deadline are required to build the notification.');
+        }
+
+        $deadlineDate = Carbon::parse($deadline)->locale('fr')->translatedFormat('j F Y');
+        $deadlineTime = Carbon::parse($deadline)->format('H:i');
+        $body = sprintf(
+            'Votre enfant a un devoir %s à remettre avant le %s à %s.',
+            $this->subjectPhrase($subjectLabel),
+            $deadlineDate,
+            $deadlineTime
+        );
         $assignmentTitle = trim((string) $assignmentTitle);
-        $body = $assignmentTitle !== ''
-            ? sprintf(
-                'Nouveau devoir de %s : %s (classe %s).',
-                $subjectLabel !== '' ? $subjectLabel : 'matière',
-                $assignmentTitle,
-                $classCode
-            )
-            : sprintf(
-                'Nouveau devoir de %s pour la classe %s.',
-                $subjectLabel !== '' ? $subjectLabel : 'matière',
-                $classCode
-            );
 
         $summary = ['sent' => 0, 'attempted' => 0, 'failed' => 0, 'invalidated' => 0];
         foreach ($parentCodes as $parentCode) {
@@ -281,6 +350,15 @@ class NotificationDispatchService
 
     protected function notifyUser(string $userCode, string $title, string $body, array $data = []): array
     {
+        $user = User::query()->where('code', $userCode)->first();
+        if ($user) {
+            $user->notify(new \App\Notifications\MobischoDatabaseNotification(
+                $title,
+                $body,
+                $data
+            ));
+        }
+
         $context = [
             'user_code' => $userCode,
             'notification_type' => (string) ($data['type'] ?? ''),
@@ -374,5 +452,15 @@ class NotificationDispatchService
             'R' => 'en retard',
             default => 'absent(e)',
         };
+    }
+
+    private function subjectPhrase(string $subjectName): string
+    {
+        $subjectName = trim($subjectName);
+        $preposition = preg_match('/^[aeiouyàâäéèêëîïôöùûüÿ]/iu', $subjectName) === 1
+            ? 'd’'
+            : 'de ';
+
+        return $preposition.$subjectName;
     }
 }

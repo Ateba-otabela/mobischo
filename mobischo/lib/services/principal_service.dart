@@ -195,13 +195,13 @@ class PrincipalAttendanceData {
   String get teacherPresenceLabel {
     switch (teacherPresenceStatus.toLowerCase()) {
       case 'present':
-        return 'Présent';
+        return 'Present';
       case 'absent':
         return 'Absent';
       case 'late':
-        return 'En retard';
+        return 'Late';
       default:
-        return 'Non renseignée';
+        return 'Not provided';
     }
   }
 
@@ -308,9 +308,13 @@ class PrincipalTeacherPresenceData {
   final String codeMatiere;
   final String date;
   final String session;
+  final String recordedAt;
   final String className;
   final String subject;
   final String presenceStatus;
+  final String studentCode;
+  final String studentName;
+  final String academicYear;
 
   const PrincipalTeacherPresenceData({
     required this.teacherCode,
@@ -319,9 +323,13 @@ class PrincipalTeacherPresenceData {
     required this.codeMatiere,
     required this.date,
     required this.session,
+    required this.recordedAt,
     required this.className,
     required this.subject,
     required this.presenceStatus,
+    required this.studentCode,
+    required this.studentName,
+    required this.academicYear,
   });
 
   factory PrincipalTeacherPresenceData.fromJson(Map<String, dynamic> json) {
@@ -332,6 +340,7 @@ class PrincipalTeacherPresenceData {
       codeMatiere: json['CodeMatiere']?.toString() ?? '',
       date: json['attendance_date']?.toString() ?? '',
       session: json['session']?.toString() ?? '',
+      recordedAt: json['recorded_at']?.toString() ?? '',
       className: _normalizeDisplayText(
         json['class_name'],
         fallback: json['CodeClasse']?.toString() ?? '',
@@ -341,19 +350,28 @@ class PrincipalTeacherPresenceData {
         fallback: json['CodeMatiere']?.toString() ?? '',
       ),
       presenceStatus: json['presence_status']?.toString() ?? '',
+      studentCode: json['student_code']?.toString() ?? '',
+      studentName: _normalizeDisplayText(
+        json['student_name'],
+        fallback: json['student_code']?.toString() ?? '',
+      ),
+      academicYear: json['CodeAnnee']?.toString() ?? '',
     );
   }
 
-  String get presenceLabel {
+  String get presenceLabelKey {
     switch (presenceStatus.toLowerCase()) {
+      case 'p':
       case 'present':
-        return 'Présent';
+        return 'present';
+      case 'a':
       case 'absent':
-        return 'Absent';
+        return 'absentAttendance';
+      case 'r':
       case 'late':
-        return 'En retard';
+        return 'lateAttendance';
       default:
-        return presenceStatus;
+        return 'notProvided';
     }
   }
 }
@@ -681,6 +699,7 @@ class PrincipalService {
   static Future<List<PrincipalTeacherPresenceData>> getTeacherPresenceHistory(
     User user, {
     required String teacherCode,
+    required String classCode,
   }) async {
     print('NEW TEACHER PRESENCE METHOD CALLED: getTeacherPresenceHistory');
     print('SELECTED TEACHER CODE: $teacherCode');
@@ -694,7 +713,7 @@ class PrincipalService {
     final endpoint = Uri.parse(
       'https://mobischo.com/api/principal/teachers/'
       '${Uri.encodeComponent(teacherCode)}/attendance',
-    );
+    ).replace(queryParameters: {'CodeClasse': classCode});
     print('TEACHER ATTENDANCE REQUEST: ${endpoint.toString()}');
     final response = await http.get(
       endpoint,

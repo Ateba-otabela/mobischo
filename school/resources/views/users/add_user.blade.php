@@ -25,6 +25,13 @@
 
 <div class="card">
     <div class="card-body">
+        @if ($errors->any())
+            <div class="alert alert-warning" role="alert">
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
         <div class="card-heading ">
             <div class="row justify-content-center mb-lg-0 mb-2">
                 <div class="col-lg-8 col-12">
@@ -354,7 +361,7 @@
                                         </div> 
                                         <div class="col-lg-4 col-12">
                                             <label>Prenoms de l'encardreur</label>
-                                            <input type="text" name="prenoms" class="form-control" placeholder="Ryan">
+                                            <input type="text" name="prenom" class="form-control" placeholder="Ryan">
                                         </div>
                                         <div class="col-lg-4 col-12">
                                             <label>Genre</label>
@@ -371,17 +378,21 @@
                                         </div>
                                         <div class="col-lg-4 col-12">
                                             <label>Etablissement</label>
-                                            
+                                            <select name="school_id" class="form-control" required>
+                                                @foreach ($schools as $school)
+                                                    <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
+                                                @endforeach
+                                            </select>
                                         </div>
                                         <div class="col-lg-4 col-12">
                                             <label>Code</label>
-                                            <input type="text" name="address" class="form-control" placeholder="Yaounde, ESSOS">
+                                            <input type="text" name="code" class="form-control" placeholder="Code encadreur" required>
                                         </div>
                                     </div>
                                     <input id="password" type="password" class="form-control d-none " name="password" value="00000000">
                                     <input id="password-confirm" type="password" class="form-control d-none" name="password_confirmation" value="00000000">
                                     
-                                    <input type="hidden" name="account_type" value="encardreur" id="account_type">
+                                    <input type="hidden" name="account_type" value="encadreur" id="account_type">
                                     <br>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
@@ -407,6 +418,23 @@
             </div>
         </div>
         <hr class="line">
+
+        <form action="{{ route('add_user') }}" method="GET" class="mb-2">
+            <div class="form-row align-items-end">
+                <div class="col-md-9">
+                    <label for="user-school-filter">Établissement</label>
+                    <select name="CodeEtablissement" id="user-school-filter" class="form-control" required>
+                        <option value="">Choisir un établissement</option>
+                        @foreach ($schools as $school)
+                            <option value="{{ $school->CodeEtablissement }}" {{ $selectedSchool && $selectedSchool->CodeEtablissement == $school->CodeEtablissement ? 'selected' : '' }}>{{ $school->Nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mt-1 mt-md-0">
+                    <button type="submit" class="btn btn-outline-primary">Afficher les utilisateurs</button>
+                </div>
+            </div>
+        </form>
         
         <div class="table-responsive">
             <table class="table table-striped table-hover zero-configuration">
@@ -422,7 +450,7 @@
                 </thead>
                 <tbody>
                     
-                    @foreach ($users as $user)
+                    @forelse ($users as $user)
                     <tr>
                         <td>
                             {{ $user->code }}
@@ -736,7 +764,9 @@
                                 </div>
                             </td>
                         </tr>                
-                        @endforeach
+                        @empty
+                        <tr><td colspan="6">{{ $selectedSchool ? 'Aucun utilisateur enregistré pour cet établissement.' : 'Aucun utilisateur disponible.' }}</td></tr>
+                        @endforelse
                         
                         
                     </tbody>

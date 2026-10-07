@@ -2,6 +2,14 @@
 
 @section('body')
 
+@if ($errors->any())
+    <div class="alert alert-warning" role="alert">
+        @foreach ($errors->all() as $error)
+            <div>{{ $error }}</div>
+        @endforeach
+    </div>
+@endif
+
 @if (session()->has('message') )
 <div class="alert {{session('alert') ?? 'border-primary'}} alert-dismissible mb-2" role="alert">
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">

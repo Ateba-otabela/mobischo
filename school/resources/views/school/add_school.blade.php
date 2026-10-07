@@ -192,7 +192,7 @@
                 </thead>
                 <tbody>
                     
-                    @foreach ($schools as $school)
+                    @forelse ($schools as $school)
                     <tr>
                         <td>
                             {{ $school->CodeEtablissement }}
@@ -455,7 +455,9 @@
                             </div>
                         </td>
                     </tr>                
-                    @endforeach
+                    @empty
+                    <tr><td colspan="4">Aucun établissement disponible.</td></tr>
+                    @endforelse
                     
                     
                 </tbody>

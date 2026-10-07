@@ -80,7 +80,7 @@
                         </td>
                         <td>
                             <div class="media-body">
-                                <h6 class="media-heading mb-0">{{ $student->classe->LibelleClasse }}</h6>
+                                <h6 class="media-heading mb-0">{{ optional($student->classe)->LibelleClasse }}</h6>
                                 <span class="font-small-2">Sex :
                                     @if ($student->sex == '0')
                                     Masculin
@@ -203,7 +203,7 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="list-content">
-                                                                    <span class="list-title">{{ $student->classe->LibelleClasse }}</span>
+                                                                    <span class="list-title">{{ optional($student->classe)->LibelleClasse }}</span>
                                                                     <small class="text-muted d-block">Classe</small>
                                                                 </div>
                                                             </div>

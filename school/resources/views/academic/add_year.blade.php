@@ -156,7 +156,7 @@
             </thead>
             <tbody>
 
-                @foreach ($years as $year)
+                @forelse ($years as $year)
                 <tr>
                     <td>
                         {{ $year->CodeAnnee }}
@@ -389,7 +389,9 @@
                         </div>
                     </td>
                 </tr>                
-                @endforeach
+                @empty
+                <tr><td colspan="3">Aucune année scolaire disponible.</td></tr>
+                @endforelse
 
 
             </tbody>

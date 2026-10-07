@@ -13,6 +13,8 @@ class Annee extends Model
         'Libelle'
     ];
     protected $primaryKey = 'CodeAnnee';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     public function notes()
     {

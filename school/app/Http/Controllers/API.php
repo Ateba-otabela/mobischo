@@ -644,6 +644,30 @@ class API extends Controller
             return $marks;
         }
 
+        if ($action == 'GET_STUDENT_YEAR_MARKS') {
+            $codeEleve = trim((string) $request->input('codeEleve', ''));
+            $codeAnnee = trim((string) $request->input('codeAnnee', ''));
+            if ($codeEleve === '' || $codeAnnee === '') {
+                return response()->json(['error' => 'Student and school year are required.'], 422);
+            }
+
+            return Note::where('CodeEleve', '=', $codeEleve)
+                ->where('CodeAnnee', '=', $codeAnnee)
+                ->get();
+        }
+
+        if ($action == 'GET_COURSE_YEAR_MARKS') {
+            $codeEnseignement = trim((string) $request->input('codeEnseignement', ''));
+            $codeAnnee = trim((string) $request->input('codeAnnee', ''));
+            if ($codeEnseignement === '' || $codeAnnee === '') {
+                return response()->json(['error' => 'Course and school year are required.'], 422);
+            }
+
+            return Note::where('CodeEnseignement', '=', $codeEnseignement)
+                ->where('CodeAnnee', '=', $codeAnnee)
+                ->get();
+        }
+
         #courses
         if($action == 'GET_ALL_COURSES'){
             $courses = Enseignement::all();
@@ -1247,6 +1271,10 @@ class API extends Controller
         }
 
         if($action == 'INSERT_CONVOCATION'){
+            $request->validate([
+                'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            ]);
+
             $code = trim((string) $request->input('code', ''));
             $codeClasse = trim((string) $request->input('CodeClasse', ''));
             $codeEnseignement = trim((string) $request->input('CodeEnseignement', ''));
@@ -1335,29 +1363,45 @@ class API extends Controller
                 return response()->json(['error' => 'Un ou plusieurs élèves ne correspondent pas à la classe.'], 422);
             }
 
-            $createdConvocations = DB::transaction(function () use (
-                $code,
-                $codeEnseignement,
-                $enseignement,
-                $motif,
-                $description,
-                $dateConvocation,
-                $students
-            ) {
-                $created = [];
-                foreach ($students as $student) {
-                    $created[] = Convocation::create([
-                        'code' => $code,
-                        'CodeEleve' => $student->CodeEleve,
-                        'motif' => $motif,
-                        'description' => $description,
-                        'CodeEnseignement' => $codeEnseignement,
-                        'CodeMatiere' => $enseignement->CodeMatiere,
-                        'dateConvocation' => $dateConvocation,
-                    ]);
+            $documentPath = null;
+            if ($request->hasFile('document')) {
+                $documentPath = $request->file('document')->store('convocations', 'public');
+                if ($documentPath === false) {
+                    return response()->json(['error' => 'Le document n’a pas pu être enregistré.'], 500);
                 }
-                return $created;
-            });
+            }
+
+            try {
+                DB::transaction(function () use (
+                    $code,
+                    $codeEnseignement,
+                    $enseignement,
+                    $motif,
+                    $description,
+                    $dateConvocation,
+                    $students,
+                    $documentPath
+                ) {
+                    foreach ($students as $student) {
+                        Convocation::create([
+                            'code' => $code,
+                            'CodeEleve' => $student->CodeEleve,
+                            'motif' => $motif,
+                            'description' => $description,
+                            'CodeEnseignement' => $codeEnseignement,
+                            'CodeMatiere' => $enseignement->CodeMatiere,
+                            'dateConvocation' => $dateConvocation,
+                            'document_path' => $documentPath,
+                        ]);
+                    }
+                });
+            } catch (\Throwable $exception) {
+                if ($documentPath !== null) {
+                    Storage::disk('public')->delete($documentPath);
+                }
+
+                throw $exception;
+            }
 
             $schoolCode = trim((string) (($creator->CodeEtablissement ?? '') ?: ($enseignement->CodeEtablissement ?? '')));
             $dispatcher = new NotificationDispatchService();
@@ -1402,6 +1446,9 @@ class API extends Controller
                 $payload = $convocation->toArray();
                 $payload['teacher_code'] = $teacherCode;
                 $payload['teacher_name'] = $teacherName;
+                $payload['document_url'] = $convocation->document_path
+                    ? url(Storage::disk('public')->url($convocation->document_path))
+                    : null;
 
                 return $payload;
             })->values();
@@ -1449,6 +1496,9 @@ class API extends Controller
                 $payload = $convocation->toArray();
                 $payload['teacher_code'] = $teacherCode;
                 $payload['teacher_name'] = $teacherName;
+                $payload['document_url'] = $convocation->document_path
+                    ? url(Storage::disk('public')->url($convocation->document_path))
+                    : null;
 
                 return $payload;
             })->values();
@@ -2200,7 +2250,7 @@ class API extends Controller
                 'CodeEtablissement' => $course->CodeEtablissement,
             ]);
 
-            $subjectLabel = trim((string) (($course->matiere?->LibelleMatiere ?? $course->CodeMatiere ?? '')));
+            $subjectLabel = trim((string) ($course->matiere?->LibelleMatiere ?? ''));
             $dispatcher = new NotificationDispatchService();
             $dispatcher->dispatchHomeworkNotification(
                 (string) $course->CodeClasse,
@@ -2208,7 +2258,8 @@ class API extends Controller
                 $teacherCode,
                 (string) ($course->CodeEtablissement ?? ''),
                 (string) $devoir->id,
-                $titre
+                $titre,
+                (string) $devoir->dateDuDevoir
             );
 
             return response()->json($devoir, 201);
@@ -2360,6 +2411,10 @@ class API extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
+            $request->validate([
+                'DateEnreg' => 'required|string|max:255',
+            ]);
+
             $statuses = $this->decodeJsonArrayInput($request->input('statuses', '[]'));
             if (!is_array($statuses) || empty($statuses)) {
                 return response()->json(['message' => 'Invalid attendance'], 422);
@@ -2371,7 +2426,10 @@ class API extends Controller
             $allowedStatuses = ['P', 'A', 'R'];
 
             foreach ($statuses as $status) {
-                if (!isset($status['CodeEleve'], $status['status'])
+                if (!is_array($status)
+                    || !isset($status['CodeEleve'], $status['status'])
+                    || !is_string($status['CodeEleve'])
+                    || !is_string($status['status'])
                     || !isset($studentCodes[$status['CodeEleve']])
                     || !in_array($status['status'], $allowedStatuses, true)) {
                     return response()->json(['message' => 'Invalid attendance student or status'], 422);
@@ -2421,7 +2479,11 @@ class API extends Controller
                     (string) $request->DateEnreg,
                     $status,
                     (string) $teacherCode,
-                    ['school_code' => (string) ($course->CodeEtablissement ?? ''), 'class_code' => (string) $course->CodeClasse]
+                    [
+                        'school_code' => (string) ($course->CodeEtablissement ?? ''),
+                        'class_code' => (string) $course->CodeClasse,
+                        'teaching_code' => (string) $course->CodeEnseignement,
+                    ]
                 );
             }
 
@@ -2495,7 +2557,11 @@ class API extends Controller
                     $date,
                     $status,
                     (string) $teacherCode,
-                    ['school_code' => (string) ($course->CodeEtablissement ?? ''), 'class_code' => (string) $course->CodeClasse]
+                    [
+                        'school_code' => (string) ($course->CodeEtablissement ?? ''),
+                        'class_code' => (string) $course->CodeClasse,
+                        'teaching_code' => (string) $course->CodeEnseignement,
+                    ]
                 );
             }
 

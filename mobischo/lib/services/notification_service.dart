@@ -42,6 +42,8 @@ class NotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final StreamController<String> _tokenRefreshController =
       StreamController<String>.broadcast();
+  final StreamController<RemoteMessage> _notificationEventController =
+      StreamController<RemoteMessage>.broadcast();
   String? _currentToken;
   bool _initialized = false;
 
@@ -53,6 +55,8 @@ class NotificationService {
   int _notificationId = 0;
 
   Stream<String> get tokenRefreshes => _tokenRefreshController.stream;
+  Stream<RemoteMessage> get notificationEvents =>
+      _notificationEventController.stream;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -156,6 +160,7 @@ class NotificationService {
   //   • displays a local notification banner (new behaviour)
   // ------------------------------------------------------------------
   void _handleForegroundMessage(RemoteMessage message) {
+    _notificationEventController.add(message);
     _logMessageMetadata('Foreground message', message);
 
     final title = message.notification?.title;
@@ -190,6 +195,7 @@ class NotificationService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
+    _notificationEventController.add(message);
     _logMessageMetadata('Notification opened', message);
     // TODO: Route using validated notification data in the future.
   }

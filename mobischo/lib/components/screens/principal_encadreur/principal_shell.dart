@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:mobischo/components/screens/encardreur/chooseStudents.dart';
-import 'package:mobischo/components/screens/encardreur/createConvocation.dart';
 import 'package:mobischo/components/screens/changePassword.dart';
 import 'package:mobischo/components/screens/layouts/customMenu.dart';
 import 'package:mobischo/components/screens/mobischo_ai.dart';
+import 'package:mobischo/components/screens/principal_encadreur/principal_students.dart';
 import 'package:mobischo/components/screens/students/ClassStudents.dart';
+import 'package:mobischo/components/screens/teachers.dart/CreateConvocation.dart';
 import 'package:mobischo/models/class.dart';
 import 'package:mobischo/models/convocation.dart';
 import 'package:mobischo/models/user.dart';
@@ -26,19 +28,19 @@ class PrincipalShell extends StatefulWidget {
 }
 
 class _PrincipalShellState extends State<PrincipalShell> {
-  final titles = const [
-    'MOBISCHO',
-    'Classes',
-    'Présence',
-    'AI',
-  ];
+  List<String> _titles(BuildContext context) => [
+        'MOBISCHO',
+        uiText(context, 'classes'),
+        uiText(context, 'presence'),
+        uiText(context, 'ai'),
+      ];
 
-  final secondaryTitles = const [
-    'Rapports des professeurs',
-    'Alertes d’investigation',
-    'Appels des professeurs',
-    'Convoquer',
-  ];
+  List<String> _secondaryTitles(BuildContext context) => [
+        uiText(context, 'teacherReports'),
+        uiText(context, 'investigationAlerts'),
+        uiText(context, 'teacherCalls'),
+        uiText(context, 'convoke'),
+      ];
 
   late Future<PrincipalDashboardData> _dashboardFuture;
 
@@ -59,7 +61,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
     return CustomMenu(
       user: widget.user,
       selectedPage: 0,
-      principalTitles: titles,
+      principalTitles: _titles(context),
       principalScreens: [
         PrincipalDashboardPage(
           user: widget.user,
@@ -87,7 +89,7 @@ class _PrincipalShellState extends State<PrincipalShell> {
         Icon(Icons.fact_check_outlined),
         Icon(Icons.smart_toy_outlined),
       ],
-      principalSecondaryTitles: secondaryTitles,
+      principalSecondaryTitles: _secondaryTitles(context),
       principalSecondaryScreens: [
         PrincipalReportsPage(user: widget.user),
         PrincipalAlertsPage(user: widget.user),
@@ -274,22 +276,7 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
         ),
         onTap: () => PrincipalSectionRequest(
           title: uiText(context, 'studentListNav'),
-          screen: PrincipalClassesPage(
-            dashboardFuture: widget.dashboardFuture,
-            onRetryDashboard: widget.onRetryDashboard,
-            headerTitle: 'Choisir une classe',
-            headerSubtitle: uiText(context, 'chooseClassToViewStudents'),
-            onSelectClass: (item) {
-              PrincipalSectionRequest(
-                title: uiText(context, 'studentListNav'),
-                screen: ClassStudents(
-                  user: widget.user,
-                  classe: _principalClass(item, widget.user.CodeEtablissement),
-                  embedded: true,
-                ),
-              ).dispatch(context);
-            },
-          ),
+          screen: PrincipalStudentClassesPage(user: widget.user),
         ).dispatch(context),
       ),
       _DashboardActionCard(
@@ -303,13 +290,14 @@ class _PrincipalDashboardPageState extends State<PrincipalDashboardPage> {
           title: uiText(context, 'teachers'),
           screen: PrincipalTeacherClassesPage(
             user: widget.user,
-            onSelectTeacher: (teacher) {
+            onSelectTeacher: (schoolClass, teacher) {
               PrincipalSectionRequest(
                 title: teacher.fullName,
                 screen: PrincipalTeacherCallsPage(
                   user: widget.user,
                   teacherName: teacher.fullName,
                   teacherCode: teacher.code,
+                  classCode: schoolClass.codeClasse,
                 ),
               ).dispatch(context);
             },
@@ -567,7 +555,9 @@ class _PrincipalClassesPageState extends State<PrincipalClassesPage> {
 
 class PrincipalTeacherClassesPage extends StatefulWidget {
   final User user;
-  final ValueChanged<PrincipalClassTeacher>? onSelectTeacher;
+  final void Function(
+          PrincipalClassSummary schoolClass, PrincipalClassTeacher teacher)?
+      onSelectTeacher;
 
   const PrincipalTeacherClassesPage({
     Key? key,
@@ -635,7 +625,8 @@ class _PrincipalTeacherClassesPageState
                                               print(
                                                 'SELECTED TEACHER CODE: ${teacher.code}',
                                               );
-                                              widget.onSelectTeacher!(teacher);
+                                              widget.onSelectTeacher!(
+                                                  schoolClass, teacher);
                                             },
                                     ))
                                 .toList(),
@@ -651,12 +642,14 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
   final User user;
   final String teacherName;
   final String teacherCode;
+  final String classCode;
 
   const PrincipalTeacherCallsPage({
     Key? key,
     required this.user,
     required this.teacherName,
     required this.teacherCode,
+    required this.classCode,
   }) : super(key: key);
 
   @override
@@ -690,20 +683,31 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
                               color: CustomTheme.blue,
                             ),
                             title: Text(
-                              '${_teacherPresenceDate(session.date)} • ${session.session}',
+                              '${_teacherPresenceDate(session.date)}'
+                              '${session.recordedAt.isEmpty ? '' : ' • ${_teacherPresenceTime(session.recordedAt)}'}'
+                              ' • ${session.subject}',
                             ),
                             subtitle: Text(
-                              '${session.className} • ${session.subject}\n'
-                              'Enseignement : ${session.codeEnseignement}',
+                              '${session.studentName} (${session.studentCode})\n'
+                              '${session.className} • ${uiText(context, 'schoolYear')} '
+                              '${session.academicYear}',
                             ),
                             isThreeLine: true,
                             trailing: Text(
-                              session.presenceLabel,
+                              uiText(context, session.presenceLabelKey),
                               style: TextStyle(
                                 color: session.presenceStatus.toLowerCase() ==
-                                        'present'
+                                            'p' ||
+                                        session.presenceStatus.toLowerCase() ==
+                                            'present'
                                     ? Colors.green.shade700
-                                    : Colors.red.shade700,
+                                    : session.presenceStatus.toLowerCase() ==
+                                                'r' ||
+                                            session.presenceStatus
+                                                    .toLowerCase() ==
+                                                'late'
+                                        ? Colors.orange.shade700
+                                        : Colors.red.shade700,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -719,6 +723,7 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
     return PrincipalService.getTeacherPresenceHistory(
       user,
       teacherCode: teacherCode,
+      classCode: classCode,
     );
   }
 
@@ -726,6 +731,11 @@ class PrincipalTeacherCallsPage extends StatelessWidget {
     final parts = date.split('-');
     if (parts.length != 3) return date;
     return '${parts[2]}/${parts[1]}/${parts[0]}';
+  }
+
+  String _teacherPresenceTime(String recordedAt) {
+    final parsed = DateTime.tryParse(recordedAt);
+    return parsed == null ? recordedAt : DateFormat('HH:mm').format(parsed);
   }
 }
 
@@ -769,22 +779,22 @@ class _PrincipalMessagesConvocationsPageState
                 classe: schoolClass,
                 user: user,
                 embedded: true,
-                onCreate: (createContext, selectedStudents) {
-                  PrincipalSectionRequest(
-                    title: uiText(context, 'createConvocation'),
-                    screen: CreateEncardreurConvocation(
-                      user: user,
-                      students: selectedStudents,
-                      classe: schoolClass,
-                      embedded: true,
-                      onSaved: (saveContext) {
-                        PrincipalSectionRequest(
-                          title: uiText(context, 'recentConvocations'),
-                          screen: PrincipalMessagesConvocationsPage(user: user),
-                        ).dispatch(saveContext);
-                      },
+                onCreateStudents: (createContext, selectedStudents) {
+                  Navigator.of(createContext).push(
+                    MaterialPageRoute(
+                      builder: (_) => CreateConvocation(
+                        user: user,
+                        students: selectedStudents,
+                        initialStudentCodes: selectedStudents
+                            .map((student) => student.CodeEleve)
+                            .toList(),
+                        codeClasse: schoolClass.CodeClasse,
+                        appBarTitle:
+                            localizedMenuTitle(createContext, 'Convocation'),
+                        useClassCourses: true,
+                      ),
                     ),
-                  ).dispatch(createContext);
+                  );
                 },
               ),
             ).dispatch(classContext);
@@ -958,13 +968,27 @@ class PrincipalAttendancePage extends StatefulWidget {
 }
 
 class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
-  String classFilter = 'Toutes les classes';
-  String subjectFilter = 'Toutes les matières';
-  String teacherFilter = 'Tous les enseignants';
-  String statusFilter = 'Tous les statuts';
+  static const _allClassesFilter = '__all_classes__';
+  static const _allSubjectsFilter = '__all_subjects__';
+  static const _allTeachersFilter = '__all_teachers__';
+  static const _allStatusesFilter = '__all_statuses__';
+
+  String classFilter = _allClassesFilter;
+  String subjectFilter = _allSubjectsFilter;
+  String teacherFilter = _allTeachersFilter;
+  String statusFilter = _allStatusesFilter;
   String? dateFilter;
   String? apiDateFilter;
   late Future<List<PrincipalAttendanceData>> _attendanceFuture;
+
+  String? _dropdownValueFor(
+    List<DropdownMenuItem<String>> items,
+    String selectedValue,
+  ) {
+    final matchingItems =
+        items.where((item) => item.value == selectedValue).length;
+    return matchingItems == 1 ? selectedValue : null;
+  }
 
   @override
   void initState() {
@@ -998,19 +1022,6 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
       apiDateFilter = null;
       _attendanceFuture = PrincipalService.getPrincipalAttendance(widget.user);
     });
-  }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'P':
-        return 'Présent';
-      case 'A':
-        return 'Absent';
-      case 'R':
-        return 'Retard';
-      default:
-        return status;
-    }
   }
 
   @override
@@ -1065,30 +1076,88 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
                     totalPresent <= totalStudents
                 ? '${(totalPresent / totalStudents * 100).round()}%'
                 : '—';
-        final classSessions = classFilter == 'Toutes les classes'
+        final classOptions = <String>{
+          _allClassesFilter,
+          ...allSessions.map((session) => session.className),
+        }.toList();
+        final classItems = classOptions
+            .map((item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item == _allClassesFilter
+                      ? uiText(context, 'allClasses')
+                      : item),
+                ))
+            .toList();
+        final classDropdownValue = _dropdownValueFor(classItems, classFilter);
+        final validClassFilter = classDropdownValue ?? _allClassesFilter;
+        final classSessions = validClassFilter == _allClassesFilter
             ? allSessions
             : allSessions
-                .where((session) => session.className == classFilter)
+                .where((session) => session.className == validClassFilter)
                 .toList();
         final subjectOptions = <String>{
-          'Toutes les matières',
+          _allSubjectsFilter,
           ...classSessions.map((session) => session.subject),
         }.toList();
-        final subjectSessions = subjectFilter == 'Toutes les matières'
+        final subjectItems = subjectOptions
+            .map((item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item == _allSubjectsFilter
+                      ? uiText(context, 'allSubjects')
+                      : item),
+                ))
+            .toList();
+        final subjectDropdownValue =
+            _dropdownValueFor(subjectItems, subjectFilter);
+        final validSubjectFilter = subjectDropdownValue ?? _allSubjectsFilter;
+        final subjectSessions = validSubjectFilter == _allSubjectsFilter
             ? classSessions
             : classSessions
-                .where((session) => session.subject == subjectFilter)
+                .where((session) => session.subject == validSubjectFilter)
                 .toList();
         final teacherOptions = <String>{
-          'Tous les enseignants',
+          _allTeachersFilter,
           ...subjectSessions.map((session) => session.teacher),
         }.toList();
+        final teacherItems = teacherOptions
+            .map((item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item == _allTeachersFilter
+                      ? uiText(context, 'allTeachers')
+                      : item),
+                ))
+            .toList();
+        final teacherDropdownValue =
+            _dropdownValueFor(teacherItems, teacherFilter);
+        final validTeacherFilter = teacherDropdownValue ?? _allTeachersFilter;
+        const statusOptions = <String>[
+          _allStatusesFilter,
+          'P',
+          'A',
+          'R',
+        ];
+        final statusItems = statusOptions
+            .map((item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item == _allStatusesFilter
+                      ? uiText(context, 'allStatuses')
+                      : item == 'P'
+                          ? uiText(context, 'presentStatusLabel')
+                          : item == 'A'
+                              ? uiText(context, 'absentStatusLabel')
+                              : uiText(context, 'lateStatusLabel')),
+                ))
+            .toList();
+        final statusDropdownValue =
+            _dropdownValueFor(statusItems, statusFilter);
+        final validStatusFilter = statusDropdownValue ?? _allStatusesFilter;
         final sessions = subjectSessions.where((session) {
-          final hasStatus = statusFilter == 'Tous les statuts' ||
-              session.records
-                  .any((record) => _statusLabel(record.status) == statusFilter);
-          return (teacherFilter == 'Tous les enseignants' ||
-                  session.teacher == teacherFilter) &&
+          final hasStatus = validStatusFilter == _allStatusesFilter ||
+              session.records.any(
+                (record) => record.status.toUpperCase() == validStatusFilter,
+              );
+          return (validTeacherFilter == _allTeachersFilter ||
+                  session.teacher == validTeacherFilter) &&
               hasStatus;
         }).toList();
 
@@ -1106,11 +1175,31 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
           );
         }
 
-        if (!subjectOptions.contains(subjectFilter)) {
-          subjectFilter = 'Toutes les matières';
-        }
-        if (!teacherOptions.contains(teacherFilter)) {
-          teacherFilter = 'Tous les enseignants';
+        if (classFilter != validClassFilter ||
+            subjectFilter != validSubjectFilter ||
+            teacherFilter != validTeacherFilter ||
+            statusFilter != validStatusFilter) {
+          final previousClassFilter = classFilter;
+          final previousSubjectFilter = subjectFilter;
+          final previousTeacherFilter = teacherFilter;
+          final previousStatusFilter = statusFilter;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() {
+              if (classFilter == previousClassFilter) {
+                classFilter = validClassFilter;
+              }
+              if (subjectFilter == previousSubjectFilter) {
+                subjectFilter = validSubjectFilter;
+              }
+              if (teacherFilter == previousTeacherFilter) {
+                teacherFilter = validTeacherFilter;
+              }
+              if (statusFilter == previousStatusFilter) {
+                statusFilter = validStatusFilter;
+              }
+            });
+          });
         }
 
         return ListView(padding: const EdgeInsets.all(14), children: [
@@ -1147,75 +1236,60 @@ class _PrincipalAttendancePageState extends State<PrincipalAttendancePage> {
               onTap: _selectDate,
             ),
             DropdownButtonFormField<String>(
-                value: classFilter,
+                key: ValueKey<String>(
+                    'attendance-class-$classFilter-${Object.hashAll(classOptions)}'),
+                value: classDropdownValue,
                 decoration: InputDecoration(
                   labelText: uiText(context, 'className'),
                 ),
-                items: <String>{
-                  'Toutes les classes',
-                  ...allSessions.map((session) => session.className),
-                }
-                    .map((item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item == 'Toutes les classes'
-                              ? uiText(context, 'allClasses')
-                              : item),
-                        ))
-                    .toList(),
-                onChanged: (value) => setState(() {
-                      classFilter = value!;
-                      subjectFilter = 'Toutes les matières';
-                      teacherFilter = 'Tous les enseignants';
-                    })),
+                items: classItems,
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    classFilter = value;
+                    subjectFilter = _allSubjectsFilter;
+                    teacherFilter = _allTeachersFilter;
+                  });
+                }),
             DropdownButtonFormField<String>(
-                value: subjectFilter,
+                key: ValueKey<String>(
+                    'attendance-subject-$subjectFilter-${Object.hashAll(subjectOptions)}'),
+                value: subjectDropdownValue,
                 decoration: InputDecoration(
                   labelText: uiText(context, 'subject'),
                 ),
-                items: subjectOptions
-                    .map((item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item == 'Toutes les matières'
-                              ? uiText(context, 'allSubjects')
-                              : item),
-                        ))
-                    .toList(),
-                onChanged: (value) => setState(() {
-                      subjectFilter = value!;
-                      teacherFilter = 'Tous les enseignants';
-                    })),
+                items: subjectItems,
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    subjectFilter = value;
+                    teacherFilter = _allTeachersFilter;
+                  });
+                }),
             DropdownButtonFormField<String>(
-                value: teacherFilter,
+                key: ValueKey<String>(
+                    'attendance-teacher-$teacherFilter-${Object.hashAll(teacherOptions)}'),
+                value: teacherDropdownValue,
                 decoration: InputDecoration(
                   labelText: uiText(context, 'teacherName'),
                 ),
-                items: teacherOptions
-                    .map((item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item == 'Tous les enseignants'
-                              ? uiText(context, 'allTeachers')
-                              : item),
-                        ))
-                    .toList(),
-                onChanged: (value) => setState(() => teacherFilter = value!)),
+                items: teacherItems,
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => teacherFilter = value);
+                }),
             DropdownButtonFormField<String>(
-                value: statusFilter,
+                key: ValueKey<String>(
+                    'attendance-status-$statusFilter-${Object.hashAll(statusOptions)}'),
+                value: statusDropdownValue,
                 decoration: InputDecoration(
                   labelText: uiText(context, 'status'),
                 ),
-                items: ['Tous les statuts', 'Présent', 'Absent', 'Retard']
-                    .map((item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item == 'Tous les statuts'
-                              ? uiText(context, 'allStatuses')
-                              : item == 'Présent'
-                                  ? uiText(context, 'presentStatusLabel')
-                                  : item == 'Absent'
-                                      ? uiText(context, 'absentStatusLabel')
-                                      : uiText(context, 'lateStatusLabel')),
-                        ))
-                    .toList(),
-                onChanged: (value) => setState(() => statusFilter = value!))
+                items: statusItems,
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => statusFilter = value);
+                })
           ])),
           const SizedBox(height: 12),
           if (sessions.isEmpty)
@@ -1347,13 +1421,14 @@ class PrincipalReportsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return PrincipalTeacherClassesPage(
       user: user,
-      onSelectTeacher: (teacher) {
+      onSelectTeacher: (schoolClass, teacher) {
         PrincipalSectionRequest(
           title: teacher.fullName,
           screen: PrincipalTeacherCallsPage(
             user: user,
             teacherName: teacher.fullName,
             teacherCode: teacher.code,
+            classCode: schoolClass.codeClasse,
           ),
         ).dispatch(context);
       },

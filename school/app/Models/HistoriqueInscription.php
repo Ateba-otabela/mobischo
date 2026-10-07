@@ -30,6 +30,6 @@ class HistoriqueInscription extends Model
 
     public function inscription()
     {
-        return $this->belongsTo(Inscription::class, 'NUMFAC');
+        return $this->belongsTo(Inscription::class, 'NUMFAC', 'NUMFAC');
     }
 }

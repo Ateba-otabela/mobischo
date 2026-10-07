@@ -19,6 +19,13 @@
 
 <div class="card">
     <div class="card-body">
+        @if ($errors->any())
+            <div class="alert alert-warning" role="alert">
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
 
         <form action="{{ route('sorted_students') }}">
         <div class="card-heading ">
@@ -32,7 +39,7 @@
                 </div>
                 
                 <div class="col-lg-2 col-12 text-lg-right">
-                    <button type="submit" class="btn btn-outline-primary">
+                    <button type="submit" class="btn btn-outline-primary" {{ $years->isEmpty() ? 'disabled' : '' }}>
                         Chercher
                     </button>
                 </div>
@@ -42,7 +49,7 @@
                     <label>Classe</label>
                     
                     <select name="CodeClasse" class="form-control">
-                        @foreach ($school->classes as $school_class)
+                        @foreach ($classes as $school_class)
 
                         @if ($class)
                             @if ($class->CodeClasse == $school_class->CodeClasse)
@@ -62,6 +69,9 @@
                     <label>Annee</label>
                     
                     <select name="CodeAnnee" class="form-control">
+                        @if ($years->isEmpty())
+                            <option value="">Aucune année scolaire disponible</option>
+                        @endif
                         @foreach ($years as $current_year)
                             
                         @if ($year)
@@ -120,7 +130,7 @@
                         </td>
                         <td>
                             <div class="media-body">
-                                <h6 class="media-heading mb-0">{{ $student->classe->LibelleClasse }}</h6>
+                                <h6 class="media-heading mb-0">{{ optional($student->classe)->LibelleClasse }}</h6>
                                 <span class="font-small-2">Sex :
                                     @if ($student->sex == '0')
                                     Masculin
@@ -260,7 +270,7 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="list-content">
-                                                                    <span class="list-title">{{ $student->classe->LibelleClasse }}</span>
+                                                                    <span class="list-title">{{ optional($student->classe)->LibelleClasse }}</span>
                                                                     <small class="text-muted d-block">Classe</small>
                                                                 </div>
                                                             </div>

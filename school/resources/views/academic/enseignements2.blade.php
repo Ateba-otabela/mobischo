@@ -2,6 +2,14 @@
 
 @section('body')
 
+@if ($errors->any())
+    <div class="alert alert-warning" role="alert">
+        @foreach ($errors->all() as $error)
+            <div>{{ $error }}</div>
+        @endforeach
+    </div>
+@endif
+
 @if (session()->has('message') )
 <div class="alert {{session('alert') ?? 'border-primary'}} alert-dismissible mb-2" role="alert">
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -31,16 +39,9 @@
             </div>
             <div class="col-lg-3 col-12">
                 <label>Classe</label>
-                 <select class="form-control" name="CodeClasse">
-                     @foreach ($school->classes as $school_classe)
-                     
-                     @if($classe)
-                        @if($school_classe->CodeClasse == $classe->CodeClasse)
-                        <option selected="selected" value="{{ $school_classe->CodeClasse }}">{{ $school_classe->LibelleClasse }}</option>
-                        @endif
-                    @endif
-
-                     <option value="{{ $school_classe->CodeClasse }}">{{ $school_classe->LibelleClasse }}</option>
+                 <select class="form-control" name="CodeClasse" {{ $classes->isEmpty() ? 'disabled' : '' }}>
+                     @foreach ($classes as $school_classe)
+                     <option value="{{ $school_classe->CodeClasse }}" {{ $classe && $school_classe->CodeClasse == $classe->CodeClasse ? 'selected' : '' }}>{{ $school_classe->LibelleClasse }}</option>
                      @endforeach
                  </select>
              </div>
@@ -73,7 +74,7 @@
             </thead>
             <tbody>
 
-                @foreach ($enseignements as $enseignement)
+                @forelse ($enseignements as $enseignement)
                 <tr>
                     <td>
                         {{ $enseignement->CodeEnseignement }}
@@ -88,8 +89,8 @@
                                 </div>
                             </div>
                             <div class="list-content">
-                                <span class="list-title">{{ $enseignement->matiere->LibelleMatiere }}</span>
-                                <small class="text-muted d-block">Classe : {{ $enseignement->classe->LibelleClasse }}</small>
+                                <span class="list-title">{{ optional($enseignement->matiere)->LibelleMatiere }}</span>
+                                <small class="text-muted d-block">Classe : {{ optional($enseignement->classe)->LibelleClasse }}</small>
                             </div>
                         </div> 
                     </td>
@@ -99,18 +100,20 @@
                                     <span class="list-title">
                                         @if($enseignement->enseignant)
 
-                                        @if($enseignement->enseignant->sex == '0')
-                                        Mr. 
-                                        @else
-                                        Mme. 
+                                        @if($enseignement->enseignant)
+                                            @if($enseignement->enseignant->sex == '0')
+                                            Mr.
+                                            @else
+                                            Mme.
+                                            @endif
+                                            {{ $enseignement->enseignant->nom }} {{ $enseignement->enseignant->prenom }}
                                         @endif
-                                        {{ $enseignement->enseignant->nom }} {{ $enseignement->enseignant->prenom }}
                                         
                                         @endif
                                     </span>
                                     <small class="text-muted d-block">Contacts : 
                                         @if($enseignement->enseignant)
-                                            6{{ $enseignement->enseignant->contacts }}
+                                            {{ $enseignement->enseignant ? '6' . $enseignement->enseignant->contacts : '- -' }}
                                         @else
                                         - -
                                         @endif
@@ -136,7 +139,7 @@
                                 <div class="modal-content">
                                    
                                         <div class="modal-header bg-info">
-                                        <h5 class="modal-title white" id="myModalLabel160">{{ $enseignement->matiere->LibelleMatiere }}</h5>
+                                        <h5 class="modal-title white" id="myModalLabel160">{{ optional($enseignement->matiere)->LibelleMatiere }}</h5>
                                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                             <i class="bx bx-x"></i>
                                         </button>
@@ -172,7 +175,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="list-content">
-                                                                <span class="list-title">{{ $enseignement->matiere->LibelleMatiere }}</span>
+                                                                <span class="list-title">{{ optional($enseignement->matiere)->LibelleMatiere }}</span>
                                                                 <small class="text-muted d-block">Libelle Enseignement</small>
                                                             </div>
                                                         </div>
@@ -218,7 +221,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="list-content">
-                                                                <span class="list-title">{{ $enseignement->classe->LibelleClasse }}</span>
+                                                                <span class="list-title">{{ optional($enseignement->classe)->LibelleClasse }}</span>
                                                                 <small class="text-muted d-block">Classe</small>
                                                             </div>
                                                         </div>
@@ -257,7 +260,7 @@
                                                             <div class="list-content">
                                                                 <span class="list-title"> 
                                                                 @if($enseignement->enseignant)
-                                                                    6{{ $enseignement->enseignant->contacts }}
+                                                                    {{ $enseignement->enseignant ? '6' . $enseignement->enseignant->contacts : '- -' }}
                                                                 @else
                                                                 - -
                                                                 @endif
@@ -365,7 +368,9 @@
                         </div>
                     </td>
                 </tr>                
-                @endforeach
+                @empty
+                <tr><td colspan="5">Aucun enseignement enregistré pour cet établissement ou cette classe.</td></tr>
+                @endforelse
 
 
             </tbody>

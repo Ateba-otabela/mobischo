@@ -106,7 +106,9 @@ class ParentNotesSequenceScreen extends StatefulWidget {
   final Student student;
   final Year year;
   final VoidCallback onBack;
-  final ValueChanged<SequenceEvaluation> onSequenceSelected;
+  final void Function(
+          SequenceEvaluation sequence, List<Course> courses, List<Mark> marks)
+      onSequenceSelected;
 
   const ParentNotesSequenceScreen({
     Key? key,
@@ -121,11 +123,17 @@ class ParentNotesSequenceScreen extends StatefulWidget {
       _ParentNotesSequenceScreenState();
 }
 
+class _SequenceNotesData {
+  final List<Course> courses;
+  final List<Mark> marks;
+
+  const _SequenceNotesData({required this.courses, required this.marks});
+}
+
 class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
-  bool checkingAvailability = false;
   SequenceEvaluation? unavailableSequence;
   late final Future<List<SequenceEvaluation>> _sequencesFuture;
-  late final Future<Map<int, bool>> _availabilityFuture;
+  late Future<_SequenceNotesData> _availabilityFuture;
 
   @override
   void initState() {
@@ -134,61 +142,36 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
     _availabilityFuture = _loadAvailability();
   }
 
-  Future<Map<int, bool>> _loadAvailability() async {
-    final sequences = await _sequencesFuture;
-    final courses =
-        await CourseServices.getClassCourses(widget.student.CodeClasse);
-    final availability = <int, bool>{};
+  Future<_SequenceNotesData> _loadAvailability() async {
+    await _sequencesFuture;
+    final results = await Future.wait([
+      CourseServices.getClassCourses(widget.student.CodeClasse),
+      MarkServices.getStudentYearMarksForNotes(
+        widget.student.CodeEleve,
+        widget.year.CodeAnnee.toString(),
+      ),
+    ]);
+    final courses = results[0] as List<Course>;
+    final classTeachingCodes =
+        courses.map((course) => course.CodeEnseignement).toSet();
+    final marks = (results[1] as List<Mark>)
+        .where((mark) => classTeachingCodes.contains(mark.Codeenseignement))
+        .toList();
 
-    await Future.wait(
-      sequences.map((sequence) async {
-        final markLists = await Future.wait(
-          courses.map(
-            (course) => MarkServices.getSortedStudentMarks(
-              widget.student.CodeEleve,
-              course.CodeEnseignement,
-              sequence.CodeEvaluation.toString(),
-              widget.year.CodeAnnee.toString(),
-            ),
-          ),
-        );
-        availability[sequence.CodeEvaluation] =
-            markLists.any((marks) => marks.isNotEmpty);
-      }),
-    );
-
-    return availability;
+    return _SequenceNotesData(courses: courses, marks: marks);
   }
 
   Future<void> _selectSequence(SequenceEvaluation sequence) async {
-    setState(() {
-      checkingAvailability = true;
-      unavailableSequence = null;
-    });
-
-    final courses =
-        await CourseServices.getClassCourses(widget.student.CodeClasse);
-    final markLists = await Future.wait(
-      courses.map(
-        (course) => MarkServices.getSortedStudentMarks(
-          widget.student.CodeEleve,
-          course.CodeEnseignement,
-          sequence.CodeEvaluation.toString(),
-          widget.year.CodeAnnee.toString(),
-        ),
-      ),
-    );
-    final hasMarks = markLists.any((marks) => marks.isNotEmpty);
-
-    if (!mounted) {
-      return;
-    }
-
+    final data = await _availabilityFuture;
+    final sequenceMarks = data.marks
+        .where(
+            (mark) => mark.CodeEvaluation == sequence.CodeEvaluation.toString())
+        .toList();
+    final hasMarks = sequenceMarks.isNotEmpty;
     if (hasMarks) {
-      widget.onSequenceSelected(sequence);
+      widget.onSequenceSelected(sequence, data.courses, sequenceMarks);
     } else {
       setState(() {
-        checkingAvailability = false;
         unavailableSequence = sequence;
       });
     }
@@ -196,20 +179,6 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (checkingAvailability && unavailableSequence == null) {
-      return Column(
-        children: [
-          _NotesHeader(
-            title: uiText(context, 'chooseSequence'),
-            onBack: widget.onBack,
-          ),
-          const Expanded(
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ],
-      );
-    }
-
     if (unavailableSequence != null) {
       return Column(
         children: [
@@ -249,7 +218,7 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
                 );
               }
 
-              return FutureBuilder<Map<int, bool>>(
+              return FutureBuilder<_SequenceNotesData>(
                 future: _availabilityFuture,
                 builder: (context, availabilitySnapshot) {
                   if (availabilitySnapshot.connectionState ==
@@ -257,16 +226,34 @@ class _ParentNotesSequenceScreenState extends State<ParentNotesSequenceScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final availability =
-                      availabilitySnapshot.data ?? <int, bool>{};
+                  if (availabilitySnapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(uiText(context, 'marksLoadError')),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: () => setState(() {
+                              _availabilityFuture = _loadAvailability();
+                            }),
+                            child: Text(uiText(context, 'retry')),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final marks = availabilitySnapshot.data?.marks ?? <Mark>[];
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: sequences.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final sequence = sequences[index];
-                      final isAvailable =
-                          availability[sequence.CodeEvaluation] ?? false;
+                      final isAvailable = marks.any((mark) =>
+                          mark.CodeEvaluation ==
+                          sequence.CodeEvaluation.toString());
                       final mutedColor = Colors.grey.shade600;
 
                       return Card(
@@ -330,6 +317,8 @@ class ParentSequenceMarksScreen extends StatelessWidget {
   final Student student;
   final Year year;
   final SequenceEvaluation sequence;
+  final List<Course> courses;
+  final List<Mark> marks;
   final VoidCallback onBack;
 
   const ParentSequenceMarksScreen({
@@ -337,6 +326,8 @@ class ParentSequenceMarksScreen extends StatelessWidget {
     required this.student,
     required this.year,
     required this.sequence,
+    required this.courses,
+    required this.marks,
     required this.onBack,
   }) : super(key: key);
 
@@ -355,62 +346,29 @@ class ParentSequenceMarksScreen extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: FutureBuilder<List<Course>>(
-            future: CourseServices.getClassCourses(student.CodeClasse),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final courses = snapshot.data ?? <Course>[];
-              if (courses.isEmpty) {
-                return _NotesMessage(
+          child: courses.isEmpty
+              ? _NotesMessage(
                   title: uiText(context, 'noSubjectsAvailable'),
                   subtitle: uiText(context, 'subjectsWillAppear'),
-                );
-              }
-
-              return FutureBuilder<List<List<Mark>>>(
-                future: Future.wait(
-                  courses.map(
-                    (course) => MarkServices.getSortedStudentMarks(
-                      student.CodeEleve,
-                      course.CodeEnseignement,
-                      sequence.CodeEvaluation.toString(),
-                      year.CodeAnnee.toString(),
-                    ),
-                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: courses.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    if (index == courses.length) {
+                      return _MarksSummary(marks: marks);
+                    }
+                    final course = courses[index];
+                    return _CourseMarkCard(
+                      course: course,
+                      marks: marks
+                          .where((mark) =>
+                              mark.Codeenseignement == course.CodeEnseignement)
+                          .toList(),
+                    );
+                  },
                 ),
-                builder: (context, marksSnapshot) {
-                  if (marksSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final marksByCourse = marksSnapshot.data ?? <List<Mark>>[];
-                  final allMarks =
-                      marksByCourse.expand((marks) => marks).toList();
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: courses.length + 1,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      if (index == courses.length) {
-                        return _MarksSummary(marks: allMarks);
-                      }
-                      return _CourseMarkCard(
-                        course: courses[index],
-                        marks: marksByCourse.length > index
-                            ? marksByCourse[index]
-                            : <Mark>[],
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          ),
         ),
       ],
     );

@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/components/screens/parent/ParentNotesSequence.dart';
+import 'package:mobischo/models/course.dart';
+import 'package:mobischo/models/mark.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/student.dart';
@@ -38,6 +40,8 @@ class _MyChildrenNotesState extends State<MyChildrenNotes> {
   Student? selectedStudent;
   Year? selectedYear;
   SequenceEvaluation? selectedSequence;
+  List<Course> selectedSequenceCourses = <Course>[];
+  List<Mark> selectedSequenceMarks = <Mark>[];
   int notesStage = 0;
   Future<Year?>? _currentYearFuture;
 
@@ -137,10 +141,12 @@ class _MyChildrenNotesState extends State<MyChildrenNotes> {
                       selectedStudent = null;
                       _currentYearFuture = null;
                     }),
-            onSequenceSelected: (sequence) => setState(() {
+            onSequenceSelected: (sequence, courses, marks) => setState(() {
               selectedYear = year;
               notesStage = 3;
               selectedSequence = sequence;
+              selectedSequenceCourses = courses;
+              selectedSequenceMarks = marks;
             }),
           );
         },
@@ -155,9 +161,13 @@ class _MyChildrenNotesState extends State<MyChildrenNotes> {
         student: selectedStudent!,
         year: selectedYear!,
         sequence: selectedSequence!,
+        courses: selectedSequenceCourses,
+        marks: selectedSequenceMarks,
         onBack: () => setState(() {
           notesStage = 1;
           selectedSequence = null;
+          selectedSequenceCourses = <Course>[];
+          selectedSequenceMarks = <Mark>[];
         }),
       );
     }

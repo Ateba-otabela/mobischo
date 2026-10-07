@@ -7,7 +7,7 @@ String getStudentDisplayName(Student student) {
   final prenom = rawPrenom is String ? rawPrenom.trim() : '';
 
   if (nom.isEmpty && prenom.isEmpty) {
-    return 'Élève';
+    return 'Student';
   }
   if (nom.isEmpty) {
     return prenom;

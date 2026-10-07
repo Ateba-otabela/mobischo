@@ -8,6 +8,7 @@ import 'package:mobischo/models/matiere.dart';
 
 class CourseServices {
   static const ROOT = 'https://mobischo.com/api/school_manager';
+  static const _notesRequestTimeout = Duration(seconds: 20);
   static const GET_ALL_ACTION = 'GET_ALL_COURSES';
   static const GET_TEACHER_COURSES_ACTION = 'GET_TEACHER_COURSES';
   static const GET_CLASS_COURSES_ACTION = 'GET_CLASS_COURSES';
@@ -69,7 +70,7 @@ class CourseServices {
     final response = await http.post(Uri.parse(ROOT), body: {
       'action': GET_TEACHER_COURSES_ACTION,
       'teacher_code': teacherCode,
-    });
+    }).timeout(_notesRequestTimeout);
     if (response.statusCode != 200) {
       throw Exception('Unable to load teacher subjects');
     }
@@ -86,7 +87,9 @@ class CourseServices {
       map['action'] = GET_CLASS_COURSES_ACTION;
       map['CodeClasse'] = CodeClasse;
 
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       // print("get class Courses Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -112,7 +115,9 @@ class CourseServices {
       map['code_matiere'] = codeMatiere;
       // print("code matiere : $codeMatiere");
 
-      var response = await http.post(Uri.parse(ROOT), body: map);
+      var response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       // print("get main Course Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -139,7 +144,9 @@ class CourseServices {
       map['action'] = GET_MAIN_CLASS_ACTION;
       map['code_classe'] = codeClasse;
 
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       // print("get main Class Response : ${response.body}");
 
       if (200 == response.statusCode) {

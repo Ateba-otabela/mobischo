@@ -36,6 +36,19 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::get('/myaccount', [App\Http\Controllers\HomeController::class, 'myaccount'])->name('myaccount');
 Route::post('/update_password', [App\Http\Controllers\HomeController::class, 'update_password'])->name('update_password');
 
+Route::prefix('admin/imports')
+    ->name('admin.imports.')
+    ->middleware(['auth', \App\Http\Middleware\EnsureAdministrator::class])
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\CsvImportController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\CsvImportController::class, 'upload'])->name('upload');
+        Route::get('/templates/{type}', [\App\Http\Controllers\CsvImportController::class, 'downloadTemplate'])->name('template');
+        Route::get('/{token}/preview', [\App\Http\Controllers\CsvImportController::class, 'preview'])->name('preview');
+        Route::post('/{token}/confirm', [\App\Http\Controllers\CsvImportController::class, 'confirm'])->name('confirm');
+        Route::get('/{token}/result', [\App\Http\Controllers\CsvImportController::class, 'result'])->name('result');
+        Route::get('/{token}/failed.csv', [\App\Http\Controllers\CsvImportController::class, 'downloadFailedRows'])->name('failed');
+    });
+
 // student controller
 
 #user routes

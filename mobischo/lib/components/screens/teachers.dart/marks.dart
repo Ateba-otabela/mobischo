@@ -74,15 +74,20 @@ class _MarkScreenState extends State<MarkScreen> {
       final years = results[1] as List<Year>;
       final sequences = results[2] as List<SequenceEvaluation>;
 
-      for (final classCode
-          in courses.map((course) => course.CodeClasse).toSet()) {
-        _classLabels[classCode] = await CourseServices.getMainClass(classCode);
-      }
-      for (final subjectCode
-          in courses.map((course) => course.CodeMatiere).toSet()) {
-        _subjectLabels[subjectCode] =
-            await CourseServices.getMainCourse(subjectCode);
-      }
+      await Future.wait([
+        ...courses.map((course) => course.CodeClasse).toSet().map(
+          (classCode) async {
+            _classLabels[classCode] =
+                await CourseServices.getMainClass(classCode);
+          },
+        ),
+        ...courses.map((course) => course.CodeMatiere).toSet().map(
+          (subjectCode) async {
+            _subjectLabels[subjectCode] =
+                await CourseServices.getMainCourse(subjectCode);
+          },
+        ),
+      ]);
 
       if (!mounted) return;
       setState(() {
@@ -126,23 +131,40 @@ class _MarkScreenState extends State<MarkScreen> {
   Future<void> _loadSequenceAvailability() async {
     final course = _selectedCourse;
     final year = _selectedYear;
-    if (course == null || year == null) return;
-    final availability = <String, List<Mark>>{};
-    for (final sequence in _sequences) {
-      availability[sequence.CodeEvaluation.toString()] =
-          await MarkServices.getSortedCourseMarks(
+    if (course == null || year == null) {
+      setState(() {
+        _loadingMarks = false;
+      });
+      return;
+    }
+
+    try {
+      final marks = await MarkServices.getCourseYearMarksForNotes(
         course.CodeEnseignement,
-        sequence.CodeEvaluation.toString(),
         year.CodeAnnee.toString(),
       );
+      final availability = <String, List<Mark>>{
+        for (final sequence in _sequences)
+          sequence.CodeEvaluation.toString(): marks
+              .where((mark) =>
+                  mark.CodeEvaluation == sequence.CodeEvaluation.toString())
+              .toList(),
+      };
+      if (!mounted) return;
+      setState(() {
+        _marksBySequence
+          ..clear()
+          ..addAll(availability);
+        _loadingMarks = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMarks = false;
+        _error = uiText(context, 'subjectMarksLoadError');
+      });
     }
-    if (!mounted) return;
-    setState(() {
-      _marksBySequence
-        ..clear()
-        ..addAll(availability);
-      _loadingMarks = false;
-    });
   }
 
   Future<void> _selectSequence(SequenceEvaluation sequence) async {
@@ -170,18 +192,13 @@ class _MarkScreenState extends State<MarkScreen> {
     }
 
     try {
-      final marks = await MarkServices.getSortedCourseMarks(
-        course.CodeEnseignement,
-        sequence.CodeEvaluation.toString(),
-        year.CodeAnnee.toString(),
-      );
-
       final students =
           await StudentServices.getCourseStudents(course.CodeClasse);
 
       if (!mounted) return;
       setState(() {
-        _marks = marks;
+        _marks =
+            _marksBySequence[sequence.CodeEvaluation.toString()] ?? <Mark>[];
         _students = students;
         _loadingMarks = false;
       });
@@ -408,39 +425,60 @@ class _MarkScreenState extends State<MarkScreen> {
                                     color: CustomTheme.blue,
                                   ),
                                 )
-                              : ListView.builder(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                  itemCount: _sequences.length,
-                                  itemBuilder: (context, index) {
-                                    final sequence = _sequences[index];
-                                    final sequenceMarks = _marksBySequence[
-                                            sequence.CodeEvaluation
-                                                .toString()] ??
-                                        [];
-                                    final hasMarks = sequenceMarks.isNotEmpty;
-                                    return Card(
-                                      child: ListTile(
-                                        title: Text(sequence.LibelleEvaluation),
-                                        subtitle: Text(hasMarks
-                                            ? uiText(context, 'marksAvailable')
-                                            : uiText(
-                                                context, 'noMarksForSubject')),
-                                        leading: Icon(
-                                          hasMarks
-                                              ? Icons.check_circle_outline
-                                              : Icons.info_outline,
-                                          color: hasMarks
-                                              ? Colors.green
-                                              : Colors.grey,
-                                        ),
-                                        trailing:
-                                            const Icon(Icons.arrow_forward_ios),
-                                        onTap: () => _selectSequence(sequence),
+                              : _error != null
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(_error!),
+                                          TextButton(
+                                            onPressed: _selectedCourse == null
+                                                ? null
+                                                : () => _selectSubject(
+                                                    _selectedCourse!),
+                                            child:
+                                                Text(uiText(context, 'retry')),
+                                          ),
+                                        ],
                                       ),
-                                    );
-                                  },
-                                )
+                                    )
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          12, 0, 12, 12),
+                                      itemCount: _sequences.length,
+                                      itemBuilder: (context, index) {
+                                        final sequence = _sequences[index];
+                                        final sequenceMarks = _marksBySequence[
+                                                sequence.CodeEvaluation
+                                                    .toString()] ??
+                                            [];
+                                        final hasMarks =
+                                            sequenceMarks.isNotEmpty;
+                                        return Card(
+                                          child: ListTile(
+                                            title: Text(
+                                                sequence.LibelleEvaluation),
+                                            subtitle: Text(hasMarks
+                                                ? uiText(
+                                                    context, 'marksAvailable')
+                                                : uiText(context,
+                                                    'noMarksForSubject')),
+                                            leading: Icon(
+                                              hasMarks
+                                                  ? Icons.check_circle_outline
+                                                  : Icons.info_outline,
+                                              color: hasMarks
+                                                  ? Colors.green
+                                                  : Colors.grey,
+                                            ),
+                                            trailing: const Icon(
+                                                Icons.arrow_forward_ios),
+                                            onTap: () =>
+                                                _selectSequence(sequence),
+                                          ),
+                                        );
+                                      },
+                                    )
                           : _loadingMarks
                               ? const Center(
                                   child: CircularProgressIndicator(
@@ -450,22 +488,22 @@ class _MarkScreenState extends State<MarkScreen> {
                                   : (_students.isEmpty || _marks.isEmpty)
                                       ? Center(
                                           child: Padding(
-                                            padding: EdgeInsets.all(24),
+                                            padding: const EdgeInsets.all(24),
                                             child: Column(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(
+                                                const Icon(
                                                   Icons.menu_book_outlined,
                                                   size: 48,
                                                   color: CustomTheme.blue,
                                                 ),
-                                                SizedBox(height: 16),
+                                                const SizedBox(height: 16),
                                                 Text(
                                                   uiText(
                                                       context, 'noMarksForNow'),
                                                   textAlign: TextAlign.center,
                                                 ),
-                                                SizedBox(height: 8),
+                                                const SizedBox(height: 8),
                                                 Text(
                                                   uiText(context,
                                                       'marksNotPublished'),

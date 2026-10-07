@@ -1,5 +1,7 @@
 // ignore_for_file: unrelated_type_equality_checks, avoid_print, file_names
 
+import 'dart:async';
+
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/components/screens/encardreur/EncardreurconvocationList.dart';
@@ -8,6 +10,8 @@ import 'package:mobischo/components/screens/encardreur/classList.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:mobischo/components/screens/notifications/notification_bell.dart';
+import 'package:mobischo/components/screens/notifications/notification_list_screen.dart';
 import 'package:mobischo/components/screens/mobischo_ai.dart';
 import 'package:mobischo/components/screens/layouts/sidebar.dart';
 import 'package:mobischo/components/screens/parent/MyChildren.dart';
@@ -21,6 +25,8 @@ import 'package:mobischo/components/screens/teachers.dart/convocation_detail.dar
 import 'package:mobischo/components/screens/users/user_list.dart';
 import 'package:mobischo/landing.dart';
 import 'package:mobischo/models/user.dart';
+import 'package:mobischo/services/notification_inbox_service.dart';
+import 'package:mobischo/services/notification_service.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 
 class PrincipalTabRequest extends Notification {
@@ -63,8 +69,10 @@ class CustomMenu extends StatefulWidget {
 }
 
 class _CustomMenuState extends State<CustomMenu>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tcontroller;
+  StreamSubscription? _notificationSubscription;
+  int _unreadNotificationCount = 0;
 
   final List<String> admintitleList = [
     "MOBISCHO",
@@ -85,7 +93,6 @@ class _CustomMenuState extends State<CustomMenu>
     "ABSENCES",
     "MES ENFANTS",
     "NOTES",
-    "AI",
   ];
 
   final List<String> encadreurTitleList = [
@@ -93,7 +100,6 @@ class _CustomMenuState extends State<CustomMenu>
     "CONVOQUER",
     "CONVOCATIONS",
     "ELEVES",
-    "AI",
   ];
 
   late String currentTitle;
@@ -105,11 +111,15 @@ class _CustomMenuState extends State<CustomMenu>
 
   @override
   void initState() {
-    if (currentIndex != widget.selectedPage) {
-      setState(() {
-        currentIndex = widget.selectedPage;
-      });
-    }
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _notificationSubscription =
+        NotificationService.instance.notificationEvents.listen((_) {
+      _refreshUnreadNotificationCount();
+    });
+    _refreshUnreadNotificationCount();
+
+    currentIndex = widget.selectedPage;
 
     currentTitle = '';
     if (widget.initialBody is SchoolAdvertScreen) {
@@ -130,7 +140,50 @@ class _CustomMenuState extends State<CustomMenu>
     _tcontroller.addListener(changeTitle);
     // Registering listener
     _tcontroller.index = widget.selectedPage;
-    super.initState();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshUnreadNotificationCount();
+    }
+  }
+
+  Future<void> _refreshUnreadNotificationCount() async {
+    try {
+      final page = await NotificationInboxService.load();
+      if (!mounted) return;
+      setState(() => _unreadNotificationCount = page.unreadCount);
+    } on Exception catch (error) {
+      debugPrint(
+        'Refreshing notification badge failed (${error.runtimeType}).',
+      );
+    }
+  }
+
+  void _openNotifications() {
+    Navigator.of(context)
+        .push<int>(
+          MaterialPageRoute(
+            builder: (_) => NotificationListScreen(
+              user: widget.user,
+              onUnreadCountChanged: (count) {
+                if (mounted) {
+                  setState(() => _unreadNotificationCount = count);
+                }
+              },
+            ),
+          ),
+        )
+        .then((_) => _refreshUnreadNotificationCount());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationSubscription?.cancel();
+    _tcontroller.dispose();
+    super.dispose();
   }
 
   // This function is called, every time active tab is changed
@@ -163,7 +216,6 @@ class _CustomMenuState extends State<CustomMenu>
                 l10n.absences.toUpperCase(),
                 l10n.myChildren.toUpperCase(),
                 l10n.notes.toUpperCase(),
-                l10n.ai.toUpperCase()
               ]
             : widget.user.account_type == 'encadreur'
                 ? [
@@ -171,7 +223,6 @@ class _CustomMenuState extends State<CustomMenu>
                     l10n.convoke.toUpperCase(),
                     l10n.convocations.toUpperCase(),
                     l10n.students.toUpperCase(),
-                    l10n.ai.toUpperCase()
                   ]
                 : [
                     l10n.appName.toUpperCase(),
@@ -201,7 +252,6 @@ class _CustomMenuState extends State<CustomMenu>
           const Icon(Icons.timer),
           const Icon(Icons.person),
           const Icon(Icons.note_add_rounded),
-          const Icon(Icons.smart_toy_outlined),
         ];
         return items;
       } else {
@@ -211,7 +261,6 @@ class _CustomMenuState extends State<CustomMenu>
             const Icon(Icons.message),
             const Icon(Icons.list_alt_sharp),
             const Icon(Icons.person),
-            const Icon(Icons.smart_toy_outlined),
           ];
           return items;
         } else {
@@ -319,7 +368,6 @@ class _CustomMenuState extends State<CustomMenu>
             MyChildrenNotes(
               user: widget.user,
             ),
-            MobischoAiScreen(user: widget.user),
           ];
         });
       } else {
@@ -330,7 +378,6 @@ class _CustomMenuState extends State<CustomMenu>
               ClassListScreen(user: widget.user),
               EncardreurConvocationList(user: widget.user),
               StudentClassListScreen(user: widget.user),
-              MobischoAiScreen(user: widget.user),
             ];
           });
         } else {
@@ -367,19 +414,39 @@ class _CustomMenuState extends State<CustomMenu>
       child: Scaffold(
         appBar: AppBar(
           // elevation: 0,
-          leading: ((widget.initialBody is SchoolAdvertScreen ||
-                      widget.initialBody is ConvocationDetail) &&
-                  showingInitialBody)
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _restoreDashboardShell,
-                )
-              : principalSecondaryBody != null
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: _restorePrincipalSecondary,
-                    )
-                  : null,
+          leadingWidth: 104,
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Builder(
+                builder: (scaffoldContext) {
+                  final showingBack =
+                      ((widget.initialBody is SchoolAdvertScreen ||
+                                  widget.initialBody is ConvocationDetail) &&
+                              showingInitialBody) ||
+                          principalSecondaryBody != null;
+                  return IconButton(
+                    icon: Icon(showingBack ? Icons.arrow_back : Icons.menu),
+                    onPressed: () {
+                      if ((widget.initialBody is SchoolAdvertScreen ||
+                              widget.initialBody is ConvocationDetail) &&
+                          showingInitialBody) {
+                        _restoreDashboardShell();
+                      } else if (principalSecondaryBody != null) {
+                        _restorePrincipalSecondary();
+                      } else {
+                        Scaffold.of(scaffoldContext).openDrawer();
+                      }
+                    },
+                  );
+                },
+              ),
+              NotificationBell(
+                unreadCount: _unreadNotificationCount,
+                onPressed: _openNotifications,
+              ),
+            ],
+          ),
           title: Text(
             (widget.initialBody is SchoolAdvertScreen && showingInitialBody)
                 ? localizedMenuTitle(context, 'École / Université')

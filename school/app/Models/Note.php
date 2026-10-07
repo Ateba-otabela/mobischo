@@ -11,15 +11,15 @@ class Note extends Model
     use HasFactory;
 
     protected $fillable = [
-        'Codeenseignement',
+        'CodeEnseignement',
         'CodeEleve',
         'CodeEvaluation',
         'CodeAppreciation',
         'valeur',
         'coef',
-        'total',
+        'Total',
         'Dateeng',
-        'codeannee'
+        'CodeAnnee'
     ];
     /**
      * Get the user that owns the Note

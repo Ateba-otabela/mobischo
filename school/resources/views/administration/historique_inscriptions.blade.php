@@ -2,6 +2,14 @@
 
 @section('body')
 
+@if ($errors->any())
+    <div class="alert alert-warning" role="alert">
+        @foreach ($errors->all() as $error)
+            <div>{{ $error }}</div>
+        @endforeach
+    </div>
+@endif
+
 @if (session()->has('message') )
 <div class="alert {{session('alert') ?? 'border-primary'}} alert-dismissible mb-2" role="alert">
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -145,13 +153,13 @@
                         <td>
                             <div class="media-body">
                                 <h6 class="media-heading mb-0">
-                                    @if($inscription->eleve)
-                                    {{ $inscription->eleve->Nom }} {{ $inscription->eleve->Prenom }}
+                                    @if($inscription->inscription && $inscription->inscription->eleve)
+                                    {{ $inscription->inscription->eleve->Nom }} {{ $inscription->inscription->eleve->Prenom }}
                                     @endif
                                 </h6>
                                 <div class="text-muted font-small-2">
-                                    @if($inscription->eleve)     
-                                        @if($inscription->eleve->Sex == 0)
+                                    @if($inscription->inscription && $inscription->inscription->eleve)
+                                        @if($inscription->inscription->eleve->Sex == 0)
                                             masculin
                                         @else
                                             feminin
@@ -292,8 +300,8 @@
                                                                 </div>
                                                                 <div class="list-content">
                                                                     <span class="list-title">
-                                                                        @if($inscription->eleve)
-                                                                            {{ $inscription->eleve->Nom }} {{ $inscription->eleve->Prenom }}
+                                                                        @if($inscription->inscription && $inscription->inscription->eleve)
+                                                                            {{ $inscription->inscription->eleve->Nom }} {{ $inscription->inscription->eleve->Prenom }}
                                                                         @endif
                                                                     </span>
                                                                     <small class="text-muted d-block">Eleve</small>
@@ -312,8 +320,8 @@
                                                                 </div>
                                                                 <div class="list-content">
                                                                     <span class="list-title">
-                                                                        @if($inscription->eleve)
-                                                                            {{ $inscription->eleve->classe->LibelleClasse }}
+                                                                        @if($inscription->inscription && $inscription->inscription->eleve && $inscription->inscription->eleve->classe)
+                                                                            {{ $inscription->inscription->eleve->classe->LibelleClasse }}
                                                                         @endif
                                                                     </span>
                                                                     <small class="text-muted d-block">Classe</small>

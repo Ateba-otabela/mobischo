@@ -11,24 +11,49 @@ use Illuminate\Http\Request;
 use App\Models\Etablissement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
     //
-    public function add_user()
+    public function add_user(Request $request)
     {
-        $users = User::all();
-        $schools = Etablissement::all();
+        $schools = Etablissement::orderBy('Nom')->get();
+        $selectedSchoolCode = $request->query('CodeEtablissement');
+        $selectedSchool = $selectedSchoolCode
+            ? Etablissement::find($selectedSchoolCode)
+            : null;
+        if ($selectedSchoolCode && !$selectedSchool) {
+            return redirect()->route('add_user')
+                ->withErrors(['CodeEtablissement' => 'Veuillez choisir un établissement existant.']);
+        }
+
+        $users = $selectedSchool
+            ? User::where('CodeEtablissement', $selectedSchool->CodeEtablissement)
+                ->with('enfants')
+                ->get()
+            : User::with('enfants')->get();
         // foreach($users as $user){
         //     $student->code = NULL;
         //     $student->save();
         // }
         // return response()->json($users);
-        return view('users.add_user',compact('users','schools'));
+        return view('users.add_user',compact('users','schools', 'selectedSchool'));
     }
     public function add_user_complete(Request $request)
     {
+        $request->validate([
+            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur',
+            'password' => 'required|string',
+        ]);
+
+        $school = null;
+        if (in_array($request->account_type, ['parent', 'enseignant', 'encadreur'], true)) {
+            $request->validate([
+                'school_id' => 'required|string|exists:etablissements,CodeEtablissement',
+            ]);
+            $school = Etablissement::findOrFail($request->school_id);
+        }
+
         function GenerateUserCode(){
             $number = mt_rand(10000000, 99999999); // better than rand()
             $number = abs($number);
@@ -43,7 +68,6 @@ class UserController extends Controller
             return User::wherecode($code)->exists();
         }
 
-        $school = Etablissement::find($request->school_id);
         if ($request->account_type == 'administrateur'){
             
             $validated = $request->validate([
@@ -113,13 +137,35 @@ class UserController extends Controller
             ]);
 
         }
+        else if ($request->account_type == 'encadreur') {
+            $validated = $request->validate([
+                'nom' => 'required|string',
+                'prenom' => 'required|string',
+                'contacts' => 'required|string',
+                'sex' => 'required|string',
+                'code' => 'required|string|unique:users,code',
+            ]);
+
+            $new_user = User::create([
+                'nom' => $validated['nom'],
+                'prenom' => $validated['prenom'],
+                'account_type' => 'encadreur',
+                'sex' => $validated['sex'],
+                'contacts' => $validated['contacts'],
+                'login' => GenerateUserCode(),
+                'password' => Hash::make($request->password),
+                'text_password' => $request->password,
+                'code' => $validated['code'],
+                'CodeEtablissement' => $school->CodeEtablissement,
+            ]);
+        }
 
         $new_user->save();
         if ($request->account_type == 'administrateur'){
             $new_user->admin = True;
             $new_user->save();
         }
-        else if ($request->account_type == 'enseignant' or 'parent'){
+        else if (in_array($request->account_type, ['enseignant', 'parent', 'encadreur'], true)){
             $new_user->CodeEtablissement = $school->CodeEtablissement;
             $new_user->save();
         }
@@ -132,7 +178,26 @@ class UserController extends Controller
 
     public function save_user(Request $request, $user_id)
     {   
-        $user = User::find($user_id);
+        $user = User::findOrFail($user_id);
+        $request->validate([
+            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur,tuteur',
+            'nom' => 'required|string',
+            'prenom' => 'required|string',
+            'sex' => 'required|string',
+            'login' => 'required|string',
+            'code' => 'required|string',
+            'contacts' => 'required|string',
+            'password' => 'required|string',
+            'RepPhoto' => 'nullable|image',
+        ]);
+        $school = null;
+        if ($request->account_type != 'administrateur') {
+            $request->validate([
+                'school_id' => 'required|string|exists:etablissements,CodeEtablissement',
+            ]);
+            $school = Etablissement::findOrFail($request->school_id);
+        }
+
         $user->nom = $request->nom;
         $user->prenom = $request->prenom;
         $user->account_type = $request->account_type;
@@ -145,7 +210,6 @@ class UserController extends Controller
         $user->save();
 
         if($user->account_type != 'administrateur'){
-            $school = Etablissement::find($request->school_id);
             $user->CodeEtablissement = $school->CodeEtablissement;
             $user->save();
         }
@@ -176,6 +240,10 @@ class UserController extends Controller
     public function assign_student_choose_class($parent_id,Request $request)
     {
         $school = Etablissement::find($request->CodeEtablissement);
+        if (!$school || !User::whereKey($parent_id)->exists()) {
+            return redirect()->route('add_user')
+                ->withErrors(['CodeEtablissement' => 'Veuillez choisir un parent et un établissement existants.']);
+        }
         $years = Annee::all();
 
         return view('users.assign_student_choose_class',compact(
@@ -189,13 +257,13 @@ class UserController extends Controller
     {
         $class = Classe::find($request->CodeClasse);
         $annee = Annee::find($request->CodeAnnee);
-        $all_students = Eleve::all();
-        // dd($all_students);
+        $parent = User::find($parent_id);
+        if (!$class || !$annee || !$parent) {
+            return redirect()->route('add_user')
+                ->withErrors(['filters' => 'Le parent, la classe ou l’année scolaire n’existe plus.']);
+        }
 
         $students =  Eleve::select('*')->where('CodeClasse', '=', $class->CodeClasse)->where('CodeAnnee', '=', $annee->CodeAnnee)->get();
-        $parent = User::find($parent_id);
-        // $students = $students->toArray();
-        // dd($students);
 
         return view('users.choose_student',compact(
             'students',
@@ -207,6 +275,11 @@ class UserController extends Controller
     {
         $parent = User::find($parent_id);
         $student = Eleve::where('CodeEleve','=',$student_id)->where('CodeAnnee','=',$code_annee)->first();
+        if (!$parent || !$student || !$student->classe || !$student->classe->etablissement) {
+            return redirect()->route('add_user')
+                ->withErrors(['student' => 'Le parent, l’élève ou ses informations de classe/établissement sont introuvables.']);
+        }
+
         $student->code = $parent->code;
         $student->save();
         // dd($student->parent);
@@ -220,8 +293,8 @@ class UserController extends Controller
 
     public function remove_student($parent_id, $student_id)
     {
-        $parent = User::find($parent_id);
-        $student = Eleve::find($student_id);
+        $parent = User::findOrFail($parent_id);
+        $student = Eleve::findOrFail($student_id);
         $student->code = NULL;
         $student->save();
         
@@ -230,67 +303,97 @@ class UserController extends Controller
 
     public function import_users(Request $request)
     {
-        if($request->csv_file){
-            $filename = time().'.'.$request->csv_file->extension();
-            $path = $request->file('csv_file')->storeAs(
-                'user_imports',
-                $filename,
-                'public'
-            );
-            $new_path = Storage::url($path);
-            // dd($new_path);
-            if (($open = fopen(public_path($new_path), "r")) !== FALSE){
-                while (($data = fgetcsv($open, 1000, ";")) !== FALSE){
-                    
-                    $current_user = User::find(trim($data[0]));
-                    if($current_user){
-                        $current_user->delete();
-                    }
-                    $user = User::create([
-                        'code'=>trim($data[0]),
-                        'nom'=>trim($data[1]),
-                        'prenom'=>trim($data[2]),
-                        'DateDeNaissance'=>trim($data[3]),
-                        'LieuDeNaissance'=>trim($data[4]),
-                        'nationalite'=>trim($data[5]),
-                        'sex'=>trim($data[6]),
-                        'DatePriseService'=>trim($data[7]),
-                        'login'=>trim($data[8]),
-                        'contacts'=>trim($data[9]),
-                        'cdegrade'=>trim($data[10]),
-                        'nbrand'=>trim($data[11]),
-                        'matricule'=>trim($data[12]),
-                        'reserve1'=>trim($data[13]),
-                        'reserve2'=>trim($data[14]),
-                        'reserve3'=>trim($data[15]),
-                        'reserve4'=>trim($data[16]),
-                        'reserve5'=>trim($data[17]),
-                        'reserve6'=>trim($data[18]),
-                        'cat'=>trim($data[19]),
-                        'echel'=>trim($data[20]),
-                        'statut'=>trim($data[21]),
-                        'reserve7'=>trim($data[22]),
-                        'reserve8'=>trim($data[23]),
-                        'reserve9'=>trim($data[24]),
-                        'CodeBank'=>trim($data[25]),
-                        'numcpt'=>trim($data[26]),
-                        'ribcpt'=>trim($data[27]),
-                        'TauhH'=>trim($data[28]),
-                        'syndicat'=>trim($data[29]),
-                        'NumAssure'=>trim($data[30]),
-                        'CodeEtablissement'=>trim($data[31]),
-                        'password'=>'$2y$10$JuTQ/qgM75boawWtIg4VxOR7Wxlq9pliljVAaLsQlo1n1AuvOXqRW',
-                        'text_password'=>'00000000'
-                    ]);
+        $rows = $this->validateLegacyCsvRows($this->readLegacyCsvRows($request, 32, 32, [
+            'code', 'nom', 'prenom', 'DateDeNaissance', 'LieuDeNaissance', 'nationalite',
+            'sex', 'DatePriseService', 'login', 'contacts', 'cdegrade', 'nbrand',
+            'matricule', 'reserve1', 'reserve2', 'reserve3', 'reserve4', 'reserve5',
+            'reserve6', 'cat', 'echel', 'statut', 'reserve7', 'reserve8', 'reserve9',
+            'CodeBank', 'numcpt', 'ribcpt', 'TauhH', 'syndicat', 'NumAssure',
+            'CodeEtablissement',
+        ]), [
+            0 => 'required|string|max:255',
+            1 => 'required|string|max:255',
+            2 => 'required|string|max:255',
+            3 => 'nullable|string|max:255',
+            4 => 'nullable|string|max:255',
+            5 => 'nullable|string|max:255',
+            6 => 'required|string|max:255',
+            7 => 'nullable|string|max:255',
+            8 => 'required|string|max:255',
+            9 => 'required|string|max:255',
+            10 => 'nullable|string|max:255',
+            11 => 'nullable|integer',
+            12 => 'nullable|string|max:255',
+            13 => 'nullable|string|max:255',
+            14 => 'nullable|string|max:255',
+            15 => 'nullable|string|max:255',
+            16 => 'nullable|string|max:255',
+            17 => 'nullable|string|max:255',
+            18 => 'nullable|string|max:255',
+            19 => 'nullable|string|max:255',
+            20 => 'nullable|string|max:255',
+            21 => 'nullable|string|max:255',
+            22 => 'nullable|string|max:255',
+            23 => 'nullable|string|max:255',
+            24 => 'nullable|string|max:255',
+            25 => 'nullable|string|max:255',
+            26 => 'nullable|string|max:255',
+            27 => 'nullable|string|max:255',
+            28 => 'nullable|string|max:255',
+            29 => 'nullable|string|max:255',
+            30 => 'nullable|string|max:255',
+            31 => 'nullable|string|max:255',
+        ]);
 
-                    $user->save();       
-                    // dd(trim($data[0]));
-                    // $array[] = $data;
-                }
-                fclose($open);
+        foreach ($rows as $index => $row) {
+            if ($row[31] !== '' && !Etablissement::where('CodeEtablissement', $row[31])->exists()) {
+                return redirect('add_user')
+                    ->withErrors(['csv_file' => 'L’établissement de la ligne '.($index + 1).' n’existe pas.']);
             }
-            
-        } 
+        }
+
+        DB::transaction(function () use ($rows): void {
+            foreach ($rows as $data) {
+                $user = User::firstOrNew(['code' => $data[0]]);
+                $user->forceFill([
+                        'nom' => $data[1],
+                        'prenom' => $data[2],
+                        'DateDeNaissance' => $data[3],
+                        'LieuDeNaissance' => $data[4],
+                        'nationalite' => $data[5],
+                        'sex' => $data[6],
+                        'DatePriseService' => $data[7],
+                        'login' => $data[8],
+                        'contacts' => $data[9],
+                        'cdegrade' => $data[10],
+                        'nbrand' => $data[11] === null || $data[11] === '' ? null : (int) $data[11],
+                        'matricule' => $data[12],
+                        'reserve1' => $data[13],
+                        'reserve2' => $data[14],
+                        'reserve3' => $data[15],
+                        'reserve4' => $data[16],
+                        'reserve5' => $data[17],
+                        'reserve6' => $data[18],
+                        'cat' => $data[19],
+                        'echel' => $data[20],
+                        'statut' => $data[21],
+                        'reserve7' => $data[22],
+                        'reserve8' => $data[23],
+                        'reserve9' => $data[24],
+                        'CodeBank' => $data[25],
+                        'numcpt' => $data[26],
+                        'ribcpt' => $data[27],
+                        'TauhH' => $data[28],
+                        'syndicat' => $data[29],
+                        'NumAssure' => $data[30],
+                        'CodeEtablissement' => $data[31] === '' ? null : $data[31],
+                        'password' => '$2y$10$JuTQ/qgM75boawWtIg4VxOR7Wxlq9pliljVAaLsQlo1n1AuvOXqRW',
+                        'text_password' => '00000000',
+                ]);
+                $user->save();
+            }
+        });
+
         return redirect('add_user')->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
     }
 

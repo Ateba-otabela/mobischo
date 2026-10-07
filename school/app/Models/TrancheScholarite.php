@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class TrancheScholarite extends Model
 {
     protected $primaryKey = 'code';
+    public $incrementing = false;
+    protected $keyType = 'string';
     
     protected $fillable = [
         'code',

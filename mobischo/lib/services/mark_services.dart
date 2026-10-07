@@ -11,6 +11,9 @@ class MarkServices {
   static const GET_STUDENT_MARKS_ACTION = 'GET_STUDENT_MARKS';
   static const GET_SORTED_STUDENT_MARKS_ACTION = 'GET_SORTED_STUDENT_MARKS';
   static const GET_SORTED_COURSE_MARKS_ACTION = 'GET_SORTED_COURSE_MARKS';
+  static const GET_STUDENT_YEAR_MARKS_ACTION = 'GET_STUDENT_YEAR_MARKS';
+  static const GET_COURSE_YEAR_MARKS_ACTION = 'GET_COURSE_YEAR_MARKS';
+  static const _notesRequestTimeout = Duration(seconds: 20);
 
   static Future<List<Mark>> getCourseMarks(String codeEnseignement) async {
     try {
@@ -18,7 +21,9 @@ class MarkServices {
       map['action'] = GET_COURSE_MARKS_ACTION;
       map['CodeEnseignement'] = codeEnseignement;
 
-      var response = await http.post(Uri.parse(ROOT), body: map);
+      var response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
 
       // print("get course marks Response : ${response.body}");
 
@@ -44,7 +49,7 @@ class MarkServices {
     final response = await http.post(Uri.parse(ROOT), body: {
       'action': GET_COURSE_MARKS_ACTION,
       'CodeEnseignement': codeEnseignement,
-    });
+    }).timeout(_notesRequestTimeout);
     if (response.statusCode != 200) {
       throw Exception('Unable to load course marks');
     }
@@ -52,6 +57,40 @@ class MarkServices {
       return parseResponse(response.body);
     } catch (_) {
       throw Exception('Invalid course marks response');
+    }
+  }
+
+  static Future<List<Mark>> getStudentYearMarksForNotes(
+      String codeEleve, String codeAnnee) async {
+    final response = await http.post(Uri.parse(ROOT), body: {
+      'action': GET_STUDENT_YEAR_MARKS_ACTION,
+      'codeEleve': codeEleve,
+      'codeAnnee': codeAnnee,
+    }).timeout(_notesRequestTimeout);
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load student notes');
+    }
+    try {
+      return parseResponse(response.body);
+    } catch (_) {
+      throw Exception('Invalid student notes response');
+    }
+  }
+
+  static Future<List<Mark>> getCourseYearMarksForNotes(
+      String codeEnseignement, String codeAnnee) async {
+    final response = await http.post(Uri.parse(ROOT), body: {
+      'action': GET_COURSE_YEAR_MARKS_ACTION,
+      'codeEnseignement': codeEnseignement,
+      'codeAnnee': codeAnnee,
+    }).timeout(_notesRequestTimeout);
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load course notes');
+    }
+    try {
+      return parseResponse(response.body);
+    } catch (_) {
+      throw Exception('Invalid course notes response');
     }
   }
 
@@ -66,7 +105,9 @@ class MarkServices {
       // print('code eleve: $CodeEleve');
       // print('code enseignement: $CodeEnseignement');
 
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       print("get student marks Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -98,7 +139,9 @@ class MarkServices {
       // print("sequence : ${sequence}");z
       map['codeEnseignement'] = CodeEnseignement;
 
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       print("get sorted student marks Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -127,7 +170,9 @@ class MarkServices {
       map['codeEnseignement'] = codeEnseignement;
       map['codeAnnee'] = codeAnnee.toString();
       map['codeEvaluation'] = sequenceEvaluation;
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       print("get sorted marks Response : ${response.body}");
 
       if (200 == response.statusCode) {

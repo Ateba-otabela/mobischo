@@ -1,6 +1,8 @@
 // ignore_for_file: file_names, non_constant_identifier_names, prefer_const_constructors, import_of_legacy_library_into_null_safe, prefer_typing_uninitialized_variables, avoid_print
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:intl/intl.dart';
@@ -17,16 +19,22 @@ class CreateConvocation extends StatefulWidget {
   final User user;
   final Student? student;
   final List<Student>? students;
+  final List<String>? initialStudentCodes;
   final String? codeClasse;
+  final String? appBarTitle;
   final bool returnToList;
+  final bool useClassCourses;
 
   const CreateConvocation({
     Key? key,
     required this.user,
     this.student,
     this.students,
+    this.initialStudentCodes,
     this.codeClasse,
+    this.appBarTitle,
     this.returnToList = false,
+    this.useClassCourses = false,
   }) : super(key: key);
 
   @override
@@ -76,6 +84,11 @@ class _CreateConvocationState extends State<CreateConvocation> {
   var motif;
   final Set<String> _selectedStudentCodes = <String>{};
   bool _isSaving = false;
+  bool _isPickingAttachment = false;
+  Uint8List? _attachmentBytes;
+  String? _attachmentName;
+
+  static const _maxAttachmentSize = 10 * 1024 * 1024;
 
   List<DropdownMenuItem<String>> ListCourses = [];
   List<DropdownMenuItem<String>> ListMotifs = [];
@@ -102,12 +115,14 @@ class _CreateConvocationState extends State<CreateConvocation> {
     if (classCode == null || classCode.isEmpty) {
       return Future.value(List<DropdownMenuItem>.from(ListCourses));
     }
+
+    final availableCourses = widget.useClassCourses
+        ? CourseServices.getClassCourses(classCode)
+        : CourseServices.getTeacherCourses(widget.user.code);
     Future<List<DropdownMenuItem>> all_class_courses =
-        CourseServices.getTeacherCourses(widget.user.code)
-            .then((teacherCourses) {
-      final all_class_courses = teacherCourses
-          .where((course) => course.CodeClasse == classCode)
-          .toList();
+        availableCourses.then((courses) {
+      final all_class_courses =
+          courses.where((course) => course.CodeClasse == classCode).toList();
       // print("length : $all_class_courses.length");
       for (var i = 0; i < all_class_courses.length; i++) {
         ListCourses.add(DropdownMenuItem(
@@ -137,6 +152,49 @@ class _CreateConvocationState extends State<CreateConvocation> {
     return all_class_courses;
   }
 
+  Future<void> _pickAttachment() async {
+    setState(() => _isPickingAttachment = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (!mounted || result == null) return;
+
+      final file = result.files.single;
+      if (file.bytes == null) {
+        _showMessage(uiText(context, 'documentReadError'));
+        return;
+      }
+      if (file.size > _maxAttachmentSize) {
+        _showMessage(uiText(context, 'documentTooLarge'));
+        return;
+      }
+
+      setState(() {
+        _attachmentBytes = file.bytes;
+        _attachmentName = file.name;
+      });
+    } on PlatformException catch (error) {
+      debugPrint('Picking convocation attachment failed (${error.code}).');
+      if (mounted) _showMessage(uiText(context, 'documentSelectError'));
+    } on Exception catch (error) {
+      debugPrint(
+          'Picking convocation attachment failed (${error.runtimeType}).');
+      if (mounted) _showMessage(uiText(context, 'documentSelectError'));
+    } finally {
+      if (mounted) setState(() => _isPickingAttachment = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -158,7 +216,8 @@ class _CreateConvocationState extends State<CreateConvocation> {
         ? <Student>[]
         : (widget.student == null ? <Student>[] : [widget.student!]);
     _selectedStudentCodes.addAll(
-      initialStudents.map((student) => student.CodeEleve),
+      widget.initialStudentCodes ??
+          initialStudents.map((student) => student.CodeEleve),
     );
     courses().then((_) {
       if (mounted) {
@@ -299,7 +358,7 @@ class _CreateConvocationState extends State<CreateConvocation> {
             },
             icon: const Icon(Icons.arrow_back_ios)),
         title: Text(
-          "Convocation",
+          widget.appBarTitle ?? "Convocation",
           style: Theme.of(context).textTheme.titleLarge,
         ),
         centerTitle: true,
@@ -413,6 +472,56 @@ class _CreateConvocationState extends State<CreateConvocation> {
                       ),
                     ),
                     Padding(
+                      padding: const EdgeInsets.fromLTRB(17, 16, 17, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(uiText(context, 'optionalSupportingDocument')),
+                          const SizedBox(height: 6),
+                          if (_attachmentBytes == null)
+                            OutlinedButton.icon(
+                              onPressed:
+                                  _isPickingAttachment ? null : _pickAttachment,
+                              icon: _isPickingAttachment
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.attach_file),
+                              label:
+                                  Text(uiText(context, 'addDocumentOrPhoto')),
+                            )
+                          else
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.description_outlined),
+                              title: Text(
+                                _attachmentName ??
+                                    uiText(context, 'selectedDocument'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: IconButton(
+                                tooltip: uiText(context, 'deleteDocument'),
+                                onPressed: () => setState(() {
+                                  _attachmentBytes = null;
+                                  _attachmentName = null;
+                                }),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ),
+                          const SizedBox(height: 4),
+                          Text(
+                            uiText(context, 'fileSizeLimit'),
+                            style: const TextStyle(
+                                color: Colors.black54, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
                       padding:
                           const EdgeInsets.only(left: 17, right: 17, top: 30),
                       child: CustomButton(
@@ -462,6 +571,8 @@ class _CreateConvocationState extends State<CreateConvocation> {
       course,
       date,
       codeClasse: widget.codeClasse ?? _availableStudents.first.CodeClasse,
+      documentBytes: _attachmentBytes,
+      documentName: _attachmentName,
     );
     if (!mounted) return;
     final success = result.toLowerCase().contains('success');

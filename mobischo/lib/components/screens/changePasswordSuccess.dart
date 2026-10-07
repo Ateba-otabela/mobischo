@@ -92,7 +92,7 @@ class _ChangePasswordSuccessState extends State<ChangePasswordSuccess> {
                   height: 20,
                 ),
                 CustomButton(
-                    text: "Aceuil",
+                    text: uiText(context, 'home'),
                     onPress: () {
                       if (widget.returnToLogin) {
                         Navigator.pushAndRemoveUntil(

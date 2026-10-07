@@ -1,14 +1,17 @@
 // ignore_for_file: import_of_legacy_library_into_null_safe, constant_identifier_names, avoid_print, unnecessary_null_comparison, non_constant_identifier_names
 
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:mobischo/models/class.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/models/convocation.dart';
+import 'package:mobischo/services/mobile_api_service.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/models/year.dart';
 
 class AcademicServices {
   static const ROOT = 'https://mobischo.com/api/school_manager';
+  static const _notesRequestTimeout = Duration(seconds: 20);
   static const GET_ALL_YEARS_ACTION = 'GET_ALL_YEARS';
   static const GET_ALL_SEQUENCES_ACTION = 'GET_ALL_SEQUENCES';
   static const GET_MAIN_YEAR_ACTION = 'GET_MAIN_YEAR';
@@ -24,7 +27,9 @@ class AcademicServices {
     try {
       var map = <String, dynamic>{};
       map['action'] = GET_ALL_YEARS_ACTION;
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       // print("get Year Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -113,7 +118,9 @@ class AcademicServices {
     try {
       var map = <String, dynamic>{};
       map['action'] = GET_ALL_SEQUENCES_ACTION;
-      final response = await http.post(Uri.parse(ROOT), body: map);
+      final response = await http
+          .post(Uri.parse(ROOT), body: map)
+          .timeout(_notesRequestTimeout);
       // print("get sequences Response : ${response.body}");
 
       if (200 == response.statusCode) {
@@ -164,9 +171,11 @@ class AcademicServices {
       String description,
       String CodeEnseignement,
       String dateConvocation,
-      {String? codeClasse}) async {
+      {String? codeClasse,
+      Uint8List? documentBytes,
+      String? documentName}) async {
     try {
-      var map = <String, dynamic>{};
+      final map = <String, String>{};
       map['action'] = INSERT_CONVOCATION_ACTION;
       map['code'] = code;
       map['CodeEleves'] = jsonEncode(studentCodes);
@@ -183,7 +192,21 @@ class AcademicServices {
       print('CONVOCATION METHOD: POST');
       print('CONVOCATION PAYLOAD: $map');
 
-      final response = await http.post(uri, body: map);
+      if ((documentBytes == null) != (documentName == null)) {
+        throw ArgumentError('Both document bytes and name are required.');
+      }
+      final response = documentBytes == null
+          ? await http.post(uri, body: map)
+          : await MobileApiService.postMultipart(
+              '/school_manager',
+              fields: map,
+              file: http.MultipartFile.fromBytes(
+                'document',
+                documentBytes,
+                filename: documentName,
+              ),
+              headers: const {'Accept': 'application/json'},
+            );
       final contentType = response.headers['content-type'] ?? '(missing)';
       final responsePreview = response.body.length > 1000
           ? response.body.substring(0, 1000)

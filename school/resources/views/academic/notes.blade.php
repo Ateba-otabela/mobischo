@@ -24,10 +24,10 @@
             <div class="col-12">
                 <h4>
                     <a href="#" onclick="history.back()"><i class="bx bx-left-arrow-circle" style="font-size: 1.5rem"></i></a>
-                Liste des notes de {{ $enseignement->matiere->LibelleMatiere }} - {{ $note->sequence_evaluation->LibelleEvaluation }} / {{ $note->annee->Libelle }}
+                Liste des notes de {{ optional(optional($enseignement)->matiere)->LibelleMatiere ?? '-' }} - {{ optional(optional($note)->sequence_evaluation)->LibelleEvaluation ?? '-' }} / {{ optional(optional($note)->annee)->Libelle ?? '-' }}
                 </h4> 
                 <p class="card-description">
-                    Classe : {{ $note->enseignement->classe->LibelleClasse }}
+                    Classe : {{ optional(optional(optional($note)->enseignement)->classe)->LibelleClasse ?? $classe->LibelleClasse }}
                 </p>
                 <p class="card-description">Etablissement : {{ $school->Nom }}</p>
             </div>
@@ -43,10 +43,10 @@
                                 
                                 @if($enseignement)
                                     @if($enseignement->CodeEnseignement == $school_enseignement->CodeEnseignement)
-                                    <option selected="selected" value="{{ $school_enseignement->CodeEnseignement }}">{{ $school_enseignement->matiere->LibelleMatiere }}</option>
+                                    <option selected="selected" value="{{ $school_enseignement->CodeEnseignement }}">{{ optional($school_enseignement->matiere)->LibelleMatiere }}</option>
                                     @endif
                                 @endif
-                                    <option value="{{ $school_enseignement->CodeEnseignement }}">{{ $school_enseignement->matiere->LibelleMatiere }}</option>
+                                    <option value="{{ $school_enseignement->CodeEnseignement }}">{{ optional($school_enseignement->matiere)->LibelleMatiere }}</option>
                             @endforeach
                             </select>
                     </div>
@@ -116,7 +116,7 @@
             </thead>
             <tbody>
 
-                @foreach ($notes as $school_note)
+                @forelse ($notes as $school_note)
                 <tr>
                     
                     <td>
@@ -353,8 +353,8 @@
                                                             </div>
                                                             <div class="list-content">
                                                                 <span class="list-title"> 
-                                                                @if($school_note->enseignant)
-                                                                    6{{ $note->enseignant->contacts }}
+                                                                @if($school_note->enseignement && $school_note->enseignement->enseignant)
+                                                                    6{{ $school_note->enseignement->enseignant->contacts }}
                                                                 @else
                                                                 - -
                                                                 @endif
@@ -462,7 +462,11 @@
                         </div>
                     </td>
                 </tr>                
-                @endforeach
+                @empty
+                <tr>
+                    <td colspan="5">Aucune note disponible pour cette classe et ces critères.</td>
+                </tr>
+                @endforelse
 
 
             </tbody>

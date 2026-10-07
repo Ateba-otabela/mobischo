@@ -230,6 +230,19 @@ class MobileApiService {
         headers: finalHeaders, body: body);
   }
 
+  static Future<http.Response> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final finalHeaders = await buildHeaders(extra: headers);
+    return http.patch(
+      Uri.parse('$_baseUrl$path'),
+      headers: finalHeaders,
+      body: body,
+    );
+  }
+
   static Future<http.Response> postMultipart(
     String path, {
     required Map<String, String> fields,

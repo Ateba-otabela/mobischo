@@ -38,6 +38,31 @@
                 </div>
             </div>
         </div>
+
+        @if ($errors->any())
+            <div class="alert alert-warning" role="alert">
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
+
+        <form action="{{ route('add_class') }}" method="GET" class="mb-2">
+            <div class="form-row align-items-end">
+                <div class="col-md-9">
+                    <label for="class-school-filter">Établissement</label>
+                    <select name="CodeEtablissement" id="class-school-filter" class="form-control" required>
+                        <option value="">Choisir un établissement</option>
+                        @foreach ($schools as $school)
+                            <option value="{{ $school->CodeEtablissement }}" {{ $selectedSchool && $selectedSchool->CodeEtablissement == $school->CodeEtablissement ? 'selected' : '' }}>{{ $school->Nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mt-1 mt-md-0">
+                    <button type="submit" class="btn btn-outline-primary">Afficher les classes</button>
+                </div>
+            </div>
+        </form>
         
         <!--primary theme Modal -->
         <div class="modal fade text-left" id="import" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
@@ -200,8 +225,8 @@
                         </td>
                         <td>
                             <div class="media-body">
-                                <h6 class="media-heading mb-0">{{ $class->etablissement->Nom }}</h6>
-                                <span class="font-small-2">Code Etablissement : {{ $class->etablissement->CodeEtablissement }}</span>
+                                <h6 class="media-heading mb-0">{{ optional($class->etablissement)->Nom }}</h6>
+                                <span class="font-small-2">Code Etablissement : {{ optional($class->etablissement)->CodeEtablissement }}</span>
                             </div>
                             
                         </td>
@@ -398,7 +423,7 @@
                                                         <select name="CodeEtablissement" class="text-center form-control">
                                                             @foreach ($schools as $school)
                                                             
-                                                            @if($class->etablissement->CodeEtablissement == $school->CodeEtablissement)
+                                                            @if(optional($class->etablissement)->CodeEtablissement == $school->CodeEtablissement)
                                                             <option selected="selected" value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
                                                             @else
                                                             <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
@@ -458,7 +483,7 @@
                         </td>
                     </tr>
                     @empty
-                    Liste vide !
+                    <tr><td colspan="4">{{ $selectedSchool ? 'Aucune classe enregistrée pour cet établissement.' : 'Aucune classe disponible.' }}</td></tr>
                     @endforelse
                     
                     

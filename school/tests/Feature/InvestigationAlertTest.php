@@ -1230,6 +1230,51 @@ class InvestigationAlertTest extends TestCase
         ]);
     }
 
+    public function test_teacher_attendance_requires_the_non_nullable_record_date(): void
+    {
+        $fixture = $this->createAttendanceMismatchFixture(['ELE-MISSING-DATE']);
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'SAVE_TEACHER_ATTENDANCE',
+            'CodeEnseignement' => $fixture['course_code'],
+            'teacher_code' => $fixture['teacher_code'],
+            'CodeAnnee' => 'AN-1',
+            'statuses' => [[
+                'CodeEleve' => 'ELE-MISSING-DATE',
+                'status' => 'P',
+            ]],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('DateEnreg');
+
+        $this->assertDatabaseMissing('conduites', [
+            'CodeEnseignement' => $fixture['course_code'],
+        ]);
+    }
+
+    public function test_teacher_attendance_rejects_array_student_codes_without_throwing(): void
+    {
+        $fixture = $this->createAttendanceMismatchFixture(['ELE-ARRAY-CODE']);
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'SAVE_TEACHER_ATTENDANCE',
+            'CodeEnseignement' => $fixture['course_code'],
+            'teacher_code' => $fixture['teacher_code'],
+            'DateEnreg' => '2026-10-07',
+            'CodeAnnee' => 'AN-1',
+            'statuses' => [[
+                'CodeEleve' => ['ELE-ARRAY-CODE'],
+                'status' => 'P',
+            ]],
+        ])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Invalid attendance student or status']);
+
+        $this->assertDatabaseMissing('conduites', [
+            'CodeEnseignement' => $fixture['course_code'],
+        ]);
+    }
+
     public function test_matching_parent_justification_and_roll_call_create_investigation_alert(): void
     {
         $fixture = $this->createAttendanceMismatchFixture(['ELE-MATCH']);

@@ -56,6 +56,25 @@ class NotificationDispatchServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('notifications', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->string('notifiable_type');
+            $table->string('notifiable_id');
+            $table->text('data');
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+            $table->index(['notifiable_type', 'notifiable_id', 'read_at']);
+        });
+
+        Schema::create('encadreur_classes', function (Blueprint $table) {
+            $table->id();
+            $table->string('code');
+            $table->string('CodeClasse');
+            $table->string('CodeEtablissement');
+            $table->timestamps();
+        });
+
         Schema::create('classes', function (Blueprint $table) {
             $table->string('CodeClasse')->primary();
             $table->string('CodeEtablissement')->nullable();
@@ -81,6 +100,22 @@ class NotificationDispatchServiceTest extends TestCase
             $table->string('CodeEnseignant2')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('matieres', function (Blueprint $table) {
+            $table->string('CodeMatiere')->primary();
+            $table->string('LibelleMatiere');
+            $table->string('ordre')->nullable();
+            $table->string('CodeEtablissement')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('conduites', function (Blueprint $table) {
+            $table->id();
+            $table->string('DateEnreg');
+            $table->string('CodeEleve');
+            $table->string('CodeEnseignement')->nullable();
+            $table->timestamps();
+        });
     }
 
     public function test_present_status_sends_no_attendance_notification(): void
@@ -103,7 +138,7 @@ class NotificationDispatchServiceTest extends TestCase
         $this->assertSame(0, $result['sent']);
     }
 
-    public function test_absent_status_notifies_parent_and_same_school_principal(): void
+    public function test_absent_notifies_parent_without_class_and_assigned_encadreur_with_class(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
@@ -113,34 +148,53 @@ class NotificationDispatchServiceTest extends TestCase
         UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
+        $this->createAbsentAttendanceRecord();
 
         $fcm = Mockery::mock(FcmNotificationService::class);
         $fcm->shouldReceive('sendToUser')
             ->once()
-            ->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice') && str_contains($body, '2026-09-29')), Mockery::on(function ($data) {
+            ->with('P-1', 'Absence scolaire', 'Alice Durand n’était pas présent au cours d’Anglais le 29 septembre 2026 à 10:15.', Mockery::on(function ($data) {
                 return ($data['type'] ?? null) === 'attendance'
                     && ($data['student_code'] ?? null) === 'E-1'
-                    && ($data['class_code'] ?? null) === 'C-1'
+                    && !isset($data['class_code'])
+                    && !isset($data['class_name'])
                     && ($data['recipient_role'] ?? null) === 'parent';
             }))
             ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
         $fcm->shouldReceive('sendToUser')
             ->once()
-            ->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+            ->with('ENC-1', 'Absence scolaire', 'Alice Durand n’était pas présent au cours d’Anglais le 29 septembre 2026 à 10:15. Classe : 6e A.', Mockery::on(function ($data) {
                 return ($data['type'] ?? null) === 'attendance'
                     && ($data['student_code'] ?? null) === 'E-1'
                     && ($data['school_code'] ?? null) === '16801'
-                    && ($data['recipient_role'] ?? null) === 'principal';
+                    && ($data['class_name'] ?? null) === '6e A'
+                    && ($data['recipient_role'] ?? null) === 'encadreur';
             }))
             ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->with('PR-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', [
+            'school_code' => '16801',
+            'class_code' => 'C-1',
+            'teaching_code' => 'EN-1',
+        ]);
 
         $this->assertSame(2, $result['sent']);
+        $this->assertSame(2, DB::table('notifications')->count());
+        $parentNotification = json_decode(
+            DB::table('notifications')->where('notifiable_id', 'P-1')->value('data'),
+            true
+        );
+        $encadreurNotification = json_decode(
+            DB::table('notifications')->where('notifiable_id', 'ENC-1')->value('data'),
+            true
+        );
+        $this->assertStringNotContainsString('Classe', $parentNotification['body']);
+        $this->assertStringContainsString('Classe : 6e A.', $encadreurNotification['body']);
     }
 
-    public function test_late_status_notifies_parent_and_same_school_principal(): void
+    public function test_late_notifies_parent_without_class_and_assigned_encadreur_with_class(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
@@ -151,24 +205,33 @@ class NotificationDispatchServiceTest extends TestCase
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
 
+        $this->createAbsentAttendanceRecord();
+
         $fcm = Mockery::mock(FcmNotificationService::class);
-        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice') && str_contains($body, 'en retard')), Mockery::on(function ($data) {
-            return ($data['type'] ?? null) === 'attendance'
-                && ($data['recipient_role'] ?? null) === 'parent';
-        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
-        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève en retard', Mockery::on(fn ($body) => str_contains($body, 'en retard')), Mockery::on(function ($data) {
+        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Retard scolaire', 'Alice Durand a été en retard au cours d’Anglais le 29 septembre 2026 à 10:15.', Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance'
                 && ($data['status'] ?? null) === 'R'
-                && ($data['recipient_role'] ?? null) === 'principal';
+                && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->once()->with('ENC-1', 'Retard scolaire', 'Alice Durand a été en retard au cours d’Anglais le 29 septembre 2026 à 10:15. Classe : 6e A.', Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance'
+                && ($data['status'] ?? null) === 'R'
+                && ($data['class_name'] ?? null) === '6e A'
+                && ($data['recipient_role'] ?? null) === 'encadreur';
+        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->with('PR-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'R', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'R', 'T-1', [
+            'school_code' => '16801',
+            'class_code' => 'C-1',
+            'teaching_code' => 'EN-1',
+        ]);
 
         $this->assertSame(2, $result['sent']);
     }
 
-    public function test_principal_from_another_school_does_not_receive_notification(): void
+    public function test_principal_never_receives_attendance_notification(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         User::create(['code' => 'PR-1', 'account_type' => 'principal', 'nom' => 'Principal', 'prenom' => 'One', 'CodeEtablissement' => '99999']);
@@ -177,25 +240,27 @@ class NotificationDispatchServiceTest extends TestCase
 
         UserDevice::create(['user_code' => 'P-1', 'fcm_token' => 'parent-device-token', 'token_hash' => hash('sha256', 'parent-device-token'), 'platform' => 'android', 'is_active' => true]);
         UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
-        UserDevice::create(['user_code' => 'PR-2', 'fcm_token' => 'principal-school-device-token', 'token_hash' => hash('sha256', 'principal-school-device-token'), 'platform' => 'android', 'is_active' => true]);
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
+        $this->createAbsentAttendanceRecord();
 
         $fcm = Mockery::mock(FcmNotificationService::class);
-        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence scolaire', 'Alice Durand n’était pas présent au cours d’Anglais le 29 septembre 2026 à 10:15.', Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
-        $fcm->shouldReceive('sendToUser')->once()->with('PR-2', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
-            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
-        }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->with('PR-2', Mockery::any(), Mockery::any(), Mockery::any())->never();
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', [
+            'school_code' => '16801',
+            'class_code' => 'C-1',
+            'teaching_code' => 'EN-1',
+        ]);
 
-        $this->assertSame(2, $result['sent']);
+        $this->assertSame(1, $result['sent']);
     }
 
-    public function test_attendance_notification_does_not_include_encadreur_or_other_staff(): void
+    public function test_unassigned_encadreur_and_other_staff_do_not_receive_attendance_notifications(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
@@ -205,41 +270,54 @@ class NotificationDispatchServiceTest extends TestCase
         UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
 
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
+        $this->createAbsentAttendanceRecord();
 
         $fcm = Mockery::mock(FcmNotificationService::class);
-        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence scolaire', 'Alice Durand n’était pas présent au cours d’Anglais le 29 septembre 2026 à 10:15.', Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
-        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
-            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
+        $fcm->shouldReceive('sendToUser')->once()->with('ENC-1', 'Absence scolaire', Mockery::on(fn ($body) => str_ends_with($body, 'Classe : 6e A.')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'encadreur';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->with('PR-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
+        $fcm->shouldReceive('sendToUser')->with('SG-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
+        $fcm->shouldReceive('sendToUser')->with('ADM-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', [
+            'school_code' => '16801',
+            'class_code' => 'C-1',
+            'teaching_code' => 'EN-1',
+        ]);
 
         $this->assertSame(2, $result['sent']);
     }
 
-    public function test_missing_parent_device_does_not_fall_back_to_school_staff(): void
+    public function test_missing_parent_device_does_not_suppress_assigned_encadreur_notification(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
         $this->createNonParentAttendanceRecipients();
         User::create(['code' => 'T-1', 'account_type' => 'enseignant', 'nom' => 'Teacher', 'prenom' => 'One', 'CodeEtablissement' => '16801']);
 
-        UserDevice::create(['user_code' => 'PR-1', 'fcm_token' => 'principal-device-token', 'token_hash' => hash('sha256', 'principal-device-token'), 'platform' => 'android', 'is_active' => true]);
-
         Eleve::create(['CodeEleve' => 'E-1', 'CodeClasse' => 'C-1', 'code' => 'P-1', 'Nom' => 'Alice', 'Prenom' => 'Durand']);
+        $this->createAbsentAttendanceRecord();
 
         $fcm = Mockery::mock(FcmNotificationService::class);
-        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence de votre enfant', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
+        $fcm->shouldReceive('sendToUser')->once()->with('P-1', 'Absence scolaire', 'Alice Durand n’était pas présent au cours d’Anglais le 29 septembre 2026 à 10:15.', Mockery::on(function ($data) {
             return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'parent';
         }))->andReturn(['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'invalidated' => 0]);
-        $fcm->shouldReceive('sendToUser')->once()->with('PR-1', 'Élève absent', Mockery::on(fn ($body) => str_contains($body, 'Alice')), Mockery::on(function ($data) {
-            return ($data['type'] ?? null) === 'attendance' && ($data['recipient_role'] ?? null) === 'principal';
+        $fcm->shouldReceive('sendToUser')->once()->with('ENC-1', 'Absence scolaire', Mockery::on(fn ($body) => str_ends_with($body, 'Classe : 6e A.')), Mockery::on(function ($data) {
+            return ($data['type'] ?? null) === 'attendance'
+                && ($data['recipient_role'] ?? null) === 'encadreur';
         }))->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
+        $fcm->shouldReceive('sendToUser')->with('PR-1', Mockery::any(), Mockery::any(), Mockery::any())->never();
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', ['school_code' => '16801', 'class_code' => 'C-1']);
+        $result = $service->dispatchAttendanceNotification('E-1', '2026-09-29', 'A', 'T-1', [
+            'school_code' => '16801',
+            'class_code' => 'C-1',
+            'teaching_code' => 'EN-1',
+        ]);
 
         $this->assertSame(1, $result['sent']);
     }
@@ -248,8 +326,49 @@ class NotificationDispatchServiceTest extends TestCase
     {
         User::create(['code' => 'PR-1', 'account_type' => 'principal', 'CodeEtablissement' => '16801']);
         User::create(['code' => 'ENC-1', 'account_type' => 'encadreur', 'CodeEtablissement' => '16801']);
+        User::create(['code' => 'ENC-2', 'account_type' => 'encadreur', 'CodeEtablissement' => '16801']);
         User::create(['code' => 'SG-1', 'account_type' => 'surveillant_general', 'CodeEtablissement' => '16801']);
         User::create(['code' => 'ADM-1', 'account_type' => 'administrateur', 'admin' => true, 'CodeEtablissement' => '16801']);
+    }
+
+    private function createAbsentAttendanceRecord(): void
+    {
+        DB::table('classes')->insert([
+            'CodeClasse' => 'C-1',
+            'CodeEtablissement' => '16801',
+            'LibelleClasse' => '6e A',
+            'created_at' => '2026-09-29 09:00:00',
+            'updated_at' => '2026-09-29 09:00:00',
+        ]);
+        DB::table('encadreur_classes')->insert([
+            'code' => 'ENC-1',
+            'CodeClasse' => 'C-1',
+            'CodeEtablissement' => '16801',
+            'created_at' => '2026-09-29 09:00:00',
+            'updated_at' => '2026-09-29 09:00:00',
+        ]);
+        DB::table('matieres')->insert([
+            'CodeMatiere' => 'MAT-1',
+            'LibelleMatiere' => 'Anglais',
+            'ordre' => '1',
+            'CodeEtablissement' => '16801',
+            'created_at' => '2026-09-29 09:00:00',
+            'updated_at' => '2026-09-29 09:00:00',
+        ]);
+        Enseignement::create([
+            'CodeEnseignement' => 'EN-1',
+            'CodeClasse' => 'C-1',
+            'code' => 'T-1',
+            'CodeMatiere' => 'MAT-1',
+            'CodeEtablissement' => '16801',
+        ]);
+        DB::table('conduites')->insert([
+            'DateEnreg' => '2026-09-29',
+            'CodeEleve' => 'E-1',
+            'CodeEnseignement' => 'EN-1',
+            'created_at' => '2026-09-29 10:15:00',
+            'updated_at' => '2026-09-29 10:15:00',
+        ]);
     }
 
     public function test_homework_dispatches_only_to_parents_of_affected_class(): void
@@ -280,15 +399,23 @@ class NotificationDispatchServiceTest extends TestCase
         $fcm = Mockery::mock(FcmNotificationService::class);
         $fcm->shouldReceive('sendToUser')
             ->once()
-            ->with('P-1', 'Nouveau devoir', Mockery::on(fn ($body) => str_contains($body, 'Math') && str_contains($body, 'Algebra exercises')), Mockery::on(fn ($data) => ($data['type'] ?? null) === 'homework' && ($data['class_code'] ?? null) === 'C-1' && ($data['assignment_title'] ?? null) === 'Algebra exercises'))
+            ->with('P-1', 'Devoir à remettre', 'Votre enfant a un devoir d’Anglais à remettre avant le 10 octobre 2026 à 23:59.', Mockery::on(fn ($data) => ($data['type'] ?? null) === 'homework' && ($data['class_code'] ?? null) === 'C-1' && ($data['assignment_title'] ?? null) === 'Algebra exercises'))
             ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
         $fcm->shouldReceive('sendToUser')
             ->once()
-            ->with('P-3', 'Nouveau devoir', Mockery::on(fn ($body) => str_contains($body, 'Math') && str_contains($body, 'Algebra exercises')), Mockery::on(fn ($data) => ($data['type'] ?? null) === 'homework' && ($data['class_code'] ?? null) === 'C-1' && ($data['assignment_title'] ?? null) === 'Algebra exercises'))
+            ->with('P-3', 'Devoir à remettre', 'Votre enfant a un devoir d’Anglais à remettre avant le 10 octobre 2026 à 23:59.', Mockery::on(fn ($data) => ($data['type'] ?? null) === 'homework' && ($data['class_code'] ?? null) === 'C-1' && ($data['assignment_title'] ?? null) === 'Algebra exercises'))
             ->andReturn(['attempted' => 1, 'succeeded' => 1, 'failed' => 0, 'invalidated' => 0]);
 
         $service = new NotificationDispatchService($fcm);
-        $result = $service->dispatchHomeworkNotification('C-1', 'Math', 'T-1', '16801', 'D-1', 'Algebra exercises');
+        $result = $service->dispatchHomeworkNotification(
+            'C-1',
+            'Anglais',
+            'T-1',
+            '16801',
+            'D-1',
+            'Algebra exercises',
+            '2026-10-10 23:59:00'
+        );
 
         $this->assertSame(2, $result['sent']);
     }

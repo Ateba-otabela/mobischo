@@ -155,7 +155,7 @@
             </thead>
             <tbody>
 
-                @foreach ($sequence_evaluations as $sequence)
+                @forelse ($sequence_evaluations as $sequence)
                 <tr>
                     <td>
                         {{ $sequence->CodeEvaluation }}
@@ -392,7 +392,9 @@
                         </div> --}}
                     {{-- </td> --}}
                 </tr>                
-                @endforeach
+                @empty
+                <tr><td colspan="3">Aucune séquence d’évaluation disponible.</td></tr>
+                @endforelse
 
 
             </tbody>

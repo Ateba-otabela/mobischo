@@ -123,6 +123,29 @@ class StudentServices {
     }
   }
 
+  static Future<List<Student>> getParentStudentsForNotes(String code) async {
+    final response = await http.post(
+      Uri.parse(ROOT),
+      body: <String, String>{
+        'action': GET_PARENT_STUDENTS_ACTION,
+        'code': code,
+      },
+    ).timeout(_notesRequestTimeout);
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load children (${response.statusCode})');
+    }
+    if (response.body.isEmpty) return <Student>[];
+
+    final decoded = json.decode(response.body);
+    if (decoded is! List) {
+      throw const FormatException('Invalid parent students response');
+    }
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(Student.fromJson)
+        .toList(growable: false);
+  }
+
   static Future<List<Student>> getAllStudents(String codeEtablissement) async {
     try {
       var map = <String, dynamic>{};

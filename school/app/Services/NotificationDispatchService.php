@@ -350,32 +350,46 @@ class NotificationDispatchService
 
     protected function notifyUser(string $userCode, string $title, string $body, array $data = []): array
     {
-        $user = User::query()->where('code', $userCode)->first();
-        if ($user) {
-            $user->notify(new \App\Notifications\MobischoDatabaseNotification(
-                $title,
-                $body,
-                $data
-            ));
-        }
-
         $context = [
             'user_code' => $userCode,
             'notification_type' => (string) ($data['type'] ?? ''),
             'recipient_role' => (string) ($data['recipient_role'] ?? ''),
         ];
 
+        $user = User::query()->where('code', $userCode)->first();
+        if ($user) {
+            try {
+                $user->notify(new \App\Notifications\MobischoDatabaseNotification(
+                    $title,
+                    $body,
+                    $data
+                ));
+            } catch (\PDOException $exception) {
+                Log::error('Database notification persistence failed.', $context + [
+                    'exception' => get_class($exception),
+                    'sql_state' => is_array($exception->errorInfo)
+                        ? ($exception->errorInfo[0] ?? null)
+                        : null,
+                ]);
+            }
+        }
+
         Log::info('Notification dispatch attempted.', $context);
 
         try {
             $result = $this->fcm->sendToUser($userCode, $title, $body, $data);
-        } catch (\Throwable $exception) {
-            Log::error('Notification dispatch threw an exception.', $context + [
+        } catch (\RuntimeException $exception) {
+            Log::error('FCM notification delivery failed.', $context + [
                 'exception' => get_class($exception),
-                'error' => $exception->getMessage(),
+                'code' => $exception->getCode(),
             ]);
 
-            throw $exception;
+            return [
+                'sent' => 0,
+                'attempted' => 0,
+                'failed' => 1,
+                'invalidated' => 0,
+            ];
         }
 
         Log::info('Notification dispatch completed.', $context + [

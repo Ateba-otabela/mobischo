@@ -140,6 +140,11 @@
                                     Encardreur
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="principal-tab-fill" data-toggle="tab" href="#principal-fill" role="tab" aria-controls="principal-fill" aria-selected="false">
+                                    Principal
+                                </a>
+                            </li>
                         </ul>
                         
                         
@@ -378,7 +383,7 @@
                                         </div>
                                         <div class="col-lg-4 col-12">
                                             <label>Etablissement</label>
-                                            <select name="school_id" class="form-control" required>
+                                            <select name="school_id" class="form-control js-encadreur-school" required>
                                                 @foreach ($schools as $school)
                                                     <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
                                                 @endforeach
@@ -388,6 +393,11 @@
                                             <label>Code</label>
                                             <input type="text" name="code" class="form-control" placeholder="Code encadreur" required>
                                         </div>
+                                    </div>
+                                    <div class="form-group pt-1">
+                                        <label for="new-encadreur-classes">Classes attribuées</label>
+                                        <select id="new-encadreur-classes" name="class_ids[]" class="form-control js-encadreur-classes" multiple size="5" data-classes-url="{{ route('admin.users.classes', ['school' => '__SCHOOL__']) }}">
+                                        </select>
                                     </div>
                                     <input id="password" type="password" class="form-control d-none " name="password" value="00000000">
                                     <input id="password-confirm" type="password" class="form-control d-none" name="password_confirmation" value="00000000">
@@ -402,6 +412,57 @@
                                         <button type="submit" class="btn btn-primary ml-1">
                                             <i class="bx bx-check d-block d-sm-none"></i>
                                             <span class="d-none d-sm-block">Creer</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="tab-pane" id="principal-fill" role="tabpanel" aria-labelledby="principal-tab-fill">
+                                <form action="{{ route('add_user_complete') }}" method="POST">
+                                    @csrf
+                                    <div class="row">
+                                        <div class="col-lg-4 col-12">
+                                            <label>Nom du Principal</label>
+                                            <input type="text" name="nom" class="form-control" required>
+                                        </div>
+                                        <div class="col-lg-4 col-12">
+                                            <label>Prénom du Principal</label>
+                                            <input type="text" name="prenom" class="form-control" required>
+                                        </div>
+                                        <div class="col-lg-4 col-12">
+                                            <label>Genre</label>
+                                            <select name="sex" class="form-control" required>
+                                                <option value="0">Masculin</option>
+                                                <option value="1">Féminin</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row pt-1">
+                                        <div class="col-lg-4 col-12">
+                                            <label>Contacts</label>
+                                            <input type="text" name="contacts" class="form-control" required>
+                                        </div>
+                                        <div class="col-lg-4 col-12">
+                                            <label>Établissement</label>
+                                            <select name="school_id" class="form-control" required>
+                                                <option value="">Choisir un établissement</option>
+                                                @foreach ($schools as $school)
+                                                    <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-lg-4 col-12">
+                                            <label>Code</label>
+                                            <input type="text" name="code" class="form-control" required>
+                                        </div>
+                                    </div>
+                                    <input type="password" class="d-none" name="password" value="00000000">
+                                    <input type="hidden" name="account_type" value="principal">
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
+                                            <span>Annuler</span>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary ml-1">
+                                            <span>Créer</span>
                                         </button>
                                     </div>
                                 </form>
@@ -436,6 +497,11 @@
             </div>
         </form>
         
+        @if (!$selectedSchool)
+            <div class="alert alert-info mt-2" role="status">
+                Choisissez un établissement pour afficher ses utilisateurs.
+            </div>
+        @else
         <div class="table-responsive">
             <table class="table table-striped table-hover zero-configuration">
                 <thead>
@@ -489,7 +555,7 @@
                             </td>
                             <td>
                                 <div class="media-body">
-                                    <h6 class="media-heading mb-0">{{ count($user->enfants) }}</h6>
+                                    <h6 class="media-heading mb-0">{{ $user->enfants_count }}</h6>
                                     <span class="font-small-2"></span>
                                 </div>
                                 
@@ -505,263 +571,14 @@
                                     <span class="bx bx-dots-vertical-rounded font-medium-3 dropdown-toggle nav-hide-arrow cursor-pointer" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" role="menu"></span>
                                     <div class="dropdown-menu dropdown-menu-right">
                                         <a class="dropdown-item" href="#"><i class="bx bxs-bar-chart-alt-2 mr-1"></i>Details</a>
-                                        <a class="dropdown-item" href="#" data-toggle="modal" data-target="#modify{{ $user->code }}"><i class="bx bx-edit-alt mr-1"></i>Modifier</a>
-                                        <a class="dropdown-item" href="#" data-toggle="modal" data-target="#add_student{{ $user->code }}"><i class="bx bx-edit-alt mr-1"></i>Attribuer un eleve</a>
-                                        <a class="dropdown-item" href="#" data-toggle="modal" data-target="#delete{{ $user->code }}"><i class="bx bx-trash mr-1"></i>Supprimmer</a>
+                                        <a class="dropdown-item" href="#" data-edit-user data-edit-url="{{ route('admin.users.edit-form', ['user_id' => $user->code, 'CodeEtablissement' => $selectedSchool->CodeEtablissement, 'page' => $users->currentPage()]) }}"><i class="bx bx-edit-alt mr-1"></i>Modifier</a>
+                                        <a class="dropdown-item" href="#" data-assign-student data-user-id="{{ $user->code }}" data-user-name="{{ $user->nom }} {{ $user->prenom }}"><i class="bx bx-edit-alt mr-1"></i>Attribuer un eleve</a>
+                                        <a class="dropdown-item" href="#" data-delete-user data-user-name="{{ $user->nom }} {{ $user->prenom }}"><i class="bx bx-trash mr-1"></i>Supprimmer</a>
                                     </div>
                                 </div>
                                 
                                 
-                                <div class="modal fade text-left" id="modify{{ $user->code }}" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" role="document">
-                                        <div class="modal-content">
-                                            
-                                            <form action="{{ route('save_user',['user_id'=>$user->code]) }}" method="POST" enctype="multipart/form-data">
-                                                @csrf
-                                                <div class="modal-header bg-info">
-                                                    <h5 class="modal-title white" id="myModalLabel160">Modifier : 
-                                                        @if($user->sex == '0')
-                                                        Mr. 
-                                                        @else
-                                                        Mme. 
-                                                        @endif
-                                                        <span class="text-uppercase">
-                                                            {{ $user->nom }} {{ $user->prenoms }}
-                                                        </span>
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <i class="bx bx-x"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    Remplissez le formulaire ci-dessous et validez
-                                                    <hr class="line">
-                                                    
-                                                    <input type="hidden" name="user_id" value="{{ $user->code }}">
-                                                    
-                                                    <div class="row pb-1">
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Noms</label>
-                                                            <input type="text" name="nom" class="form-control" value="{{ $user->nom }}">
-                                                        </div> 
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Prenoms</label>
-                                                            <input type="text" name="prenom" class="form-control" value="{{ $user->prenom }}">
-                                                        </div>
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Profil</label>
-                                                             
-                                                            <select name="account_type" class="form-control" oninput="DisplaySchool(this.value, {{ $user->code }})" onchange="DisplaySchool(this.value,{{ $user->code }})">
-                                                            @if ($user->account_type == 'administrateur')
-                                                                <option value="administrateur">Administrateur</option>
-                                                                <option value="enseignant">Enseignant</option>
-                                                                <option value="parent">Parent</option>
-                                                                <option value="tuteur">Encardreur</option>
-                                                          
-                                                            @elseif ($user->account_type == 'enseignant')
-                                                           
-                                                                <option value="enseignant">Enseignant</option>
-                                                                <option value="administrateur">Administrateur</option>
-                                                                <option value="parent">Parent</option>
-                                                                <option value="tuteur">Encardreur</option>
-                                                            
-                                                            @elseif ($user->account_type == 'parent')
-                                                            
-                                                                <option value="parent">Parent</option>
-                                                                <option value="administrateur">Administrateur</option>
-                                                                <option value="enseignant">Enseignant</option>
-                                                                <option value="tuteur">Encardreur</option>
-                                                           
-                                                            @elseif ($user->account_type == 'tuteur')
-                                                            
-                                                                <option value="tuteur">Encardreur</option>
-                                                                <option value="administrateur">Administrateur</option>
-                                                                <option value="enseignant">Enseignant</option>
-                                                                <option value="parent">Parent</option>
-                                                            
-                                                            @endif
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div class="row pb-1">
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Genre</label>
-                                                            <select name="sex" class="form-control">
-                                                                @if($user->sex == '0')
-                                                                <option value="0">Masculin</option>
-                                                                <option value="1">Feminin</option>
-                                                                @else
-                                                                <option value="1">Feminin</option>
-                                                                <option value="0">Masculin</option>
-                                                                @endif
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Contacts</label>
-                                                            <input type="text" name="contacts" class="form-control" value="{{ $user->contacts }}">
-                                                        </div>
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Photo de Profil</label>
-                                                            <input type="file" name="RepPhoto" class="form-control" accept="*">
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div class="row pb-1">
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Code</label>
-                                                            <input type="text" name="code" class="form-control" value="{{ $user->code }}">
-                                                        </div>
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Login</label>
-                                                            <input type="text" class="form-control" name="login" value="{{ $user->login }}">
-                                                        </div>
-                                                        <div class="col-lg-4 col-12">
-                                                            <label>Mot de passe</label>
-                                                            <input id="password" type="text" value="{{ $user->text_password }}" class="form-control @error('password') is-invalid @enderror" name="password" required autocomplete="new-password">
-                                                        </div>
-                                                    </div>
-                                                  
-                                                    <div class="row" id="display_school{{ $user->code }}">
-                                                        <div class="col-12">
-                                                            <label>Etablissement {{ $user->CodeEtablissement }}</label>
-                                                            <select name="school_id" class="text-center form-control">
-                                                                @foreach ($schools as $school)
-                                                                
-                                                                    @if($user->CodeEtablissement == $school->CodeEtablissement)
-                                                                        <option selected="selected" value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
-                                                                    @else
-                                                                        <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
-                                                                    @endif
 
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <hr class="line">
-                                                    @foreach ($user->enfants as $student)
-                                                    <div class="row pb-1">
-                                                        <div class="col-lg-8 col-12">
-                                                            <div class="list-left d-flex">
-                                                                <div class="list-icon mr-1">
-                                                                    <div class="avatar bg-rgba-info m-0">
-                                                                        <div class="avatar-content">
-                                                                            <i class="bx bxs-zap text-info font-size-base"></i>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="list-content">
-                                                                    <span class="list-title">{{ $student->Nom }} {{ $student->Prenom }}</span>
-                                                                    <small class="text-muted d-block">Code Eleve : {{ $student->CodeEleve }}</small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-lg-4 col-12 text-right">
-                                                            <a href="{{ route('remove_student',['parent_id'=>$user->code,'student_id'=>$student->CodeEleve]) }}" class="btn btn-info">Retirer</a>
-                                                        </div>
-                                                    @endforeach
-                                                   
-                                                    
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                                                        <i class="bx bx-x d-block d-sm-none"></i>
-                                                        <span class="d-none d-sm-block">Annuler</span>
-                                                    </button>
-                                                    <button type="submit" class="btn btn-info ml-1">
-                                                        <i class="bx bx-check d-block d-sm-none"></i>
-                                                        <span class="d-none d-sm-block">Sauvegarder</span>
-                                                    </button>
-                                                </div>
-                                            </form>
-                                            
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="modal fade text-left" id="add_student{{ $user->code }}" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" role="document">
-                                        <div class="modal-content">
-                                            
-                                            <form action="{{ route('assign_student_choose_class',['parent_id'=>$user->code]) }}">
-                                                
-                                                <div class="modal-header bg-info">
-                                                    <h5 class="modal-title white" id="myModalLabel160">Attribuer un nouvel eleve a : 
-                                                        @if($user->sex == '0')
-                                                        Mr. 
-                                                        @else
-                                                        Mme. 
-                                                        @endif
-                                                        <span class="text-uppercase">
-                                                            {{ $user->nom }} {{ $user->prenoms }}
-                                                        </span>
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <i class="bx bx-x"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    Choisissez un etablissement
-                                                    <hr class="line">
-                                                    
-                                                    <div class="row pb-1">
-                                                        <div class="col-12">
-                                                            <label>Etablissement</label>
-                                                           <select class="form-control" name="CodeEtablissement">
-                                                            @foreach ($schools as $school)
-                                                                <option value="{{ $school->CodeEtablissement }}">{{ $school->Nom }}</option>
-                                                            @endforeach
-                                                           </select>
-                                                        </div> 
-                                                    </div>
-
-                                                    
-
-                                                    
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                                                        <i class="bx bx-x d-block d-sm-none"></i>
-                                                        <span class="d-none d-sm-block">Annuler</span>
-                                                    </button>
-                                                    <button type="submit" class="btn btn-info ml-1">
-                                                        <i class="bx bx-check d-block d-sm-none"></i>
-                                                        <span class="d-none d-sm-block">Liste des eleves</span>
-                                                    </button>
-                                                </div>
-                                            </form>
-                                            
-                                        </div>
-                                    </div>
-                                </div>
-
-                                
-                                <div class="modal fade text-left" id="delete{{ $user->code }}" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" role="document">
-                                        <div class="modal-content">
-                                            <div class="modal-header bg-danger">
-                                                <h5 class="modal-title white" id="myModalLabel160">Supprimmer {{ $user->name }}</h5>
-                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                    <i class="bx bx-x"></i>
-                                                </button>
-                                            </div>
-                                            <div class="modal-body">
-                                                Confirmez-vous vouloir suprimmer cette etablissement ?
-                                                <br>
-                                                NB: Toutes les données relatives à cette école seront supprimées et il ne sera pas possible de les récupérer
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                                                    <i class="bx bx-x d-block d-sm-none"></i>
-                                                    <span class="d-none d-sm-block">Annuler</span>
-                                                </button>
-                                                <a href="#" class="btn btn-danger ml-1">
-                                                    <i class="bx bx-check d-block d-sm-none"></i>
-                                                    <span class="d-none d-sm-block">Oui, Suprimmer</span>
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </td>
                         </tr>                
                         @empty
@@ -771,29 +588,317 @@
                         
                     </tbody>
                 </table>
-            </table>
         </div>
+        @if ($users->hasPages())
+            <div class="d-flex justify-content-center mt-2">
+                {{ $users->links() }}
+            </div>
+        @endif
+        @endif
         
+        <div class="modal fade text-left" id="user-edit-modal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" role="document">
+                <div class="modal-content" id="user-edit-modal-content">
+                    <div class="modal-body">Chargement...</div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade text-left" id="user-assignment-modal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <form id="user-assignment-form" method="GET" action="{{ route('assign_student_choose_class', ['parent_id' => '__PARENT_ID__']) }}">
+                        <div class="modal-header bg-info">
+                            <h5 class="modal-title white" id="user-assignment-title">Attribuer un nouvel eleve</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><i class="bx bx-x"></i></button>
+                        </div>
+                        <div class="modal-body">
+                            Choisissez un etablissement
+                            <hr class="line">
+                            <label for="assignment-school">Etablissement</label>
+                            <select class="form-control" id="assignment-school" name="CodeEtablissement">
+                                @foreach ($schools as $school)
+                                    <option value="{{ $school->CodeEtablissement }}" {{ $selectedSchool && $selectedSchool->CodeEtablissement == $school->CodeEtablissement ? 'selected' : '' }}>{{ $school->Nom }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light-secondary" data-dismiss="modal"><span>Annuler</span></button>
+                            <button type="submit" class="btn btn-info ml-1"><span>Liste des eleves</span></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade text-left" id="user-delete-modal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger">
+                        <h5 class="modal-title white">Supprimmer <span id="user-delete-name"></span></h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><i class="bx bx-x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        Confirmez-vous vouloir suprimmer cet utilisateur ?
+                        <br>NB: Toutes les données relatives à cet utilisateur seront supprimées et il ne sera pas possible de les récupérer.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light-secondary" data-dismiss="modal"><span>Annuler</span></button>
+                        <a href="#" class="btn btn-danger ml-1"><span>Oui, Suprimmer</span></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    function loadClasses(select, schoolCode, selectedCodes) {
+        select.innerHTML = '';
+        select.setCustomValidity('');
+        select.dataset.loadState = 'loading';
+        if (!schoolCode) {
+            select.disabled = true;
+            select.dataset.loadState = 'error';
+            return;
+        }
 
-// To avoid displaying schools to administrator accounts upon modification
-function DisplaySchool(account_type,user_id){
-    school_id = 'display_school'+ user_id
-    var school_row = document.getElementById(school_id);
-    if(account_type == 'administrateur'){
-        school_row.classList.remove('d-block');
-        school_row.classList.add('d-none');
+        select.disabled = true;
+        var requestId = String(Number(select.dataset.requestId || 0) + 1);
+        select.dataset.requestId = requestId;
+        var url = select.dataset.classesUrl.replace('__SCHOOL__', encodeURIComponent(schoolCode));
+
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('classes-request-failed');
+                }
+                return response.json();
+            })
+            .then(function (classes) {
+                if (select.dataset.requestId !== requestId) {
+                    return;
+                }
+                if (classes.length === 0) {
+                    var emptyOption = document.createElement('option');
+                    emptyOption.disabled = true;
+                    emptyOption.textContent = 'Aucune classe pour cet établissement.';
+                    select.appendChild(emptyOption);
+                    select.disabled = false;
+                    select.dataset.loadState = 'loaded';
+                    return;
+                }
+                classes.forEach(function (schoolClass) {
+                    var option = document.createElement('option');
+                    option.value = schoolClass.CodeClasse;
+                    option.textContent = schoolClass.LibelleClasse + ' (' + schoolClass.CodeClasse + ')';
+                    option.selected = selectedCodes.indexOf(schoolClass.CodeClasse) !== -1;
+                    select.appendChild(option);
+                });
+                select.disabled = false;
+                select.dataset.loadState = 'loaded';
+            })
+            .catch(function () {
+                if (select.dataset.requestId !== requestId) {
+                    return;
+                }
+                var errorOption = document.createElement('option');
+                errorOption.disabled = true;
+                errorOption.textContent = 'Impossible de charger les classes. Modifiez l’établissement pour réessayer.';
+                select.appendChild(errorOption);
+                select.dataset.loadState = 'error';
+            });
     }
-    else{
-        school_row.classList.remove('d-none');
-        school_row.classList.add('d-block');
+
+    document.querySelectorAll('.js-encadreur-classes').forEach(function (select) {
+        var userId = select.dataset.userId;
+        var form = select.closest('form');
+        var schoolSelect = form.querySelector('.js-encadreur-school');
+        var wrapper = userId ? document.getElementById('encadreur-classes-row-' + userId) : null;
+        var selectedCodes = wrapper ? JSON.parse(wrapper.dataset.selectedClasses || '[]') : [];
+
+        if (schoolSelect) {
+            schoolSelect.addEventListener('change', function () {
+                loadClasses(select, schoolSelect.value, []);
+            });
+        }
+        var accountType = form.querySelector('.js-user-account-type');
+        if (!accountType || accountType.value === 'encadreur') {
+            loadClasses(select, schoolSelect ? schoolSelect.value : '', selectedCodes);
+        }
+        form.addEventListener('submit', function (event) {
+            var currentAccountType = form.querySelector('.js-user-account-type');
+            if ((!currentAccountType || currentAccountType.value === 'encadreur')
+                && select.dataset.loadState !== 'loaded') {
+                event.preventDefault();
+                select.setCustomValidity('Attendez le chargement des classes ou réessayez.');
+                select.reportValidity();
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-user-account-type').forEach(function (select) {
+        select.addEventListener('change', function () {
+            DisplaySchool(select.value, select.dataset.userId);
+            if (select.value === 'encadreur') {
+                var form = select.closest('form');
+                var classSelect = form.querySelector('.js-encadreur-classes');
+                var schoolSelect = form.querySelector('.js-encadreur-school');
+                var wrapper = document.getElementById('encadreur-classes-row-' + select.dataset.userId);
+                var selectedCodes = wrapper ? JSON.parse(wrapper.dataset.selectedClasses || '[]') : [];
+                if (classSelect && schoolSelect) {
+                    loadClasses(classSelect, schoolSelect.value, selectedCodes);
+                }
+            }
+        });
+        DisplaySchool(select.value, select.dataset.userId);
+    });
+});
+
+function DisplaySchool(accountType, userId) {
+    var schoolRow = document.getElementById('display_school' + userId);
+    var classesRow = document.getElementById('encadreur-classes-row-' + userId);
+    if (schoolRow) {
+        schoolRow.classList.toggle('d-none', accountType === 'administrateur');
+    }
+    if (classesRow) {
+        classesRow.classList.toggle('d-none', accountType !== 'encadreur');
     }
 }
-    </script>
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var editContent = document.getElementById('user-edit-modal-content');
+
+    function initializeEditForm(form) {
+        var classSelect = form.querySelector('.js-encadreur-classes');
+        var schoolSelect = form.querySelector('.js-encadreur-school');
+        var accountType = form.querySelector('.js-user-account-type');
+        if (!classSelect) return;
+
+        var wrapper = document.getElementById('encadreur-classes-row-' + classSelect.dataset.userId);
+        var selectedCodes = wrapper ? JSON.parse(wrapper.dataset.selectedClasses || '[]') : [];
+        var loadClasses = function (selected) {
+            classSelect.innerHTML = '';
+            classSelect.setCustomValidity('');
+            classSelect.disabled = true;
+            classSelect.dataset.loadState = 'loading';
+            var url = classSelect.dataset.classesUrl.replace('__SCHOOL__', encodeURIComponent(schoolSelect.value));
+            fetch(url, { headers: { 'Accept': 'application/json' } })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('classes-request-failed');
+                    return response.json();
+                })
+                .then(function (classes) {
+                    if (classes.length === 0) {
+                        var empty = document.createElement('option');
+                        empty.disabled = true;
+                        empty.textContent = 'Aucune classe pour cet établissement.';
+                        classSelect.appendChild(empty);
+                    }
+                    classes.forEach(function (schoolClass) {
+                        var option = document.createElement('option');
+                        option.value = schoolClass.CodeClasse;
+                        option.textContent = schoolClass.LibelleClasse + ' (' + schoolClass.CodeClasse + ')';
+                        option.selected = selected.indexOf(schoolClass.CodeClasse) !== -1;
+                        classSelect.appendChild(option);
+                    });
+                    classSelect.disabled = false;
+                    classSelect.dataset.loadState = 'loaded';
+                })
+                .catch(function () {
+                    classSelect.dataset.loadState = 'error';
+                    classSelect.setCustomValidity('Impossible de charger les classes. Modifiez l’établissement pour réessayer.');
+                    classSelect.reportValidity();
+                });
+        };
+
+        if (schoolSelect) schoolSelect.addEventListener('change', function () { loadClasses([]); });
+        if (!accountType || accountType.value === 'encadreur') loadClasses(selectedCodes);
+        form.addEventListener('submit', function (event) {
+            if ((!accountType || accountType.value === 'encadreur') && classSelect.dataset.loadState !== 'loaded') {
+                event.preventDefault();
+                classSelect.setCustomValidity('Attendez le chargement des classes ou réessayez.');
+                classSelect.reportValidity();
+            }
+        });
+        if (accountType) {
+            accountType.addEventListener('change', function () {
+                var schoolRow = document.getElementById('display_school' + accountType.dataset.userId);
+                var classesRow = document.getElementById('encadreur-classes-row-' + accountType.dataset.userId);
+                if (schoolRow) schoolRow.classList.toggle('d-none', accountType.value === 'administrateur');
+                if (classesRow) classesRow.classList.toggle('d-none', accountType.value !== 'encadreur');
+                if (accountType.value === 'encadreur') loadClasses(selectedCodes);
+            });
+        }
+    }
+
+    function loadEditForm(url) {
+        editContent.innerHTML = '<div class="modal-body">Chargement...</div>';
+        fetch(url, { headers: { 'Accept': 'text/html' } })
+            .then(function (response) {
+                if (!response.ok) throw new Error('edit-form-request-failed');
+                return response.text();
+            })
+            .then(function (html) {
+                editContent.innerHTML = html;
+                var form = editContent.querySelector('form');
+                if (form) initializeEditForm(form);
+            })
+            .catch(function () {
+                var body = document.createElement('div');
+                body.className = 'modal-body';
+                var message = document.createElement('div');
+                message.className = 'alert alert-danger mb-0';
+                message.textContent = 'Impossible de charger le formulaire. ';
+                var retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'btn btn-link p-0';
+                retry.textContent = 'Réessayer';
+                retry.dataset.retryEdit = url;
+                message.appendChild(retry);
+                body.appendChild(message);
+                editContent.replaceChildren(body);
+            });
+    }
+
+    document.addEventListener('click', function (event) {
+        var retry = event.target.closest('[data-retry-edit]');
+        if (retry) {
+            loadEditForm(retry.dataset.retryEdit);
+            return;
+        }
+
+        var edit = event.target.closest('[data-edit-user]');
+        if (edit) {
+            event.preventDefault();
+            $('#user-edit-modal').modal('show');
+            loadEditForm(edit.dataset.editUrl);
+            return;
+        }
+
+        var assignment = event.target.closest('[data-assign-student]');
+        if (assignment) {
+            event.preventDefault();
+            var form = document.getElementById('user-assignment-form');
+            if (!form.dataset.actionTemplate) form.dataset.actionTemplate = form.action;
+            form.action = form.dataset.actionTemplate.replace('__PARENT_ID__', encodeURIComponent(assignment.dataset.userId));
+            document.getElementById('user-assignment-title').textContent = 'Attribuer un nouvel eleve a : ' + assignment.dataset.userName;
+            $('#user-assignment-modal').modal('show');
+            return;
+        }
+
+        var deleteAction = event.target.closest('[data-delete-user]');
+        if (deleteAction) {
+            event.preventDefault();
+            document.getElementById('user-delete-name').textContent = deleteAction.dataset.userName;
+            $('#user-delete-modal').modal('show');
+        }
+    });
+});
+</script>
 
 
 

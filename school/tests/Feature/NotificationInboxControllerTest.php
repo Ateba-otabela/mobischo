@@ -27,6 +27,19 @@ class NotificationInboxControllerTest extends TestCase
         ]);
     }
 
+    public function test_empty_notification_list_returns_successful_empty_collection(): void
+    {
+        $user = $this->createUser('P-EMPTY', 'parent');
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/notifications')
+            ->assertOk()
+            ->assertExactJson([
+                'data' => [],
+                'unread_count' => 0,
+            ]);
+    }
+
     public function test_notification_list_returns_unread_count_and_hides_class_from_parent(): void
     {
         $parent = $this->createUser('P-1', 'parent');

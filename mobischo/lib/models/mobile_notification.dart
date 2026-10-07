@@ -45,22 +45,24 @@ class MobileNotificationPage {
 
   factory MobileNotificationPage.fromJson(Map<String, dynamic> json) {
     final rawItems = json['data'];
-    final items = rawItems is List
-        ? rawItems
-            .whereType<Map<String, dynamic>>()
-            .map(MobileNotification.fromJson)
-            .toList()
-        : <MobileNotification>[];
+    final rawUnreadCount = json['unread_count'];
+    if (rawItems is! List || rawUnreadCount is! int || rawUnreadCount < 0) {
+      throw const FormatException('Invalid notifications response.');
+    }
+
+    final items = <MobileNotification>[];
+    for (final rawItem in rawItems) {
+      if (rawItem is! Map) {
+        throw const FormatException('Invalid notification item.');
+      }
+      items.add(
+        MobileNotification.fromJson(Map<String, dynamic>.from(rawItem)),
+      );
+    }
 
     return MobileNotificationPage(
       notifications: items,
-      unreadCount: _notificationInt(json['unread_count']),
+      unreadCount: rawUnreadCount,
     );
   }
-}
-
-int _notificationInt(dynamic value) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
 }

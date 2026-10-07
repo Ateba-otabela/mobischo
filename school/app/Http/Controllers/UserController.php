@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use App\Models\Etablissement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -29,47 +30,67 @@ class UserController extends Controller
 
         $users = $selectedSchool
             ? User::where('CodeEtablissement', $selectedSchool->CodeEtablissement)
-                ->with('enfants')
-                ->get()
-            : User::with('enfants')->get();
-        // foreach($users as $user){
-        //     $student->code = NULL;
-        //     $student->save();
-        // }
-        // return response()->json($users);
+                ->withCount('enfants')
+                ->orderBy('nom')
+                ->orderBy('prenom')
+                ->paginate(25)
+                ->appends($request->query())
+            : null;
+
         return view('users.add_user',compact('users','schools', 'selectedSchool'));
     }
+
+    public function edit_user_form($user_id)
+    {
+        $user = User::with(['enfants', 'encadreurClasses'])->findOrFail($user_id);
+        $schools = Etablissement::orderBy('Nom')->get();
+
+        return view('users.partials.edit_user_modal', compact('user', 'schools'));
+    }
+
+    public function classes_for_school($school)
+    {
+        $school = Etablissement::findOrFail($school);
+
+        return response()->json(
+            Classe::query()
+                ->where('CodeEtablissement', $school->CodeEtablissement)
+                ->orderBy('LibelleClasse')
+                ->get(['CodeClasse', 'LibelleClasse'])
+        );
+    }
+
     public function add_user_complete(Request $request)
     {
         $request->validate([
-            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur',
+            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur,principal',
             'password' => 'required|string',
         ]);
 
         $school = null;
-        if (in_array($request->account_type, ['parent', 'enseignant', 'encadreur'], true)) {
+        if ($request->account_type !== 'administrateur') {
             $request->validate([
                 'school_id' => 'required|string|exists:etablissements,CodeEtablissement',
             ]);
             $school = Etablissement::findOrFail($request->school_id);
         }
 
-        function GenerateUserCode(){
-            $number = mt_rand(10000000, 99999999); // better than rand()
-            $number = abs($number);
-            if (UserCodeExists($number)){
-                return GenerateUserCode();
-            }
-            $a = (int)$number;
-            return abs($a);
-        }
-        
-        function UserCodeExists($code){
-            return User::wherecode($code)->exists();
+        if ($request->account_type === 'encadreur') {
+            $request->validate([
+                'class_ids' => 'nullable|array',
+                'class_ids.*' => [
+                    'required',
+                    'string',
+                    'distinct',
+                    Rule::exists('classes', 'CodeClasse')->where(function ($query) use ($school) {
+                        $query->where('CodeEtablissement', $school->CodeEtablissement);
+                    }),
+                ],
+            ]);
         }
 
-        if ($request->account_type == 'administrateur'){
-            
+        $validated = [];
+        if ($request->account_type == 'administrateur') {
             $validated = $request->validate([
                 'login' => 'required|unique:users',
                 'prenom' => 'required',
@@ -77,42 +98,13 @@ class UserController extends Controller
                 'contacts' => 'required',
                 'code' => 'required|unique:users',
             ]);
-
-            $new_user = User::create([
-                'nom'=>$request->nom,
-                'prenom'=>$request->prenom,
-                'account_type'=>$request->account_type,
-                'sex'=>$request->sex,
-                'contacts'=>$request->contacts,
-                'password'=>Hash::make($request->password),
-                'text_password'=>$request->password,
-                'code'=>$request->code,
-                'login'=>$request->login
-            ]);
-        }
-        else if ($request->account_type == 'parent'){
-            
+        } elseif ($request->account_type == 'parent') {
             $validated = $request->validate([
-              
                 'prenom' => 'required',
                 'nom' => 'required',
                 'contacts' => 'required',
-               
             ]);
-
-            $new_user = User::create([
-                'nom'=>$request->nom,
-                'prenom'=>$request->prenom,
-                'account_type'=>$request->account_type,
-                'sex'=>$request->sex,
-                'contacts'=>$request->contacts,
-                'password'=>Hash::make($request->password),
-                'text_password'=>$request->password,
-                'login'=>GenerateUserCode(),
-                'code'=>GenerateUserCode()
-            ]);
-        }
-        else  if ($request->account_type == 'enseignant'){
+        } elseif ($request->account_type == 'enseignant') {
             $validated = $request->validate([
                 'reserve1' => 'required',
                 'prenom' => 'required',
@@ -121,23 +113,7 @@ class UserController extends Controller
                 'matricule' => 'required',
                 'code' => 'required|unique:users',
             ]);
-
-            $new_user = User::create([
-                'nom'=>$request->nom,
-                'prenom'=>$request->prenom,
-                'account_type'=>$request->account_type,
-                'sex'=>$request->sex,
-                'login'=>$request->nom.$school->CodeEtablissement,
-                'contacts'=>$request->contacts,
-                'password'=>Hash::make($request->password),
-                'text_password'=>$request->password,
-                'reserve1'=>$request->reserve1,
-                'matricule'=>$request->matricule,
-                'code'=>$request->code,
-            ]);
-
-        }
-        else if ($request->account_type == 'encadreur') {
+        } elseif (in_array($request->account_type, ['encadreur', 'principal'], true)) {
             $validated = $request->validate([
                 'nom' => 'required|string',
                 'prenom' => 'required|string',
@@ -145,33 +121,35 @@ class UserController extends Controller
                 'sex' => 'required|string',
                 'code' => 'required|string|unique:users,code',
             ]);
+        }
 
-            $new_user = User::create([
-                'nom' => $validated['nom'],
-                'prenom' => $validated['prenom'],
-                'account_type' => 'encadreur',
-                'sex' => $validated['sex'],
-                'contacts' => $validated['contacts'],
-                'login' => GenerateUserCode(),
+        DB::transaction(function () use ($request, $school, $validated) {
+            $accountType = $request->account_type;
+            $code = $validated['code'] ?? (string) $this->generateUniqueUserCode();
+            $login = $validated['login'] ?? ($accountType === 'enseignant'
+                ? $request->nom . $school->CodeEtablissement
+                : (string) $this->generateUniqueUserCode());
+
+            $user = User::create([
+                'nom' => $request->nom,
+                'prenom' => $request->prenom,
+                'account_type' => $accountType,
+                'sex' => $request->sex,
+                'contacts' => $request->contacts,
                 'password' => Hash::make($request->password),
                 'text_password' => $request->password,
-                'code' => $validated['code'],
-                'CodeEtablissement' => $school->CodeEtablissement,
+                'code' => $code,
+                'login' => $login,
+                'CodeEtablissement' => $school ? $school->CodeEtablissement : null,
+                'admin' => $accountType === 'administrateur',
+                'reserve1' => $request->reserve1,
+                'matricule' => $request->matricule,
             ]);
-        }
 
-        $new_user->save();
-        if ($request->account_type == 'administrateur'){
-            $new_user->admin = True;
-            $new_user->save();
-        }
-        else if (in_array($request->account_type, ['enseignant', 'parent', 'encadreur'], true)){
-            $new_user->CodeEtablissement = $school->CodeEtablissement;
-            $new_user->save();
-        }
-        else if ($request->account_type == 'parent'){
-            $new_user->addresse = $request->adresse;
-        }
+            if ($accountType === 'encadreur') {
+                $this->syncEncadreurClasses($user, $school->CodeEtablissement, $request->input('class_ids', []));
+            }
+        });
 
         return redirect('add_user');
     }
@@ -179,17 +157,18 @@ class UserController extends Controller
     public function save_user(Request $request, $user_id)
     {   
         $user = User::findOrFail($user_id);
-        $request->validate([
-            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur,tuteur',
+        $validated = $request->validate([
+            'account_type' => 'required|in:administrateur,parent,enseignant,encadreur,tuteur,principal,principal_encadreur',
             'nom' => 'required|string',
             'prenom' => 'required|string',
             'sex' => 'required|string',
             'login' => 'required|string',
-            'code' => 'required|string',
+            'code' => ['required', 'string', Rule::unique('users', 'code')->ignore($user_id, 'code')],
             'contacts' => 'required|string',
             'password' => 'required|string',
             'RepPhoto' => 'nullable|image',
         ]);
+
         $school = null;
         if ($request->account_type != 'administrateur') {
             $request->validate([
@@ -198,43 +177,104 @@ class UserController extends Controller
             $school = Etablissement::findOrFail($request->school_id);
         }
 
-        $user->nom = $request->nom;
-        $user->prenom = $request->prenom;
-        $user->account_type = $request->account_type;
-        $user->sex = $request->sex;
-        $user->login = $request->login;
-        $user->code = $request->code;
-        $user->contacts = $request->contacts;
-        $user->text_password = $request->password;
-        $user->password = Hash::make($request->password);
-        $user->save();
-
-        if($user->account_type != 'administrateur'){
-            $user->CodeEtablissement = $school->CodeEtablissement;
-            $user->save();
+        if ($request->account_type === 'encadreur') {
+            $request->validate([
+                'class_ids' => 'nullable|array',
+                'class_ids.*' => [
+                    'required',
+                    'string',
+                    'distinct',
+                    Rule::exists('classes', 'CodeClasse')->where(function ($query) use ($school) {
+                        $query->where('CodeEtablissement', $school->CodeEtablissement);
+                    }),
+                ],
+            ]);
         }
 
-        if($request->RepPhoto){
-            $filename = time().'.'.$request->RepPhoto->extension();
-            $path = $request->file('RepPhoto')->storeAs(
+        $oldCode = $user->code;
+        DB::transaction(function () use ($request, $user, $school, $oldCode, $validated) {
+            $user->nom = $validated['nom'];
+            $user->prenom = $validated['prenom'];
+            $user->account_type = $validated['account_type'];
+            $user->sex = $validated['sex'];
+            $user->login = $validated['login'];
+            $user->code = $validated['code'];
+            $user->contacts = $validated['contacts'];
+            $user->text_password = $validated['password'];
+            $user->password = Hash::make($validated['password']);
+            $user->admin = $validated['account_type'] === 'administrateur';
+            if ($school) {
+                $user->CodeEtablissement = $school->CodeEtablissement;
+            }
+            $user->save();
+
+            if ($oldCode !== $user->code) {
+                DB::table('encadreur_classes')
+                    ->where('code', $oldCode)
+                    ->update(['code' => $user->code]);
+            }
+
+            if ($validated['account_type'] === 'encadreur') {
+                $this->syncEncadreurClasses(
+                    $user,
+                    $school->CodeEtablissement,
+                    $request->input('class_ids', [])
+                );
+            } else {
+                $user->encadreurClasses()->delete();
+            }
+        });
+
+        if ($request->RepPhoto) {
+            $filename = time() . '.' . $request->RepPhoto->extension();
+            $user->photo_path = $request->file('RepPhoto')->storeAs(
                 'profile_pictures',
                 $filename,
                 'public'
             );
-            $user->photo_path=$path;
-        }
-        if ($request->account_type == 'administrateur'){
-            $user->admin = True;
-            $user->save();
-        }
-        else{
-            $user->admin = False;
             $user->save();
         }
 
-        $user->save();
+        $returnSchool = $request->input('return_school');
+        $returnPage = max(1, (int) $request->input('return_page', 1));
+        $returnParameters = $returnSchool
+            ? ['CodeEtablissement' => $returnSchool, 'page' => $returnPage]
+            : [];
+        return redirect()
+            ->route('add_user', $returnParameters)
+            ->with(['message' => "L'utilisateur a été modifié avec succès", 'alert' => 'border-success']);
+    }
 
-        return \redirect('add_user')->with(['message'=>"L'utilisateur a été modifié avec succès",'alert'=>'border-success']);
+    private function syncEncadreurClasses(User $user, string $schoolCode, array $classCodes): void
+    {
+        $classCodes = array_values(array_unique($classCodes));
+        $assignments = $user->encadreurClasses();
+        $assignments->whereNotIn('CodeClasse', $classCodes)->delete();
+
+        $existingCodes = $user->encadreurClasses()->pluck('CodeClasse')->all();
+        $newAssignments = [];
+        foreach (array_diff($classCodes, $existingCodes) as $classCode) {
+            $newAssignments[] = [
+                'code' => $user->code,
+                'CodeClasse' => $classCode,
+                'CodeEtablissement' => $schoolCode,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if ($newAssignments) {
+            DB::table('encadreur_classes')->insert($newAssignments);
+        }
+    }
+
+    private function generateUniqueUserCode(): int
+    {
+        do {
+            $code = random_int(10000000, 99999999);
+        } while (User::where('code', $code)->exists());
+
+        return $code;
     }
 
     public function assign_student_choose_class($parent_id,Request $request)

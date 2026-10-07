@@ -1252,6 +1252,54 @@ class InvestigationAlertTest extends TestCase
         ]);
     }
 
+    public function test_attendance_save_survives_notification_storage_unavailability(): void
+    {
+        $fixture = $this->createAttendanceMismatchFixture([
+            'ELE-NOTIFICATION-FAILURE',
+        ]);
+        User::create([
+            'code' => 'P-ELE-NOTIFICATION-FAILURE',
+            'nom' => 'Parent',
+            'prenom' => 'One',
+            'sex' => 'F',
+            'login' => 'parent-notification-failure',
+            'contacts' => '222',
+            'password' => bcrypt('secret'),
+            'account_type' => 'parent',
+            'CodeEtablissement' => 'SCHOOL-1',
+        ]);
+        Schema::drop('notifications');
+
+        $this->submitTeacherAttendance(
+            $fixture,
+            '2026-10-07',
+            [[
+                'CodeEleve' => 'ELE-NOTIFICATION-FAILURE',
+                'status' => 'A',
+            ]]
+        )->assertOk()->assertJson(['status' => 'success']);
+
+        $this->assertDatabaseHas('conduites', [
+            'CodeEleve' => 'ELE-NOTIFICATION-FAILURE',
+            'CodeClasse' => 'CL-MISMATCH',
+            'CodeEnseignement' => 'ENS-MISMATCH',
+            'DateEnreg' => '2026-10-07',
+            'CodeEtatCond' => 'A',
+            'CodeAnnee' => 'AN-1',
+        ]);
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_TEACHER_ATTENDANCE',
+            'teacher_code' => $fixture['teacher_code'],
+            'CodeEnseignement' => $fixture['course_code'],
+            'DateEnreg' => '2026-10-07',
+        ])
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.CodeEleve', 'ELE-NOTIFICATION-FAILURE')
+            ->assertJsonPath('0.CodeEtatCond', 'A');
+    }
+
     public function test_teacher_attendance_rejects_array_student_codes_without_throwing(): void
     {
         $fixture = $this->createAttendanceMismatchFixture(['ELE-ARRAY-CODE']);

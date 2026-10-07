@@ -9,11 +9,13 @@ import 'package:mobischo/utils/custom_theme.dart';
 class NotificationListScreen extends StatefulWidget {
   final User user;
   final ValueChanged<int> onUnreadCountChanged;
+  final Future<MobileNotificationPage> Function()? loadNotifications;
 
   const NotificationListScreen({
     Key? key,
     required this.user,
     required this.onUnreadCountChanged,
+    this.loadNotifications,
   }) : super(key: key);
 
   @override
@@ -34,7 +36,8 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
   }
 
   Future<MobileNotificationPage> _loadNotifications() async {
-    final page = await NotificationInboxService.load();
+    final page =
+        await (widget.loadNotifications ?? NotificationInboxService.load)();
     _notifications = page.notifications;
     _unreadCount = page.unreadCount;
     widget.onUnreadCountChanged(_unreadCount);
@@ -172,9 +175,29 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
 
           if (_notifications.isEmpty) {
             return Center(
-              child: Text(
-                uiText(context, 'notificationsEmpty'),
-                textAlign: TextAlign.center,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.notifications_none,
+                      size: 48,
+                      color: CustomTheme.blue.withOpacity(0.7),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      uiText(context, 'noNotifications'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      uiText(context, 'notificationsEmpty'),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             );
           }

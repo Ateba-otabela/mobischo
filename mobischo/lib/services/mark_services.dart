@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/models/mark.dart';
+import 'package:mobischo/services/mobile_api_service.dart';
 
 class MarkServices {
   static const ROOT = 'https://mobischo.com/api/school_manager';
@@ -13,6 +14,7 @@ class MarkServices {
   static const GET_SORTED_COURSE_MARKS_ACTION = 'GET_SORTED_COURSE_MARKS';
   static const GET_STUDENT_YEAR_MARKS_ACTION = 'GET_STUDENT_YEAR_MARKS';
   static const GET_COURSE_YEAR_MARKS_ACTION = 'GET_COURSE_YEAR_MARKS';
+  static const GET_STUDENT_SEQUENCE_MARKS_ACTION = 'GET_STUDENT_SEQUENCE_MARKS';
   static const _notesRequestTimeout = Duration(seconds: 20);
 
   static Future<List<Mark>> getCourseMarks(String codeEnseignement) async {
@@ -75,6 +77,33 @@ class MarkServices {
     } catch (_) {
       throw Exception('Invalid student notes response');
     }
+  }
+
+  static Future<List<Mark>> getStudentSequenceMarks(
+      String codeEleve, String codeEvaluation) async {
+    final response = await MobileApiService.post(
+      '/notes/student-sequence',
+      body: <String, dynamic>{
+        'action': GET_STUDENT_SEQUENCE_MARKS_ACTION,
+        'codeEleve': codeEleve,
+        'codeEvaluation': codeEvaluation,
+      },
+    ).timeout(_notesRequestTimeout);
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Unable to load student sequence notes (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw const FormatException('Invalid student sequence notes response');
+    }
+    return decoded.map((item) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException('Invalid student mark entry');
+      }
+      return Mark.fromJson(item);
+    }).toList(growable: false);
   }
 
   static Future<List<Mark>> getCourseYearMarksForNotes(

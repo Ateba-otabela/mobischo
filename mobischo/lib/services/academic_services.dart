@@ -141,6 +141,25 @@ class AcademicServices {
     }
   }
 
+  static Future<List<SequenceEvaluation>> getSequencesForNotes(
+      String codeEleve) async {
+    final response = await MobileApiService.post(
+      '/notes/student-sequence',
+      body: <String, dynamic>{
+        'action': 'GET_STUDENT_SEQUENCE_AVAILABILITY',
+        'codeEleve': codeEleve,
+      },
+    ).timeout(_notesRequestTimeout);
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load assessment periods');
+    }
+    try {
+      return parseSequenceEvaluationResponse(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid assessment periods response');
+    }
+  }
+
   static Future<String> createConvocationTable() async {
     try {
       var map = <String, dynamic>{};
@@ -358,9 +377,14 @@ class AcademicServices {
 
   static List<SequenceEvaluation> parseSequenceEvaluationResponse(
       String responseBody) {
-    final parsed = json.decode(responseBody).cast<Map<String, dynamic>>();
-    return parsed
-        .map<SequenceEvaluation>((json) => SequenceEvaluation.fromJson(json))
+    final decoded = json.decode(responseBody);
+    if (decoded is! List) {
+      throw const FormatException('Expected a sequence list');
+    }
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(SequenceEvaluation.fromJson)
+        .where((sequence) => sequence.LibelleEvaluation.trim().isNotEmpty)
         .toList();
   }
 

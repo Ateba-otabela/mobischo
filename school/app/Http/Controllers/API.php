@@ -25,12 +25,57 @@ use App\Models\AbsenceJustification;
 use App\Models\InvestigationAlert;
 use App\Models\TeacherAttendance;
 use App\Services\EncadreurClassScope;
+use App\Services\PrincipalContextService;
 use App\Services\NotificationDispatchService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class API extends Controller
 {
+    private function authorizeStudentNotesRequest(Request $request, string $codeEleve)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Authentication is required.'], 401);
+        }
+        if (!$user->tokenCan('mobischo:mobile')) {
+            return response()->json(['error' => 'This token cannot access student notes.'], 403);
+        }
+
+        $student = Eleve::where('CodeEleve', $codeEleve)->first();
+        if (!$student) {
+            return response()->json(['error' => 'Student not found.'], 404);
+        }
+
+        $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+        if ($accountType === 'parent') {
+            if ((string) $student->code !== (string) $user->code) {
+                return response()->json(['error' => 'Student is not linked to this parent.'], 403);
+            }
+        } else {
+            $principalRole = in_array($accountType, [
+                'principal',
+                'principal_encadreur',
+                'administrateur',
+            ], true) || (bool) $user->admin;
+            $principalScope = (new PrincipalContextService())->resolve($user);
+            $schoolCode = trim((string) ($principalScope['school_code'] ?? ''));
+
+            if (!$principalRole || $schoolCode === '') {
+                return response()->json(['error' => 'This account cannot access student notes.'], 403);
+            }
+
+            $studentBelongsToSchool = Classe::where('CodeClasse', $student->CodeClasse)
+                ->where('CodeEtablissement', $schoolCode)
+                ->exists();
+            if (!$studentBelongsToSchool) {
+                return response()->json(['error' => 'Student is outside this school.'], 403);
+            }
+        }
+
+        return $student;
+    }
+
     private function isMobileEligibleUser(User $user): bool
     {
         $accountType = strtolower(trim((string) ($user->account_type ?? '')));
@@ -654,6 +699,78 @@ class API extends Controller
             return Note::where('CodeEleve', '=', $codeEleve)
                 ->where('CodeAnnee', '=', $codeAnnee)
                 ->get();
+        }
+
+        if ($action === 'GET_STUDENT_SEQUENCE_AVAILABILITY') {
+            $codeEleve = trim((string) $request->input('codeEleve', ''));
+            if ($codeEleve === '') {
+                return response()->json(['error' => 'Student is required.'], 422);
+            }
+
+            $student = $this->authorizeStudentNotesRequest($request, $codeEleve);
+            if (!$student instanceof Eleve) {
+                return $student;
+            }
+
+            $availableSequenceCodes = DB::table('notes')
+                ->where('CodeEleve', $codeEleve)
+                ->whereNotNull('valeur')
+                ->where('valeur', '<>', '')
+                ->distinct()
+                ->pluck('CodeEvaluation')
+                ->map(static fn ($code) => (string) $code)
+                ->flip();
+
+            return SequenceEvaluation::query()
+                ->get()
+                ->map(function (SequenceEvaluation $sequence) use ($availableSequenceCodes) {
+                    $sequence->setAttribute(
+                        'hasMarks',
+                        $availableSequenceCodes->has((string) $sequence->CodeEvaluation)
+                    );
+
+                    return $sequence;
+                })
+                ->values();
+        }
+
+        if ($action === 'GET_STUDENT_SEQUENCE_MARKS') {
+            $codeEleve = trim((string) $request->input('codeEleve', ''));
+            $codeEvaluation = trim((string) $request->input('codeEvaluation', ''));
+            if ($codeEleve === '' || $codeEvaluation === '') {
+                return response()->json(['error' => 'Student and sequence are required.'], 422);
+            }
+
+            $student = $this->authorizeStudentNotesRequest($request, $codeEleve);
+            if (!$student instanceof Eleve) {
+                return $student;
+            }
+
+            if (!SequenceEvaluation::where('CodeEvaluation', $codeEvaluation)->exists()) {
+                return response()->json(['error' => 'Sequence not found.'], 404);
+            }
+
+            return DB::table('notes as n')
+                ->leftJoin('enseignements as e', 'e.CodeEnseignement', '=', 'n.CodeEnseignement')
+                ->leftJoin('matieres as m', 'm.CodeMatiere', '=', 'e.CodeMatiere')
+                ->where('n.CodeEleve', $codeEleve)
+                ->where('n.CodeEvaluation', $codeEvaluation)
+                ->orderBy('m.LibelleMatiere')
+                ->orderBy('n.CodeEnseignement')
+                ->orderBy('n.id')
+                ->get([
+                    'n.id',
+                    'n.CodeEleve',
+                    'n.CodeEnseignement',
+                    'n.CodeEvaluation',
+                    'e.CodeMatiere',
+                    'm.LibelleMatiere',
+                    'n.CodeAppreciation',
+                    'n.valeur',
+                    'n.coef',
+                    'n.Total',
+                    'n.Dateeng',
+                ]);
         }
 
         if ($action == 'GET_COURSE_YEAR_MARKS') {

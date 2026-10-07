@@ -138,6 +138,41 @@ class NotificationDispatchServiceTest extends TestCase
         $this->assertSame(0, $result['sent']);
     }
 
+    public function test_fcm_runtime_failure_does_not_abort_attendance_notification_dispatch(): void
+    {
+        User::create([
+            'code' => 'P-1',
+            'account_type' => 'parent',
+            'nom' => 'Parent',
+            'prenom' => 'One',
+            'CodeEtablissement' => '16801',
+        ]);
+        Eleve::create([
+            'CodeEleve' => 'E-1',
+            'CodeClasse' => 'C-1',
+            'code' => 'P-1',
+            'Nom' => 'Alice',
+            'Prenom' => 'Durand',
+        ]);
+
+        $fcm = Mockery::mock(FcmNotificationService::class);
+        $fcm->shouldReceive('sendToUser')
+            ->once()
+            ->andThrow(new \RuntimeException('FCM unavailable'));
+
+        $service = new NotificationDispatchService($fcm);
+        $result = $service->dispatchAttendanceNotification(
+            'E-1',
+            '2026-09-29',
+            'A',
+            'T-1',
+            ['school_code' => '16801', 'class_code' => 'C-1']
+        );
+
+        $this->assertSame(1, $result['failed']);
+        $this->assertDatabaseCount('notifications', 1);
+    }
+
     public function test_absent_notifies_parent_without_class_and_assigned_encadreur_with_class(): void
     {
         User::create(['code' => 'P-1', 'account_type' => 'parent', 'nom' => 'Parent', 'prenom' => 'One', 'CodeEtablissement' => '16801']);

@@ -434,6 +434,8 @@ String uiText(
       return l10n.leaveSession;
     case 'allClasses':
       return l10n.allClasses;
+    case 'noNotifications':
+      return l10n.noNotifications;
     case 'notificationsEmpty':
       return l10n.notificationsEmpty;
     case 'markNotificationRead':
@@ -912,6 +914,8 @@ String uiText(
       return l10n.marksBySemesters;
     case 'marksAvailable':
       return l10n.marksAvailable;
+    case 'noMarksAvailableForSequence':
+      return l10n.noMarksAvailableForSequence;
     case 'loading':
       return l10n.loading;
     case 'retry':
@@ -1062,6 +1066,8 @@ String uiText(
       return l10n.continueAction;
     case 'noSequencesAvailable':
       return l10n.noSequencesAvailable;
+    case 'sequencesLoadError':
+      return l10n.sequencesLoadError;
     case 'sequencesWillAppear':
       return l10n.sequencesWillAppear;
     case 'noSubjectsAvailable':

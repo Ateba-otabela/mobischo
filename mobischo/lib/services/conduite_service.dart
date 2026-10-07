@@ -79,7 +79,31 @@ class ConduiteServices {
       'CodeEnseignement': codeEnseignement,
       'statuses': jsonEncode(statuses),
     });
-    return response.statusCode == 200;
+    if (response.statusCode != 200) {
+      var serverMessage = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          serverMessage =
+              (decoded['message'] ?? decoded['error'] ?? '').toString().trim();
+        }
+      } on FormatException {
+        // Non-JSON error pages are represented by their HTTP status below.
+      }
+      print(
+        'SAVE_TEACHER_ATTENDANCE failed: HTTP ${response.statusCode}'
+        '${serverMessage.isEmpty ? '' : ' ($serverMessage)'}',
+      );
+      return false;
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> && decoded['status'] == 'success';
+    } on FormatException {
+      print('SAVE_TEACHER_ATTENDANCE returned an invalid response.');
+      return false;
+    }
   }
 
   static Future<bool> updateTeacherAttendance({

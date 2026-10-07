@@ -8,7 +8,9 @@ use App\Models\Eleve;
 use App\Models\Etablissement;
 use App\Models\SequenceEvaluation;
 use App\Models\TrancheScholarite;
+use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -133,6 +135,7 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_user_list_is_scoped_to_the_selected_school(): void
     {
+        $this->actingAsAdministrator();
         $this->createSchool('12301');
         $this->createSchool('45601');
         $this->createUser('101', '12301', 'Teacher One');
@@ -141,20 +144,107 @@ class SchoolDependentPagesTest extends TestCase
         $this->get(route('add_user', ['CodeEtablissement' => '12301']))
             ->assertOk()
             ->assertSee('Teacher One')
-            ->assertDontSee('Teacher Two');
+            ->assertDontSee('Teacher Two')
+            ->assertSee('data-edit-user')
+            ->assertDontSee('id="modify101"')
+            ->assertDontSee('id="add_student101"');
     }
 
-    public function test_user_list_shows_existing_users_without_a_school_filter(): void
+    public function test_user_edit_form_is_loaded_on_demand(): void
     {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createUser('101', '12301', 'Teacher One');
+
+        $this->get(route('admin.users.edit-form', [
+            'user_id' => '101',
+            'CodeEtablissement' => '12301',
+        ]))
+            ->assertOk()
+            ->assertSee('name="nom"', false)
+            ->assertSee('name="prenom"', false)
+            ->assertSee('name="class_ids[]"', false)
+            ->assertSee('return_school', false);
+    }
+
+    public function test_user_list_requires_a_school_before_loading_users(): void
+    {
+        $this->actingAsAdministrator();
         $this->createSchool('12301');
         $this->createSchool('45601');
         $this->createUser('101', '12301', 'Teacher One');
         $this->createUser('202', '45601', 'Teacher Two');
 
+        $userQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$userQueries): void {
+            if (preg_match('/\bfrom\s+[`"]?users\b/i', $query->sql)) {
+                $userQueries[] = $query->sql;
+            }
+        });
+
         $this->get(route('add_user'))
             ->assertOk()
-            ->assertSee('Teacher One')
-            ->assertSee('Teacher Two');
+            ->assertSee('Choisissez un établissement pour afficher ses utilisateurs.')
+            ->assertDontSee('Teacher One')
+            ->assertDontSee('Teacher Two')
+            ->assertViewHas('users', null);
+
+        $this->assertSame([], $userQueries);
+    }
+
+    public function test_user_list_paginates_only_users_from_the_selected_school(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createSchool('45601');
+        for ($index = 1; $index <= 27; $index++) {
+            $this->createUser(
+                (string) $index,
+                '12301',
+                'Teacher ' . str_pad((string) $index, 2, '0', STR_PAD_LEFT)
+            );
+        }
+        $this->createUser('OTHER', '45601', 'Other School Teacher');
+
+        $pageOne = $this->get(route('add_user', ['CodeEtablissement' => '12301']))
+            ->assertOk()
+            ->assertSee('Teacher 01')
+            ->assertSee('Teacher 25')
+            ->assertDontSee('Teacher 26')
+            ->assertDontSee('Other School Teacher')
+            ->viewData('users');
+
+        $this->assertSame(25, $pageOne->count());
+        $this->assertSame(27, $pageOne->total());
+        $this->assertStringContainsString('CodeEtablissement=12301', $pageOne->url(2));
+        $this->assertStringContainsString('page=2', $pageOne->url(2));
+
+        $this->get(route('add_user', ['CodeEtablissement' => '12301', 'page' => 2]))
+            ->assertOk()
+            ->assertSee('Teacher 26')
+            ->assertSee('Teacher 27')
+            ->assertDontSee('Teacher 01')
+            ->assertDontSee('Other School Teacher');
+    }
+
+    public function test_user_management_routes_require_an_administrator(): void
+    {
+        $this->get(route('add_user'))
+            ->assertRedirect(route('login'));
+        $this->get(route('admin.users.edit-form', ['user_id' => '101']))
+            ->assertRedirect(route('login'));
+
+        $this->actingAs(new User([
+            'code' => 'NOT-ADMIN',
+            'account_type' => 'enseignant',
+            'admin' => false,
+        ]));
+        $this->get(route('add_user'))->assertForbidden();
+        $this->get(route('admin.users.edit-form', ['user_id' => '101']))
+            ->assertForbidden();
+
+        $this->actingAsAdministrator();
+        $this->get(route('add_user'))->assertOk();
     }
 
     public function test_class_csv_import_creates_valid_data_and_rejects_short_rows(): void
@@ -213,6 +303,7 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_existing_admin_csv_buttons_import_valid_rows_for_academic_records(): void
     {
+        $this->actingAsAdministrator();
         $this->post(route('import_schools'), [
             'csv_file' => $this->csvUpload(
                 'schools.csv',
@@ -287,7 +378,7 @@ class SchoolDependentPagesTest extends TestCase
         ];
         $this->post(route('import_users'), [
             'csv_file' => $this->csvUpload('teachers.csv', implode(';', $teacherColumns)."\n"),
-        ])->assertRedirect('add_user');
+        ])->assertRedirect(route('add_user'));
 
         $teachingColumns = [
             'ENSEIGNEMENT-CSV',
@@ -511,6 +602,10 @@ class SchoolDependentPagesTest extends TestCase
      */
     public function test_each_legacy_import_rejects_short_rows(string $routeName): void
     {
+        if ($routeName === 'import_users') {
+            $this->actingAsAdministrator();
+        }
+
         $this->post(route($routeName), [
             'csv_file' => $this->csvUpload('short.csv', "too-short\n"),
         ])->assertRedirect()->assertSessionHasErrors('csv_file');
@@ -813,6 +908,7 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_legacy_imports_reject_invalid_references_before_writing(): void
     {
+        $this->actingAsAdministrator();
         $teacherColumns = array_fill(0, 32, '');
         $teacherColumns[0] = 'TEACHER-BAD-SCHOOL';
         $teacherColumns[1] = 'Teacher';
@@ -887,6 +983,9 @@ class SchoolDependentPagesTest extends TestCase
         ];
 
         foreach ($routes as $routeName) {
+            if ($routeName === 'add_user') {
+                $this->actingAsAdministrator();
+            }
             $this->get(route($routeName))
                 ->assertOk();
         }
@@ -971,6 +1070,7 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_user_assignment_pages_reject_missing_parent_class_or_year_gracefully(): void
     {
+        $this->actingAsAdministrator();
         $this->get(route('choose_student', [
             'parent_id' => 'MISSING-PARENT',
             'CodeClasse' => 'MISSING-CLASS',
@@ -990,7 +1090,10 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_admin_encadreur_form_creates_a_valid_encadreur_account(): void
     {
+        $this->actingAsAdministrator();
         $this->createSchool('12301');
+        $this->createClass('CLS-A1', '12301');
+        $this->createClass('CLS-A2', '12301');
 
         $this->post(route('add_user_complete'), [
             'account_type' => 'encadreur',
@@ -1001,6 +1104,7 @@ class SchoolDependentPagesTest extends TestCase
             'code' => 'ENC-1',
             'school_id' => '12301',
             'password' => 'temporary-password',
+            'class_ids' => ['CLS-A1', 'CLS-A2'],
         ])
             ->assertRedirect(route('add_user'));
 
@@ -1009,10 +1113,180 @@ class SchoolDependentPagesTest extends TestCase
             'account_type' => 'encadreur',
             'CodeEtablissement' => '12301',
         ]);
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-1',
+            'CodeClasse' => 'CLS-A1',
+            'CodeEtablissement' => '12301',
+        ]);
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-1',
+            'CodeClasse' => 'CLS-A2',
+            'CodeEtablissement' => '12301',
+        ]);
+    }
+
+    public function test_principal_creation_and_school_change_use_school_wide_access_without_class_assignments(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createSchool('45601');
+        $this->createClass('CLS-A1', '12301');
+        $this->createClass('CLS-B1', '45601');
+
+        $this->post(route('add_user_complete'), [
+            'account_type' => 'principal',
+            'nom' => 'Ateba',
+            'prenom' => 'Sam',
+            'contacts' => '123456',
+            'sex' => '0',
+            'code' => 'PRIN-1',
+            'school_id' => '12301',
+            'password' => 'temporary-password',
+        ])->assertRedirect(route('add_user'));
+
+        $this->assertDatabaseHas('users', [
+            'code' => 'PRIN-1',
+            'account_type' => 'principal',
+            'CodeEtablissement' => '12301',
+        ]);
+        $this->assertDatabaseMissing('encadreur_classes', ['code' => 'PRIN-1']);
+
+        $principal = User::findOrFail('PRIN-1');
+        $this->assertSame('12301', app(\App\Services\PrincipalContextService::class)->resolve($principal)['school_code']);
+
+        $this->post(route('save_user', ['user_id' => 'PRIN-1']), [
+            'account_type' => 'principal',
+            'nom' => $principal->nom,
+            'prenom' => $principal->prenom,
+            'contacts' => $principal->contacts,
+            'sex' => $principal->sex,
+            'login' => $principal->login,
+            'code' => 'PRIN-1',
+            'password' => 'temporary-password',
+            'school_id' => '45601',
+        ])->assertRedirect(route('add_user'));
+
+        $principal->refresh();
+        $this->assertSame('45601', $principal->CodeEtablissement);
+        $this->assertSame('45601', app(\App\Services\PrincipalContextService::class)->resolve($principal)['school_code']);
+        $this->assertDatabaseMissing('encadreur_classes', ['code' => 'PRIN-1']);
+    }
+
+    public function test_encadreur_rejects_classes_from_another_school_and_class_endpoint_is_school_scoped(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createSchool('45601');
+        $this->createClass('CLS-A1', '12301');
+        $this->createClass('CLS-B1', '45601');
+
+        $this->get(route('admin.users.classes', ['school' => '12301']))
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['CodeClasse' => 'CLS-A1'])
+            ->assertJsonMissing(['CodeClasse' => 'CLS-B1']);
+
+        $this->post(route('add_user_complete'), [
+            'account_type' => 'encadreur',
+            'nom' => 'Ateba',
+            'prenom' => 'Sam',
+            'contacts' => '123456',
+            'sex' => 'male',
+            'code' => 'ENC-INVALID',
+            'school_id' => '12301',
+            'password' => 'temporary-password',
+            'class_ids' => ['CLS-B1'],
+        ])->assertSessionHasErrors('class_ids.0');
+
+        $this->assertDatabaseMissing('users', ['code' => 'ENC-INVALID']);
+        $this->get(route('admin.users.classes', ['school' => 'MISSING']))
+            ->assertNotFound();
+    }
+
+    public function test_encadreur_edit_replaces_assignments_atomically_when_school_changes(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createSchool('45601');
+        $this->createClass('CLS-A1', '12301');
+        $this->createClass('CLS-A2', '12301');
+        $this->createClass('CLS-A3', '12301');
+        $this->createClass('CLS-B1', '45601');
+        $this->createUser('ENC-2', '12301', 'Encadreur');
+        DB::table('users')->where('code', 'ENC-2')->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            [
+                'code' => 'ENC-2',
+                'CodeClasse' => 'CLS-A1',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'code' => 'ENC-2',
+                'CodeClasse' => 'CLS-A2',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $encadreurScope = app(\App\Services\EncadreurClassScope::class);
+        $encadreur = User::findOrFail('ENC-2');
+        $this->assertTrue($encadreurScope->ensureClassAccessForEncadreur($encadreur, 'CLS-A1'));
+        $this->assertFalse($encadreurScope->ensureClassAccessForEncadreur($encadreur, 'CLS-A3'));
+
+        $this->post(route('save_user', ['user_id' => 'ENC-2']), [
+            'account_type' => 'encadreur',
+            'nom' => 'Encadreur',
+            'prenom' => 'Staff',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Encadreur',
+            'code' => 'ENC-2',
+            'password' => 'temporary-password',
+            'school_id' => '12301',
+            'class_ids' => ['CLS-A1'],
+        ])->assertRedirect(route('add_user'));
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-2',
+            'CodeClasse' => 'CLS-A1',
+        ]);
+        $this->assertDatabaseMissing('encadreur_classes', [
+            'code' => 'ENC-2',
+            'CodeClasse' => 'CLS-A2',
+        ]);
+
+        $this->post(route('save_user', ['user_id' => 'ENC-2']), [
+            'account_type' => 'encadreur',
+            'nom' => 'Encadreur',
+            'prenom' => 'Staff',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Encadreur',
+            'code' => 'ENC-2',
+            'password' => 'temporary-password',
+            'school_id' => '45601',
+            'class_ids' => ['CLS-B1'],
+        ])->assertRedirect('add_user');
+
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-2',
+            'CodeClasse' => 'CLS-B1',
+            'CodeEtablissement' => '45601',
+        ]);
+        $this->assertDatabaseMissing('encadreur_classes', [
+            'code' => 'ENC-2',
+            'CodeEtablissement' => '12301',
+        ]);
+        $encadreur->refresh();
+        $this->assertFalse($encadreurScope->ensureClassAccessForEncadreur($encadreur, 'CLS-A1'));
+        $this->assertTrue($encadreurScope->ensureClassAccessForEncadreur($encadreur, 'CLS-B1'));
     }
 
     public function test_user_creation_rejects_invalid_type_or_missing_password_with_validation_errors(): void
     {
+        $this->actingAsAdministrator();
         $this->post(route('add_user_complete'), [
             'account_type' => 'not-a-user-type',
         ])
@@ -1079,6 +1353,7 @@ class SchoolDependentPagesTest extends TestCase
 
     public function test_admin_record_actions_return_not_found_for_missing_ids(): void
     {
+        $this->actingAsAdministrator();
         $this->get(route('delete_school', ['school_id' => 'MISSING']))
             ->assertNotFound();
         $this->post(route('save_school', ['school_id' => 'MISSING']))
@@ -1095,7 +1370,7 @@ class SchoolDependentPagesTest extends TestCase
 
     private function createSchoolPageTables(): void
     {
-        foreach (['notes', 'enseignements', 'matieres', 'eleves', 'classes', 'annees', 'etablissements', 'users', 'sequence_evaluations', 'tranche_scholarites', 'inscriptions', 'historique_inscriptions'] as $table) {
+        foreach (['encadreur_classes', 'notes', 'enseignements', 'matieres', 'eleves', 'classes', 'annees', 'etablissements', 'users', 'sequence_evaluations', 'tranche_scholarites', 'inscriptions', 'historique_inscriptions'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -1263,6 +1538,15 @@ class SchoolDependentPagesTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('encadreur_classes', function (Blueprint $table): void {
+            $table->id();
+            $table->string('code');
+            $table->string('CodeClasse');
+            $table->string('CodeEtablissement');
+            $table->timestamps();
+            $table->unique(['CodeEtablissement', 'code', 'CodeClasse']);
+        });
+
         Schema::create('eleves', function (Blueprint $table): void {
             $table->string('CodeEleve')->primary();
             $table->string('code')->nullable();
@@ -1353,6 +1637,15 @@ class SchoolDependentPagesTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function actingAsAdministrator(): void
+    {
+        $administrator = new User();
+        $administrator->code = 'TEST-ADMIN';
+        $administrator->account_type = 'administrateur';
+        $administrator->admin = true;
+        $this->actingAs($administrator);
     }
 
     private function createStudent(string $code, string $classCode, string $yearCode, string $name): void

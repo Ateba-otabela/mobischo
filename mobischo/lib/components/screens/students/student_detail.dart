@@ -7,6 +7,7 @@ import 'package:flutter/src/foundation/key.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:mobischo/components/screens/parent/MyChildrenInscription.dart';
 import 'package:mobischo/components/screens/students/StudentCourseList.dart';
+import 'package:mobischo/components/screens/students/student_sequence_notes_screen.dart';
 import 'package:mobischo/components/screens/teachers.dart/CreateConvocation.dart';
 import 'package:mobischo/models/student.dart';
 import 'package:mobischo/models/user.dart';
@@ -29,6 +30,16 @@ class StudentDetailScreen extends StatefulWidget {
 }
 
 class _StudentDetailScreenState extends State<StudentDetailScreen> {
+  bool get _usesConsolidatedNotes {
+    final accountType = widget.user.account_type.trim().toLowerCase();
+    return accountType == 'parent' ||
+        accountType == 'principal' ||
+        accountType == 'principal_encadreur' ||
+        accountType == 'administrateur' ||
+        widget.user.admin == '1' ||
+        widget.user.admin.toLowerCase() == 'true';
+  }
+
   String getGender(String sex) {
     if (sex == '0') {
       return "Masculin";
@@ -296,10 +307,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: ((context) => StudentCoursesScreen(
-                                      student: widget.student,
-                                      user: widget.user,
-                                    ))));
+                                builder: ((context) => _usesConsolidatedNotes
+                                    ? StudentSequenceNotesScreen(
+                                        student: widget.student,
+                                      )
+                                    : StudentCoursesScreen(
+                                        student: widget.student,
+                                        user: widget.user,
+                                      ))));
                       },
                     ),
                     const Divider(

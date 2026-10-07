@@ -2,16 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:mobischo/components/screens/parent/ParentNotesSequence.dart';
-import 'package:mobischo/models/course.dart';
-import 'package:mobischo/models/mark.dart';
-import 'package:mobischo/models/sequence_evaluation.dart';
+import 'package:mobischo/components/screens/students/student_sequence_notes_screen.dart';
 import 'package:mobischo/l10n/ui_text.dart';
 import 'package:mobischo/models/student.dart';
-import 'package:mobischo/models/year.dart';
 import 'package:mobischo/models/user.dart';
 import 'package:mobischo/services/students_services.dart';
-import 'package:mobischo/services/academic_services.dart';
 import 'package:mobischo/utils/custom_theme.dart';
 import 'package:mobischo/utils/student_display_name.dart';
 
@@ -32,227 +27,164 @@ class MyChildrenNotes extends StatefulWidget {
 }
 
 class _MyChildrenNotesState extends State<MyChildrenNotes> {
+  Student? _selectedStudent;
+  Future<List<Student>>? _childrenFuture;
   InterstitialAd? _interstitialAd;
-  int _numInterstitialLoadAttempts = 0;
-  int maxFailedLoadAttempts = 3;
-
-  bool isLoaded = false;
-  Student? selectedStudent;
-  Year? selectedYear;
-  SequenceEvaluation? selectedSequence;
-  List<Course> selectedSequenceCourses = <Course>[];
-  List<Mark> selectedSequenceMarks = <Mark>[];
-  int notesStage = 0;
-  Future<Year?>? _currentYearFuture;
+  var _interstitialLoadAttempts = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialStudent != null) {
-      selectedStudent = widget.initialStudent;
-      notesStage = 1;
-      _currentYearFuture = _getCurrentYear();
+    _selectedStudent = widget.initialStudent;
+    if (_selectedStudent == null) {
+      _childrenFuture = _loadChildren();
     }
-  }
-
-  Future<Year?> _getCurrentYear() async {
-    final years = await AcademicServices.getYears();
-    if (years.isEmpty) {
-      return null;
-    }
-
-    years.sort((first, second) {
-      final firstMatch = RegExp(r'\d{4}').firstMatch(first.Libelle);
-      final secondMatch = RegExp(r'\d{4}').firstMatch(second.Libelle);
-      final firstStartYear =
-          int.tryParse(firstMatch?.group(0) ?? '') ?? first.CodeAnnee;
-      final secondStartYear =
-          int.tryParse(secondMatch?.group(0) ?? '') ?? second.CodeAnnee;
-      final comparison = secondStartYear.compareTo(firstStartYear);
-      return comparison != 0
-          ? comparison
-          : second.CodeAnnee.compareTo(first.CodeAnnee);
-    });
-
-    return years.first;
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _createInterstitialAd();
+    _loadInterstitialAd();
   }
 
-  void _createInterstitialAd() {
+  @override
+  void dispose() {
+    _interstitialAd?.dispose();
+    super.dispose();
+  }
+
+  Future<List<Student>> _loadChildren() =>
+      StudentServices.getParentStudentsForNotes(widget.user.code);
+
+  void _loadInterstitialAd() {
     InterstitialAd.load(
-        adUnitId: 'ca-app-pub-2496623977736610/2133664237',
-        // adUnitId: 'ca-app-pub-2496623977736610/2133664237',
-        request: const AdRequest(),
-        adLoadCallback: InterstitialAdLoadCallback(
-          onAdLoaded: (InterstitialAd ad) {
-            _interstitialAd = ad;
-            _numInterstitialLoadAttempts = 0;
-            _interstitialAd!.setImmersiveMode(true);
-
-            setState(() {
-              isLoaded = true;
-            });
-          },
-          onAdFailedToLoad: (LoadAdError error) {
-            _numInterstitialLoadAttempts += 1;
-            _interstitialAd = null;
-            if (_numInterstitialLoadAttempts < maxFailedLoadAttempts) {
-              _createInterstitialAd();
-            }
-          },
-        ));
+      adUnitId: 'ca-app-pub-2496623977736610/2133664237',
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+          _interstitialAd = ad;
+          _interstitialLoadAttempts = 0;
+          ad.setImmersiveMode(true);
+        },
+        onAdFailedToLoad: (_) {
+          _interstitialAd = null;
+          _interstitialLoadAttempts++;
+          if (mounted && _interstitialLoadAttempts < 3) {
+            _loadInterstitialAd();
+          }
+        },
+      ),
+    );
   }
 
-  String getGender(String sex, BuildContext context) {
-    if (sex == '0') {
-      return uiText(context, 'genderMale');
-    } else {
-      return uiText(context, 'genderFemale');
+  String _genderLabel(String sex) {
+    switch (sex.trim().toLowerCase()) {
+      case '0':
+      case 'm':
+      case 'male':
+        return uiText(context, 'genderMale');
+      case '1':
+      case 'f':
+      case 'female':
+        return uiText(context, 'genderFemale');
+      default:
+        return '';
     }
+  }
+
+  String _childName(Student child) {
+    final name = getStudentDisplayName(child);
+    return name == 'Student' ? uiText(context, 'notProvided') : name;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (notesStage == 1 && selectedStudent != null) {
-      return FutureBuilder<Year?>(
-        future: _currentYearFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final year = snapshot.data;
-          if (year == null) {
-            return Center(
-                child: Text(uiText(context, 'noSchoolYearAvailable')));
-          }
-
-          return ParentNotesSequenceScreen(
-            student: selectedStudent!,
-            year: year,
-            onBack: widget.onBack ??
-                () => setState(() {
-                      notesStage = 0;
-                      selectedStudent = null;
-                      _currentYearFuture = null;
-                    }),
-            onSequenceSelected: (sequence, courses, marks) => setState(() {
-              selectedYear = year;
-              notesStage = 3;
-              selectedSequence = sequence;
-              selectedSequenceCourses = courses;
-              selectedSequenceMarks = marks;
-            }),
-          );
-        },
+    final student = _selectedStudent;
+    if (student != null) {
+      return StudentSequenceNotesScreen(
+        student: student,
+        onBack: widget.onBack ?? () => setState(() => _selectedStudent = null),
       );
     }
 
-    if (notesStage == 3 &&
-        selectedStudent != null &&
-        selectedYear != null &&
-        selectedSequence != null) {
-      return ParentSequenceMarksScreen(
-        student: selectedStudent!,
-        year: selectedYear!,
-        sequence: selectedSequence!,
-        courses: selectedSequenceCourses,
-        marks: selectedSequenceMarks,
-        onBack: () => setState(() {
-          notesStage = 1;
-          selectedSequence = null;
-          selectedSequenceCourses = <Course>[];
-          selectedSequenceMarks = <Mark>[];
-        }),
-      );
-    }
-
-    return Center(
-      child: FutureBuilder(
-        future: StudentServices.getParentStudents(widget.user.code),
-        builder: (BuildContext context, AsyncSnapshot snapshot) {
-          if (snapshot.data == null) {
-            return const Center(child: CircularProgressIndicator());
-          } else {
-            return Column(
+    return FutureBuilder<List<Student>>(
+      future: _childrenFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(
-                      top: 12, left: 5, right: 5, bottom: 5),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: CustomTheme.cardShadow),
-                    child: ListTile(
-                      trailing: const Image(
-                          image: AssetImage('assets/images/landing6.png')),
-                      title: Text(
-                        "Cliquez sur un enfant pour consulter ses notes",
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        // style: TextStyle(fontSize: 30),
-                      ),
-                    ),
-                  ),
-                ),
-                // Divider(),
-                Container(
-                  color: CustomTheme.grey,
-                  child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: snapshot.data.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: Container(
-                            decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: Colors.white),
-                            child: ListTile(
-                              leading: Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    image: DecorationImage(
-                                        image: AssetImage(
-                                            'assets/images/avatar-s-19.jpg'),
-                                        fit: BoxFit.fill),
-                                  )),
-                              title: Text(
-                                  getStudentDisplayName(snapshot.data[index]),
-                                  style: const TextStyle(fontSize: 13)),
-                              subtitle: Text(
-                                getGender(snapshot.data[index].Sex, context),
-                                style: const TextStyle(color: CustomTheme.blue),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward_ios),
-                              onTap: () {
-                                if (isLoaded == true) {
-                                  _interstitialAd!.show();
-                                }
-                                setState(() {
-                                  selectedStudent = snapshot.data[index];
-                                  notesStage = 1;
-                                  _currentYearFuture = _getCurrentYear();
-                                });
-                              },
-                            ),
-                          ),
-                        );
-                      }),
+                Text(uiText(context, 'childrenLoadError')),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () =>
+                      setState(() => _childrenFuture = _loadChildren()),
+                  child: Text(uiText(context, 'retry')),
                 ),
               ],
-            );
-          }
-        },
-      ),
+            ),
+          );
+        }
+
+        final children = snapshot.data ?? <Student>[];
+        if (children.isEmpty) {
+          return Center(child: Text(uiText(context, 'noChildLinked')));
+        }
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                uiText(context, 'selectYourChild'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                itemCount: children.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (context, index) {
+                  final child = children[index];
+                  return Card(
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundImage:
+                            AssetImage('assets/images/avatar-s-19.jpg'),
+                      ),
+                      title: Text(
+                        _childName(child),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      subtitle: _genderLabel(child.Sex).isEmpty
+                          ? null
+                          : Text(
+                              _genderLabel(child.Sex),
+                              style: const TextStyle(color: CustomTheme.blue),
+                            ),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        _interstitialAd?.show();
+                        setState(() => _selectedStudent = child);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -52,15 +52,18 @@ Route::prefix('admin/imports')
 // student controller
 
 #user routes
-Route::get('/add_user', [UserController::class, 'add_user'])->name('add_user');
-Route::post('/add_user_complete', [UserController::class, 'add_user_complete'])->name('add_user_complete');
-Route::post('/save_user/{user_id}', [UserController::class, 'save_user'])->name('save_user');
-Route::get('/assign_student_choose_class/{parent_id}', [UserController::class, 'assign_student_choose_class'])->name('assign_student_choose_class');
-Route::get('/choose_student/{parent_id}', [UserController::class, 'choose_student'])->name('choose_student');
-Route::get('/assign_student_complete/{parent_id}/{student_id}/{code_annee}', [UserController::class, 'assign_student_complete'])->name('assign_student_complete');
-Route::get('/assign_student_complete/{parent_id}/{student_id}/{code_annee}', [UserController::class, 'assign_student_complete'])->name('assign_student_complete');
-Route::get('/remove_student/{parent_id}/{student_id}/', [UserController::class, 'remove_student'])->name('remove_student');
-Route::post('/import_users', [UserController::class, 'import_users'])->name('import_users');
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdministrator::class])->group(function () {
+    Route::get('/add_user', [UserController::class, 'add_user'])->name('add_user');
+    Route::post('/add_user_complete', [UserController::class, 'add_user_complete'])->name('add_user_complete');
+    Route::post('/save_user/{user_id}', [UserController::class, 'save_user'])->name('save_user');
+    Route::get('/admin/users/{user_id}/edit-form', [UserController::class, 'edit_user_form'])->name('admin.users.edit-form');
+    Route::get('/admin/users/schools/{school}/classes', [UserController::class, 'classes_for_school'])->name('admin.users.classes');
+    Route::get('/assign_student_choose_class/{parent_id}', [UserController::class, 'assign_student_choose_class'])->name('assign_student_choose_class');
+    Route::get('/choose_student/{parent_id}', [UserController::class, 'choose_student'])->name('choose_student');
+    Route::get('/assign_student_complete/{parent_id}/{student_id}/{code_annee}', [UserController::class, 'assign_student_complete'])->name('assign_student_complete');
+    Route::get('/remove_student/{parent_id}/{student_id}/', [UserController::class, 'remove_student'])->name('remove_student');
+    Route::post('/import_users', [UserController::class, 'import_users'])->name('import_users');
+});
 
 
 #school routes

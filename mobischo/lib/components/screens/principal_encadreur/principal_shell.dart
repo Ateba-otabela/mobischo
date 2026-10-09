@@ -2702,8 +2702,7 @@ class PrincipalProfilePage extends StatelessWidget {
               onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) =>
-                          ChangePassword(user: user, localOnly: true)))),
+                      builder: (_) => ChangePassword(user: user)))),
           ListTile(
               leading: const Icon(Icons.logout),
               title: Text(uiText(context, 'logout')),

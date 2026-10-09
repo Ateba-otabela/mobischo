@@ -15,6 +15,7 @@ import '../../../models/user.dart';
 import '../../../utils/custom_button.dart';
 import '../../../utils/custom_input.dart';
 import '../../../utils/custom_theme.dart';
+import '../changePassword.dart';
 import '../principal_encadreur/principal_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -65,7 +66,10 @@ class _LoginScreenState extends State<LoginScreen> {
             return;
           }
 
-          final user = User.fromJson(data.first as Map<String, dynamic>);
+          final loginData = data.first as Map<String, dynamic>;
+          final user = User.fromJson(loginData);
+          final mustChangePassword =
+              loginData['must_change_password'] == true;
           if (user.token.isNotEmpty) {
             await MobileApiService.saveSession(user, user.token);
             unawaited(_registerDeviceAfterLogin());
@@ -78,6 +82,29 @@ class _LoginScreenState extends State<LoginScreen> {
             'principal_encadreur',
             'administrateur',
           }.contains(accountType);
+          final destination = shouldUsePrincipalShell
+              ? PrincipalShell(user: user)
+              : Home(user: user, selectedPage: 0);
+
+          if (mustChangePassword) {
+            Fluttertoast.showToast(
+              msg:
+                  'For security, you must change your default password before continuing.',
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.CENTER,
+              fontSize: 16.0,
+            );
+            if (!mounted) return;
+            await Navigator.of(cont).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ChangePassword(
+                  user: user,
+                  postChangeDestination: destination,
+                ),
+              ),
+            );
+            return;
+          }
 
           if (shouldUsePrincipalShell) {
             debugPrint(

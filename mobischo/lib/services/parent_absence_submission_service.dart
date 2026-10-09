@@ -6,8 +6,9 @@ import 'package:mobischo/services/mobile_api_service.dart';
 
 class ParentAbsenceSubmissionException implements Exception {
   final String message;
+  final int statusCode;
 
-  const ParentAbsenceSubmissionException(this.message);
+  const ParentAbsenceSubmissionException(this.message, this.statusCode);
 
   @override
   String toString() => message;
@@ -21,55 +22,78 @@ class ParentAbsenceSubmissionService {
     required DateTime absenceDate,
     required String reason,
     required String explanation,
-    Uint8List? documentBytes,
-    String? documentName,
   }) async {
     final date = '${absenceDate.year.toString().padLeft(4, '0')}-'
         '${absenceDate.month.toString().padLeft(2, '0')}-'
         '${absenceDate.day.toString().padLeft(2, '0')}';
-    final fields = <String, String>{
+    final body = <String, String>{
       'action': 'SUBMIT_ABSENCE_JUSTIFICATION',
       'CodeEleve': studentCode,
       'date_absence': date,
       'reason': reason,
       'justification': explanation,
     };
-    final file = documentBytes == null
-        ? null
-        : http.MultipartFile.fromBytes(
-            'document',
-            documentBytes,
-            filename: documentName,
-          );
 
-    final response = await MobileApiService.postMultipart(
+    final response = await MobileApiService.post(
       _endpoint,
-      fields: fields,
-      file: file,
+      body: body,
       headers: const {'Accept': 'application/json'},
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 409) {
-        final decoded = jsonDecode(response.body);
-        final error =
-            decoded is Map ? decoded['error']?.toString().trim() : null;
+        final error = _responseError(response);
         throw ParentAbsenceSubmissionException(
-          error != null && error.isNotEmpty
+          error.isNotEmpty
               ? error
               : 'Une justification est déjà en attente pour cet élève à cette date.',
+          response.statusCode,
         );
       }
       debugPrint(
         'Submitting absence justification failed '
         '(HTTP ${response.statusCode}).',
       );
-      throw StateError('Unable to submit absence justification.');
+      throw ParentAbsenceSubmissionException(
+        _responseError(response),
+        response.statusCode,
+      );
     }
 
     final decoded = jsonDecode(response.body);
     if (decoded is! Map || decoded['status'] != 'success') {
       throw const FormatException('Invalid justification submission response.');
     }
+  }
+
+  static String _responseError(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return '';
+
+      final error = decoded['error']?.toString().trim() ?? '';
+      if (error.isNotEmpty) return error;
+
+      final errors = decoded['errors'];
+      if (errors is Map) {
+        for (final messages in errors.values) {
+          if (messages is Iterable) {
+            for (final message in messages) {
+              final text = message.toString().trim();
+              if (text.isNotEmpty) return text;
+            }
+          }
+        }
+      }
+
+      final message = decoded['message']?.toString().trim() ?? '';
+      if (message.isNotEmpty && message != 'The given data was invalid.') {
+        return message;
+      }
+    } on FormatException {
+      return '';
+    }
+
+    return '';
   }
 }

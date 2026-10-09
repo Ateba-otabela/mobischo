@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +29,6 @@ class _NewAbsenceJustificationPageState
     'Urgence familiale',
     'Autre',
   ];
-  static const _maxDocumentSize = 10 * 1024 * 1024;
 
   final _formKey = GlobalKey<FormState>();
   final _explanationController = TextEditingController();
@@ -39,10 +37,7 @@ class _NewAbsenceJustificationPageState
   Student? _selectedChild;
   DateTime? _selectedDate;
   String? _selectedReason;
-  Uint8List? _documentBytes;
-  String? _documentName;
   bool _isSubmitting = false;
-  bool _isPickingDocument = false;
 
   @override
   void initState() {
@@ -73,8 +68,6 @@ class _NewAbsenceJustificationPageState
   void _resetForm() {
     _selectedReason = null;
     _explanationController.clear();
-    _documentBytes = null;
-    _documentName = null;
   }
 
   void _changeChild() {
@@ -104,50 +97,6 @@ class _NewAbsenceJustificationPageState
         '${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
-  Future<void> _pickDocument() async {
-    setState(() => _isPickingDocument = true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-        allowMultiple: false,
-        withData: true,
-      );
-      if (!mounted || result == null) return;
-
-      final file = result.files.single;
-      final bytes = file.bytes;
-      if (bytes == null) {
-        debugPrint('Supporting document could not be read from the picker.');
-        _showMessage(uiText(context, 'documentReadError'));
-        return;
-      }
-      if (file.size > _maxDocumentSize) {
-        _showMessage(uiText(context, 'documentTooLarge'));
-        return;
-      }
-
-      setState(() {
-        _documentBytes = bytes;
-        _documentName = file.name;
-      });
-    } on PlatformException catch (error) {
-      debugPrint('Picking supporting document failed (${error.code}).');
-      if (mounted) {
-        _showMessage(uiText(context, 'documentSelectError'));
-      }
-    } on Exception catch (error) {
-      debugPrint('Picking supporting document failed (${error.runtimeType}).');
-      if (mounted) {
-        _showMessage(uiText(context, 'documentSelectError'));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isPickingDocument = false);
-      }
-    }
-  }
-
   Future<void> _submit() async {
     if (_isSubmitting || _selectedChild == null || _selectedDate == null) {
       return;
@@ -161,8 +110,6 @@ class _NewAbsenceJustificationPageState
         absenceDate: _selectedDate!,
         reason: _selectedReason!,
         explanation: _explanationController.text.trim(),
-        documentBytes: _documentBytes,
-        documentName: _documentName,
       );
       if (!mounted) return;
 
@@ -199,7 +146,11 @@ class _NewAbsenceJustificationPageState
     } on ParentAbsenceSubmissionException catch (error) {
       debugPrint('Justification submission rejected by backend.');
       if (mounted) {
-        _showMessage(error.message);
+        _showMessage(
+          error.message.isNotEmpty
+              ? error.message
+              : uiText(context, 'justificationSubmissionError'),
+        );
       }
     } on Exception catch (error) {
       debugPrint('Justification submission failed (${error.runtimeType}).');
@@ -416,90 +367,9 @@ class _NewAbsenceJustificationPageState
                   return null;
                 },
               ),
-              const SizedBox(height: 6),
-              Text(
-                uiText(context, 'optionalSupportingDocument'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              if (_documentBytes == null)
-                OutlinedButton.icon(
-                  onPressed: _isPickingDocument ? null : _pickDocument,
-                  icon: _isPickingDocument
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.attach_file),
-                  label: Text(uiText(context, 'addDocumentOrPhoto')),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: CustomTheme.blue,
-                    side: const BorderSide(color: CustomTheme.blue),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                )
-              else
-                _buildSelectedDocument(),
-              const SizedBox(height: 4),
-              Text(
-                uiText(context, 'fileSizeLimit'),
-                style: TextStyle(color: Colors.black54, fontSize: 12),
-              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedDocument() {
-    final name = _documentName ?? uiText(context, 'selectedDocument');
-    final isImage = name.toLowerCase().endsWith('.jpg') ||
-        name.toLowerCase().endsWith('.jpeg') ||
-        name.toLowerCase().endsWith('.png');
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xfff3f7f4),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xffd6e8db)),
-      ),
-      child: Row(
-        children: [
-          if (isImage && _documentBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.memory(
-                _documentBytes!,
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-              ),
-            )
-          else
-            const Icon(Icons.description_outlined, color: CustomTheme.blue),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-          IconButton(
-            tooltip: uiText(context, 'deleteDocument'),
-            onPressed: () => setState(() {
-              _documentBytes = null;
-              _documentName = null;
-            }),
-            icon: const Icon(Icons.close, color: Colors.redAccent),
-          ),
-        ],
       ),
     );
   }

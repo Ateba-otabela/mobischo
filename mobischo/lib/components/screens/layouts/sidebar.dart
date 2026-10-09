@@ -103,7 +103,6 @@ class _SideBarMenuState extends State<SideBarMenu> {
           navigator.push(MaterialPageRoute(
             builder: (_) => ChangePassword(
               user: widget.user,
-              localOnly: _isPrincipal,
             ),
           ));
         },

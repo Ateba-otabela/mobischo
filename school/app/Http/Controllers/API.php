@@ -271,6 +271,7 @@ class API extends Controller
             'CodeEtablissement' => (string) ($user->CodeEtablissement ?? ''),
             'token' => $mobileToken,
             'ai_token' => $aiToken,
+            'must_change_password' => $storedTextPassword === '00000000',
         ];
 
         return response()->json([$userPayload]);
@@ -718,7 +719,9 @@ class API extends Controller
                 ->where('valeur', '<>', '')
                 ->distinct()
                 ->pluck('CodeEvaluation')
-                ->map(static fn ($code) => (string) $code)
+                ->map(function ($code) {
+                    return (string) $code;
+                })
                 ->flip();
 
             return SequenceEvaluation::query()
@@ -792,10 +795,30 @@ class API extends Controller
         }
 
         if($action == 'GET_TEACHER_COURSES'){
-            $teacher_code = $request->teacher_code;
-            $courses = Enseignement::where(function ($query) use ($teacher_code) {
+            $teacher_code = trim((string) $request->input('teacher_code', ''));
+            $teacher = User::where('code', '=', $teacher_code)
+                ->where('account_type', '=', 'enseignant')
+                ->first();
+            $courses = Enseignement::where(function ($query) use ($teacher_code, $teacher) {
                 $query->where('code', '=', $teacher_code)
                     ->orWhere('CodeEnseignant2', '=', $teacher_code);
+
+                if ($teacher && $teacher->CodeEtablissement) {
+                    $schoolCode = (string) $teacher->CodeEtablissement;
+                    $query->orWhere(function ($assignedClassCourses) use ($teacher_code, $schoolCode) {
+                        $assignedClassCourses
+                            ->where('CodeEtablissement', '=', $schoolCode)
+                            ->whereIn('CodeClasse', function ($assignedClasses) use ($teacher_code, $schoolCode) {
+                                $assignedClasses
+                                    ->select('ec.CodeClasse')
+                                    ->from('encadreur_classes as ec')
+                                    ->join('classes as c', 'c.CodeClasse', '=', 'ec.CodeClasse')
+                                    ->where('ec.code', '=', $teacher_code)
+                                    ->where('ec.CodeEtablissement', '=', $schoolCode)
+                                    ->where('c.CodeEtablissement', '=', $schoolCode);
+                            });
+                    });
+                }
             })->get();
             return $courses;
         }

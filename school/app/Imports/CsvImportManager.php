@@ -84,18 +84,6 @@ class CsvImportManager
             throw new InvalidArgumentException(__('csv_import.errors.csv_extension'));
         }
 
-        $mime = strtolower((string) $file->getMimeType());
-        $allowedMimes = [
-            'text/plain',
-            'text/csv',
-            'application/csv',
-            'application/vnd.ms-excel',
-            'application/octet-stream',
-        ];
-        if ($mime !== '' && !in_array($mime, $allowedMimes, true)) {
-            throw new InvalidArgumentException(__('csv_import.errors.csv_mime'));
-        }
-
         if ($file->getSize() === 0) {
             throw new InvalidArgumentException(__('csv_import.errors.empty_file'));
         }

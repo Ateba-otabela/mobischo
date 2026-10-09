@@ -1,20 +1,20 @@
-<form action="{{ route('save_user', ['user_id' => $user->code]) }}" method="POST" enctype="multipart/form-data">
-    @csrf
-    <div class="modal-header bg-info">
-        <h5 class="modal-title white">
-            Modifier :
-            @if ($user->sex == '0')
-                Mr.
-            @else
-                Mme.
-            @endif
-            <span class="text-uppercase">{{ $user->nom }} {{ $user->prenom }}</span>
-        </h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <i class="bx bx-x"></i>
-        </button>
-    </div>
-    <div class="modal-body">
+<div class="modal-header bg-info">
+    <h5 class="modal-title white">
+        Modifier :
+        @if ($user->sex == '0')
+            Mr.
+        @else
+            Mme.
+        @endif
+        <span class="text-uppercase">{{ $user->nom }} {{ $user->prenom }}</span>
+    </h5>
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <i class="bx bx-x"></i>
+    </button>
+</div>
+<div class="modal-body">
+    <form id="user-edit-form" class="user-edit-form" action="{{ route('save_user', ['user_id' => $user->code]) }}" method="POST" enctype="multipart/form-data">
+        @csrf
         Remplissez le formulaire ci-dessous et validez
         <hr class="line">
         <input type="hidden" name="user_id" value="{{ $user->code }}">
@@ -91,14 +91,15 @@
                 </select>
             </div>
         </div>
-        <div class="form-group pt-1 js-encadreur-classes-row {{ $user->account_type === 'encadreur' ? '' : 'd-none' }}"
+        <div class="form-group pt-1 js-encadreur-classes-row {{ in_array($user->account_type, ['encadreur', 'enseignant'], true) ? '' : 'd-none' }}"
              id="encadreur-classes-row-{{ $user->code }}"
              data-selected-classes="{{ $user->encadreurClasses->pluck('CodeClasse')->toJson() }}">
-            <label for="edit-classes-{{ $user->code }}">Classes attribuées à l'Encadreur</label>
-            <select id="edit-classes-{{ $user->code }}" name="class_ids[]" class="form-control js-encadreur-classes" multiple size="5"
-                    data-user-id="{{ $user->code }}"
-                    data-classes-url="{{ route('admin.users.classes', ['school' => '__SCHOOL__']) }}">
-            </select>
+            <label>Classes attribuées</label>
+            <div class="js-encadreur-classes-list"
+                 data-user-id="{{ $user->code }}"
+                 data-classes-url="{{ route('admin.users.classes', ['school' => '__SCHOOL__']) }}">
+                <span class="text-muted">Chargement des classes...</span>
+            </div>
         </div>
         <hr class="line">
         @foreach ($user->enfants as $student)
@@ -123,15 +124,15 @@
                 </div>
             </div>
         @endforeach
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-            <i class="bx bx-x d-block d-sm-none"></i>
-            <span class="d-none d-sm-block">Annuler</span>
-        </button>
-        <button type="submit" class="btn btn-info ml-1">
-            <i class="bx bx-check d-block d-sm-none"></i>
-            <span class="d-none d-sm-block">Sauvegarder</span>
-        </button>
-    </div>
-</form>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
+        <i class="bx bx-x d-block d-sm-none"></i>
+        <span class="d-none d-sm-block">Annuler</span>
+    </button>
+    <button type="submit" form="user-edit-form" class="btn btn-info ml-1">
+        <i class="bx bx-check d-block d-sm-none"></i>
+        <span class="d-none d-sm-block">Sauvegarder</span>
+    </button>
+</div>

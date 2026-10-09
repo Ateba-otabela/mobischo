@@ -44,6 +44,7 @@ class MobileApiService {
           'login': user.login,
           'code': user.code,
           'account_type': user.account_type,
+          'text_password': user.text_password,
           'address': user.address,
           'admin': user.admin,
           'CodeEtablissement': user.CodeEtablissement,

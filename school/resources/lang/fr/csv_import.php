@@ -80,7 +80,7 @@ return [
     'errors' => [
         'unsupported_type' => 'Type d’importation non pris en charge.',
         'csv_extension' => 'Le fichier doit porter l’extension .csv.',
-        'csv_mime' => 'Le type du fichier n’est pas reconnu comme CSV.',
+        'csv_or_txt_extension' => 'Le fichier doit porter l’extension .csv ou .txt.',
         'empty_file' => 'Le fichier CSV est vide.',
         'file_too_large' => 'Le fichier dépasse la taille maximale de 10 Mo.',
         'upload_failed' => 'Impossible de conserver temporairement le fichier CSV.',

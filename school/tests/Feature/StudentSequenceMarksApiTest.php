@@ -269,5 +269,9 @@ class StudentSequenceMarksApiTest extends TestCase
             'codeEleve' => 'STUDENT-1',
             'codeEvaluation' => 'SEQ-1',
         ])->assertUnauthorized();
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_STUDENT_SEQUENCE_AVAILABILITY',
+            'codeEleve' => 'STUDENT-1',
+        ])->assertUnauthorized();
     }
 }

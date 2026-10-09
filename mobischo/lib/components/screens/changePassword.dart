@@ -11,14 +11,19 @@ import 'package:mobischo/models/user.dart';
 
 import 'package:mobischo/utils/custom_input.dart';
 import 'package:mobischo/utils/custom_theme.dart';
+import 'package:mobischo/utils/password_validation.dart';
+import 'package:mobischo/services/mobile_api_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/l10n/ui_text.dart';
 
 class ChangePassword extends StatefulWidget {
   final User user;
-  final bool localOnly;
-  const ChangePassword({Key? key, required this.user, this.localOnly = false})
-      : super(key: key);
+  final Widget? postChangeDestination;
+  const ChangePassword({
+    Key? key,
+    required this.user,
+    this.postChangeDestination,
+  }) : super(key: key);
 
   @override
   State<ChangePassword> createState() => _ChangePasswordState();
@@ -91,24 +96,18 @@ class _ChangePasswordState extends State<ChangePassword> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
-
-    if (widget.localOnly) {
-      _password.clear();
-      _new_password.clear();
-      _confirm_new_password.clear();
-      Navigator.push(
-        cont,
-        MaterialPageRoute(
-          builder: (context) => ChangePasswordSuccess(
-            user: widget.user,
-            returnToLogin: true,
-          ),
-        ),
+    final passwordValidationError = validateStrongPassword(_new_password.text);
+    if (passwordValidationError != null) {
+      Fluttertoast.showToast(
+        msg: passwordValidationError,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.CENTER,
+        fontSize: 16.0,
       );
-      if (mounted) setState(() => _isSubmitting = false);
       return;
     }
+
+    setState(() => _isSubmitting = true);
 
     const url = "https://mobischo.com/login.php";
     final map = <String, dynamic>{
@@ -138,16 +137,30 @@ class _ChangePasswordState extends State<ChangePassword> {
           fontSize: 16.0,
         );
       } else {
+        widget.user.text_password = _new_password.text;
+        final currentToken = MobileApiService.currentToken;
+        if (currentToken != null && currentToken.isNotEmpty) {
+          await MobileApiService.saveSession(widget.user, currentToken);
+        }
         _password.clear();
         _new_password.clear();
         _confirm_new_password.clear();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => ChangePasswordSuccess(
-                    user: widget.user,
-                  )),
-        );
+
+        if (widget.postChangeDestination != null) {
+          await Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => widget.postChangeDestination!,
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => ChangePasswordSuccess(
+                      user: widget.user,
+                    )),
+          );
+        }
       }
     } catch (_) {
       Fluttertoast.showToast(
@@ -164,34 +177,39 @@ class _ChangePasswordState extends State<ChangePassword> {
   @override
   Widget build(BuildContext context) {
     final _formKey = GlobalKey<FormState>();
+    final isForcedPasswordChange = widget.postChangeDestination != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back_ios,
-              color: CustomTheme.blue,
-            )),
-        title: Text(
-          uiText(context, 'myAccount'),
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        centerTitle: true,
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12.0),
-            child: Image(
-              image: AssetImage('assets/images/icon.png'),
-              width: 40,
-              height: 40,
-            ),
+    return WillPopScope(
+      onWillPop: () async => !isForcedPasswordChange,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: isForcedPasswordChange
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back_ios,
+                    color: CustomTheme.blue,
+                  )),
+          title: Text(
+            uiText(context, 'myAccount'),
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-        ],
-      ),
-      body: Center(
+          centerTitle: true,
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 12.0),
+              child: Image(
+                image: AssetImage('assets/images/icon.png'),
+                width: 40,
+                height: 40,
+              ),
+            ),
+          ],
+        ),
+        body: Center(
         child: Wrap(
           children: [
             Column(
@@ -267,6 +285,7 @@ class _ChangePasswordState extends State<ChangePassword> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

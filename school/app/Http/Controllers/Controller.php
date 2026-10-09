@@ -18,12 +18,22 @@ class Controller extends BaseController
         Request $request,
         int $minimumColumns,
         ?int $maximumColumns = null,
-        array $expectedHeader = []
+        array $expectedHeader = [],
+        bool $validateExtension = true
     ): array
     {
         $request->validate([
-            'csv_file' => ['required', 'file', 'mimes:csv,txt'],
+            'csv_file' => ['required', 'file'],
         ]);
+
+        if ($validateExtension) {
+            $extension = strtolower($request->file('csv_file')->getClientOriginalExtension());
+            if (!in_array($extension, ['csv', 'txt'], true)) {
+                throw ValidationException::withMessages([
+                    'csv_file' => __('csv_import.errors.csv_or_txt_extension'),
+                ]);
+            }
+        }
 
         $handle = fopen($request->file('csv_file')->getRealPath(), 'rb');
         if ($handle === false) {

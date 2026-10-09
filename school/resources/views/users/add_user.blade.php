@@ -60,6 +60,9 @@
 
             <form action="{{ route('import_users') }}" enctype="multipart/form-data" method="POST">
                 @csrf
+                @if ($selectedSchool)
+                    <input type="hidden" name="CodeEtablissement" value="{{ $selectedSchool->CodeEtablissement }}">
+                @endif
             <div class="modal-header bg-dark">
                 <h5 class="modal-title white" id="myModalLabel160">Importer un fichier CSV d'utilisateurs</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -394,10 +397,13 @@
                                             <input type="text" name="code" class="form-control" placeholder="Code encadreur" required>
                                         </div>
                                     </div>
-                                    <div class="form-group pt-1">
-                                        <label for="new-encadreur-classes">Classes attribuées</label>
-                                        <select id="new-encadreur-classes" name="class_ids[]" class="form-control js-encadreur-classes" multiple size="5" data-classes-url="{{ route('admin.users.classes', ['school' => '__SCHOOL__']) }}">
-                                        </select>
+                                    <div class="form-group pt-1 js-encadreur-classes-row">
+                                        <label>Classes attribuées</label>
+                                        <div class="js-encadreur-classes-list"
+                                             data-user-id=""
+                                             data-classes-url="{{ route('admin.users.classes', ['school' => '__SCHOOL__']) }}">
+                                            <span class="text-muted">Chargement des classes...</span>
+                                        </div>
                                     </div>
                                     <input id="password" type="password" class="form-control d-none " name="password" value="00000000">
                                     <input id="password-confirm" type="password" class="form-control d-none" name="password_confirmation" value="00000000">
@@ -651,6 +657,27 @@
     </div>
 </div>
 
+<style>
+#user-edit-modal .modal-content {
+    max-height: calc(100vh - 3.5rem);
+    overflow: hidden;
+}
+
+#user-edit-modal-content > .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#user-edit-modal-content .user-edit-form {
+    min-height: 0;
+}
+
+#user-edit-modal-content .js-encadreur-classes-list {
+    max-height: 18rem;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -763,7 +790,7 @@ function DisplaySchool(accountType, userId) {
         schoolRow.classList.toggle('d-none', accountType === 'administrateur');
     }
     if (classesRow) {
-        classesRow.classList.toggle('d-none', accountType !== 'encadreur');
+        classesRow.classList.toggle('d-none', ['encadreur', 'enseignant'].indexOf(accountType) === -1);
     }
 }
 </script>
@@ -772,56 +799,86 @@ function DisplaySchool(accountType, userId) {
 document.addEventListener('DOMContentLoaded', function () {
     var editContent = document.getElementById('user-edit-modal-content');
 
-    function initializeEditForm(form) {
-        var classSelect = form.querySelector('.js-encadreur-classes');
+    function initializeEncadreurClassList(form) {
+        var classList = form.querySelector('.js-encadreur-classes-list');
         var schoolSelect = form.querySelector('.js-encadreur-school');
         var accountType = form.querySelector('.js-user-account-type');
-        if (!classSelect) return;
+        if (!classList || !schoolSelect) return;
 
-        var wrapper = document.getElementById('encadreur-classes-row-' + classSelect.dataset.userId);
-        var selectedCodes = wrapper ? JSON.parse(wrapper.dataset.selectedClasses || '[]') : [];
-        var loadClasses = function (selected) {
-            classSelect.innerHTML = '';
-            classSelect.setCustomValidity('');
-            classSelect.disabled = true;
-            classSelect.dataset.loadState = 'loading';
-            var url = classSelect.dataset.classesUrl.replace('__SCHOOL__', encodeURIComponent(schoolSelect.value));
-            fetch(url, { headers: { 'Accept': 'application/json' } })
+        var userId = classList.dataset.userId || '';
+        var requestId = 0;
+
+        function loadClasses() {
+            var currentRequest = ++requestId;
+            classList.dataset.loadState = 'loading';
+            classList.replaceChildren(document.createTextNode('Chargement des classes...'));
+            var url = classList.dataset.classesUrl.replace(
+                '__SCHOOL__',
+                encodeURIComponent(schoolSelect.value)
+            );
+            var urlObject = new URL(url, window.location.origin);
+            if (userId) urlObject.searchParams.set('encadreur_code', userId);
+            fetch(urlObject.toString(), { headers: { 'Accept': 'application/json' } })
                 .then(function (response) {
                     if (!response.ok) throw new Error('classes-request-failed');
                     return response.json();
                 })
                 .then(function (classes) {
-                    if (classes.length === 0) {
-                        var empty = document.createElement('option');
-                        empty.disabled = true;
-                        empty.textContent = 'Aucune classe pour cet établissement.';
-                        classSelect.appendChild(empty);
+                    if (currentRequest !== requestId) return;
+                    classList.replaceChildren();
+                    if (!classes.length) {
+                        classList.textContent = 'Aucune classe pour cet établissement.';
                     }
                     classes.forEach(function (schoolClass) {
-                        var option = document.createElement('option');
-                        option.value = schoolClass.CodeClasse;
-                        option.textContent = schoolClass.LibelleClasse + ' (' + schoolClass.CodeClasse + ')';
-                        option.selected = selected.indexOf(schoolClass.CodeClasse) !== -1;
-                        classSelect.appendChild(option);
+                        var row = document.createElement('div');
+                        row.className = 'custom-control custom-checkbox mb-1';
+                        var checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'class_ids[]';
+                        checkbox.value = schoolClass.CodeClasse;
+                        checkbox.id = 'class-' + userId + '-' + schoolClass.CodeClasse;
+                        checkbox.className = 'custom-control-input';
+
+                        var assignedToCurrent = schoolClass.assignedToCurrentEncadreur === true;
+                        var ownerName = schoolClass.assignedToEncadreurName || '';
+                        var unavailable = !!ownerName && !assignedToCurrent;
+                        checkbox.checked = assignedToCurrent;
+                        checkbox.disabled = unavailable;
+
+                        var label = document.createElement('label');
+                        label.className = 'custom-control-label';
+                        label.htmlFor = checkbox.id;
+                        var className = document.createElement('strong');
+                        className.textContent = schoolClass.LibelleClasse;
+                        label.appendChild(className);
+                        label.appendChild(document.createTextNode(' (' + schoolClass.CodeClasse + ')'));
+                        if (unavailable) {
+                            label.appendChild(document.createTextNode(' — Déjà attribuée à ' + ownerName));
+                            row.classList.add('text-muted');
+                        } else if (assignedToCurrent) {
+                            label.appendChild(document.createTextNode(' — Attribuée à cet utilisateur'));
+                        }
+
+                        row.appendChild(checkbox);
+                        row.appendChild(label);
+                        classList.appendChild(row);
                     });
-                    classSelect.disabled = false;
-                    classSelect.dataset.loadState = 'loaded';
+                    classList.dataset.loadState = 'loaded';
                 })
                 .catch(function () {
-                    classSelect.dataset.loadState = 'error';
-                    classSelect.setCustomValidity('Impossible de charger les classes. Modifiez l’établissement pour réessayer.');
-                    classSelect.reportValidity();
+                    if (currentRequest !== requestId) return;
+                    classList.dataset.loadState = 'error';
+                    classList.textContent = 'Impossible de charger les classes. Modifiez l’établissement pour réessayer.';
                 });
-        };
+        }
 
-        if (schoolSelect) schoolSelect.addEventListener('change', function () { loadClasses([]); });
-        if (!accountType || accountType.value === 'encadreur') loadClasses(selectedCodes);
+        schoolSelect.addEventListener('change', loadClasses);
+        if (!accountType || ['encadreur', 'enseignant'].indexOf(accountType.value) !== -1) loadClasses();
         form.addEventListener('submit', function (event) {
-            if ((!accountType || accountType.value === 'encadreur') && classSelect.dataset.loadState !== 'loaded') {
+            if ((!accountType || ['encadreur', 'enseignant'].indexOf(accountType.value) !== -1)
+                && classList.dataset.loadState !== 'loaded') {
                 event.preventDefault();
-                classSelect.setCustomValidity('Attendez le chargement des classes ou réessayez.');
-                classSelect.reportValidity();
+                classList.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
         if (accountType) {
@@ -829,11 +886,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 var schoolRow = document.getElementById('display_school' + accountType.dataset.userId);
                 var classesRow = document.getElementById('encadreur-classes-row-' + accountType.dataset.userId);
                 if (schoolRow) schoolRow.classList.toggle('d-none', accountType.value === 'administrateur');
-                if (classesRow) classesRow.classList.toggle('d-none', accountType.value !== 'encadreur');
-                if (accountType.value === 'encadreur') loadClasses(selectedCodes);
+                var hasClassAssignments = ['encadreur', 'enseignant'].indexOf(accountType.value) !== -1;
+                if (classesRow) classesRow.classList.toggle('d-none', !hasClassAssignments);
+                if (hasClassAssignments) loadClasses();
             });
         }
     }
+
+    document.querySelectorAll('.js-encadreur-classes-list').forEach(function (classList) {
+        initializeEncadreurClassList(classList.closest('form'));
+    });
 
     function loadEditForm(url) {
         editContent.innerHTML = '<div class="modal-body">Chargement...</div>';
@@ -845,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (html) {
                 editContent.innerHTML = html;
                 var form = editContent.querySelector('form');
-                if (form) initializeEditForm(form);
+                if (form) initializeEncadreurClassList(form);
             })
             .catch(function () {
                 var body = document.createElement('div');

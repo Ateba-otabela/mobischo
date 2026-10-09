@@ -163,7 +163,7 @@ class SchoolDependentPagesTest extends TestCase
             ->assertOk()
             ->assertSee('name="nom"', false)
             ->assertSee('name="prenom"', false)
-            ->assertSee('name="class_ids[]"', false)
+            ->assertSee('js-encadreur-classes-list')
             ->assertSee('return_school', false);
     }
 
@@ -952,6 +952,44 @@ class SchoolDependentPagesTest extends TestCase
         $this->assertDatabaseMissing('tranche_scholarites', ['code' => 'TR-BAD']);
     }
 
+    public function test_user_import_exception_uses_standard_error_response(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('SCHOOL-IMPORT-FAILURE');
+
+        DB::unprepared(
+            "CREATE TRIGGER fail_user_import BEFORE INSERT ON users
+            BEGIN
+                SELECT RAISE(ABORT, 'password=DO_NOT_EXPOSE_PASSWORD; api_key=DO_NOT_EXPOSE_API_KEY; token=DO_NOT_EXPOSE_TOKEN');
+            END;"
+        );
+
+        $columns = array_fill(0, 32, '');
+        $columns[0] = 'IMPORT-FAILURE-USER';
+        $columns[1] = 'Example';
+        $columns[2] = 'Person';
+        $columns[6] = 'F';
+        $columns[8] = 'example.login';
+        $columns[9] = '000000000';
+        $columns[11] = '1';
+        $columns[31] = 'SCHOOL-IMPORT-FAILURE';
+        $header = implode(';', [
+            'code', 'nom', 'prenom', 'DateDeNaissance', 'LieuDeNaissance', 'nationalite',
+            'sex', 'DatePriseService', 'login', 'contacts', 'cdegrade', 'nbrand', 'matricule',
+            'reserve1', 'reserve2', 'reserve3', 'reserve4', 'reserve5', 'reserve6', 'cat',
+            'echel', 'statut', 'reserve7', 'reserve8', 'reserve9', 'CodeBank', 'numcpt',
+            'ribcpt', 'TauhH', 'syndicat', 'NumAssure', 'CodeEtablissement',
+        ]);
+        $response = $this->post(route('import_users'), [
+            'csv_file' => $this->csvUpload(
+                'import-failure.csv',
+                $header . "\n" . implode(';', $columns) . "\n"
+            ),
+        ]);
+
+        $response->assertStatus(500);
+    }
+
     public function test_notes_page_renders_a_friendly_empty_state_without_teaching_records(): void
     {
         $this->createSchool('12301');
@@ -1122,6 +1160,297 @@ class SchoolDependentPagesTest extends TestCase
             'code' => 'ENC-1',
             'CodeClasse' => 'CLS-A2',
             'CodeEtablissement' => '12301',
+        ]);
+    }
+
+    public function test_encadreur_class_assignments_remain_available_after_transition_to_teacher(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createSchool('45601');
+        $this->createClass('CLS-ASSIGNED', '12301');
+        $this->createClass('CLS-UNASSIGNED', '12301');
+        $this->createClass('CLS-OTHER-SCHOOL', '45601');
+        $this->createUser('ENC-TRANSITION', '12301', 'Jean Dupont');
+        DB::table('users')->where('code', 'ENC-TRANSITION')->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            [
+                'code' => 'ENC-TRANSITION',
+                'CodeClasse' => 'CLS-ASSIGNED',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'code' => 'ENC-TRANSITION',
+                'CodeClasse' => 'CLS-OTHER-SCHOOL',
+                'CodeEtablissement' => '45601',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        DB::table('enseignements')->insert([
+            [
+                'CodeEnseignement' => 'ENS-ASSIGNED',
+                'CodeMatiere' => 'MAT-1',
+                'code' => 'OTHER-TEACHER',
+                'CodeClasse' => 'CLS-ASSIGNED',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'CodeEnseignement' => 'ENS-UNASSIGNED',
+                'CodeMatiere' => 'MAT-2',
+                'code' => 'OTHER-TEACHER',
+                'CodeClasse' => 'CLS-UNASSIGNED',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->get(route('admin.users.edit-form', ['user_id' => 'ENC-TRANSITION']))
+            ->assertOk()
+            ->assertSee('user-edit-form', false)
+            ->assertSee('CLS-ASSIGNED', false);
+        $this->get(route('add_user', ['CodeEtablissement' => '12301']))
+            ->assertOk()
+            ->assertSee('#user-edit-modal-content > .modal-body', false)
+            ->assertSee('max-height: 18rem', false)
+            ->assertSee('overflow-y: auto', false);
+
+        $this->get(route('admin.users.classes', [
+            'school' => '12301',
+            'encadreur_code' => 'ENC-TRANSITION',
+        ]))
+            ->assertOk()
+            ->assertJsonFragment([
+                'CodeClasse' => 'CLS-ASSIGNED',
+                'assignedToCurrentEncadreur' => true,
+            ])
+            ->assertJsonMissing(['CodeClasse' => 'CLS-OTHER-SCHOOL']);
+
+        $this->post(route('save_user', ['user_id' => 'ENC-TRANSITION']), [
+            'account_type' => 'enseignant',
+            'nom' => 'Jean',
+            'prenom' => 'Dupont',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Jean Dupont',
+            'code' => 'ENC-TRANSITION',
+            'password' => 'temporary-password',
+            'school_id' => '12301',
+            'class_ids' => ['CLS-ASSIGNED'],
+        ])->assertRedirect(route('add_user'));
+
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-TRANSITION',
+            'CodeClasse' => 'CLS-ASSIGNED',
+            'CodeEtablissement' => '12301',
+        ]);
+        $this->assertDatabaseMissing('encadreur_classes', [
+            'code' => 'ENC-TRANSITION',
+            'CodeEtablissement' => '45601',
+        ]);
+
+        $this->postJson('/api/school_manager', [
+            'action' => 'GET_TEACHER_COURSES',
+            'teacher_code' => 'ENC-TRANSITION',
+        ])
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['CodeEnseignement' => 'ENS-ASSIGNED'])
+            ->assertJsonMissing(['CodeEnseignement' => 'ENS-UNASSIGNED']);
+
+        $this->post(route('save_user', ['user_id' => 'ENC-TRANSITION']), [
+            'account_type' => 'encadreur',
+            'nom' => 'Jean',
+            'prenom' => 'Dupont',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Jean Dupont',
+            'code' => 'ENC-TRANSITION',
+            'password' => 'temporary-password',
+            'school_id' => '12301',
+            'class_ids' => ['CLS-ASSIGNED'],
+        ])->assertRedirect(route('add_user'));
+
+        $this->assertSame(1, DB::table('encadreur_classes')
+            ->where('code', 'ENC-TRANSITION')
+            ->where('CodeClasse', 'CLS-ASSIGNED')
+            ->count());
+    }
+
+    public function test_changing_encadreur_to_non_assignment_role_removes_class_assignments(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createClass('CLS-A1', '12301');
+        $this->createUser('ENC-OTHER-ROLE', '12301', 'Former Encadreur');
+        DB::table('users')->where('code', 'ENC-OTHER-ROLE')->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            'code' => 'ENC-OTHER-ROLE',
+            'CodeClasse' => 'CLS-A1',
+            'CodeEtablissement' => '12301',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->post(route('save_user', ['user_id' => 'ENC-OTHER-ROLE']), [
+            'account_type' => 'parent',
+            'nom' => 'Former',
+            'prenom' => 'Encadreur',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Former Encadreur',
+            'code' => 'ENC-OTHER-ROLE',
+            'password' => 'temporary-password',
+            'school_id' => '12301',
+        ])->assertRedirect(route('add_user'));
+
+        $this->assertDatabaseMissing('encadreur_classes', ['code' => 'ENC-OTHER-ROLE']);
+    }
+
+    public function test_encadreur_checkbox_list_shows_available_and_owned_class_status(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createClass('CLS-A1', '12301');
+        $this->createClass('CLS-A2', '12301');
+        $this->createUser('ENC-OWNER', '12301', 'Jean Dupont');
+        DB::table('users')->where('code', 'ENC-OWNER')->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            'code' => 'ENC-OWNER',
+            'CodeClasse' => 'CLS-A1',
+            'CodeEtablissement' => '12301',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get(route('add_user', ['CodeEtablissement' => '12301']))
+            ->assertOk()
+            ->assertSee('js-encadreur-classes-list')
+            ->assertSee("checkbox.type = 'checkbox'", false)
+            ->assertSee("checkbox.name = 'class_ids[]'", false);
+
+        $this->get(route('admin.users.classes', ['school' => '12301']))
+            ->assertOk()
+            ->assertJsonFragment([
+                'CodeClasse' => 'CLS-A1',
+                'assignedToEncadreurCode' => 'ENC-OWNER',
+                'assignedToEncadreurName' => 'Jean Dupont Staff',
+                'assignedToCurrentEncadreur' => false,
+            ])
+            ->assertJsonFragment([
+                'CodeClasse' => 'CLS-A2',
+                'assignedToEncadreurCode' => null,
+                'assignedToEncadreurName' => null,
+                'assignedToCurrentEncadreur' => false,
+            ]);
+
+        $this->get(route('admin.users.classes', [
+            'school' => '12301',
+            'encadreur_code' => 'ENC-OWNER',
+        ]))
+            ->assertOk()
+            ->assertJsonFragment([
+                'CodeClasse' => 'CLS-A1',
+                'assignedToCurrentEncadreur' => true,
+            ]);
+    }
+
+    public function test_encadreur_creation_rejects_another_encadreur_class_with_owner_details(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createClass('CLS-A1', '12301');
+        $this->createUser('ENC-OWNER', '12301', 'Jean Dupont');
+        DB::table('users')->where('code', 'ENC-OWNER')->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            'code' => 'ENC-OWNER',
+            'CodeClasse' => 'CLS-A1',
+            'CodeEtablissement' => '12301',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->from(route('add_user', ['CodeEtablissement' => '12301']))
+            ->post(route('add_user_complete'), [
+                'account_type' => 'encadreur',
+                'nom' => 'Ateba',
+                'prenom' => 'Sam',
+                'contacts' => '123456',
+                'sex' => 'male',
+                'code' => 'ENC-DUPLICATE',
+                'school_id' => '12301',
+                'password' => 'temporary-password',
+                'class_ids' => ['CLS-A1'],
+            ])
+            ->assertRedirect(route('add_user', ['CodeEtablissement' => '12301']))
+            ->assertSessionHasErrors('class_ids');
+
+        $this->assertStringContainsString(
+            'Classe déjà attribuée. La classe Class CLS-A1 est déjà attribuée à Jean Dupont Staff.',
+            implode(' ', $response->getSession()->get('errors')->getBag('default')->get('class_ids'))
+        );
+        $this->assertDatabaseMissing('users', ['code' => 'ENC-DUPLICATE']);
+    }
+
+    public function test_encadreur_edit_keeps_own_classes_and_rejects_classes_owned_by_another_encadreur(): void
+    {
+        $this->actingAsAdministrator();
+        $this->createSchool('12301');
+        $this->createClass('CLS-OWN', '12301');
+        $this->createClass('CLS-OTHER', '12301');
+        $this->createUser('ENC-EDIT', '12301', 'Edit Owner');
+        $this->createUser('ENC-OWNER', '12301', 'Jean Dupont');
+        DB::table('users')
+            ->whereIn('code', ['ENC-EDIT', 'ENC-OWNER'])
+            ->update(['account_type' => 'encadreur']);
+        DB::table('encadreur_classes')->insert([
+            [
+                'code' => 'ENC-EDIT',
+                'CodeClasse' => 'CLS-OWN',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'code' => 'ENC-OWNER',
+                'CodeClasse' => 'CLS-OTHER',
+                'CodeEtablissement' => '12301',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->post(route('save_user', ['user_id' => 'ENC-EDIT']), [
+            'account_type' => 'encadreur',
+            'nom' => 'Edit',
+            'prenom' => 'Owner',
+            'contacts' => '123456',
+            'sex' => '0',
+            'login' => 'Edit Owner',
+            'code' => 'ENC-EDIT',
+            'password' => 'temporary-password',
+            'school_id' => '12301',
+            'class_ids' => ['CLS-OWN', 'CLS-OTHER'],
+        ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('class_ids');
+
+        $errors = session('errors')->getBag('default')->get('class_ids');
+        $this->assertStringContainsString('Class CLS-OTHER', implode(' ', $errors));
+        $this->assertStringContainsString('Jean Dupont Staff', implode(' ', $errors));
+        $this->assertDatabaseHas('encadreur_classes', [
+            'code' => 'ENC-EDIT',
+            'CodeClasse' => 'CLS-OWN',
+            'CodeEtablissement' => '12301',
+        ]);
+        $this->assertDatabaseMissing('encadreur_classes', [
+            'code' => 'ENC-EDIT',
+            'CodeClasse' => 'CLS-OTHER',
         ]);
     }
 

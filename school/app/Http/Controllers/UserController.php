@@ -12,6 +12,7 @@ use App\Models\Etablissement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -51,13 +52,39 @@ class UserController extends Controller
     public function classes_for_school($school)
     {
         $school = Etablissement::findOrFail($school);
+        $encadreurCode = request()->query('encadreur_code');
+        $assignmentsByClass = DB::table('encadreur_classes as ec')
+            ->join('users as u', 'u.code', '=', 'ec.code')
+            ->where('ec.CodeEtablissement', $school->CodeEtablissement)
+            ->orderBy('u.nom')
+            ->orderBy('u.prenom')
+            ->get([
+                'ec.CodeClasse',
+                'u.code as encadreur_code',
+                'u.nom',
+                'u.prenom',
+            ])
+            ->groupBy('CodeClasse');
 
-        return response()->json(
-            Classe::query()
-                ->where('CodeEtablissement', $school->CodeEtablissement)
-                ->orderBy('LibelleClasse')
-                ->get(['CodeClasse', 'LibelleClasse'])
-        );
+        $classes = Classe::query()
+            ->where('CodeEtablissement', $school->CodeEtablissement)
+            ->orderBy('LibelleClasse')
+            ->get(['CodeClasse', 'LibelleClasse']);
+
+        return response()->json($classes->map(function (Classe $class) use ($assignmentsByClass, $encadreurCode) {
+            $owner = $assignmentsByClass->get($class->CodeClasse)?->first();
+            $class->setAttribute('assignedToEncadreurCode', $owner ? (string) $owner->encadreur_code : null);
+            $class->setAttribute(
+                'assignedToEncadreurName',
+                $owner ? trim($owner->nom . ' ' . $owner->prenom) : null
+            );
+            $class->setAttribute(
+                'assignedToCurrentEncadreur',
+                $owner !== null && $encadreurCode !== null && (string) $owner->encadreur_code === (string) $encadreurCode
+            );
+
+            return $class;
+        }));
     }
 
     public function add_user_complete(Request $request)
@@ -125,6 +152,12 @@ class UserController extends Controller
 
         DB::transaction(function () use ($request, $school, $validated) {
             $accountType = $request->account_type;
+            if ($accountType === 'encadreur') {
+                $this->ensureEncadreurClassesAvailable(
+                    $request->input('class_ids', []),
+                    $school->CodeEtablissement
+                );
+            }
             $code = $validated['code'] ?? (string) $this->generateUniqueUserCode();
             $login = $validated['login'] ?? ($accountType === 'enseignant'
                 ? $request->nom . $school->CodeEtablissement
@@ -177,7 +210,7 @@ class UserController extends Controller
             $school = Etablissement::findOrFail($request->school_id);
         }
 
-        if ($request->account_type === 'encadreur') {
+        if (in_array($request->account_type, ['encadreur', 'enseignant'], true)) {
             $request->validate([
                 'class_ids' => 'nullable|array',
                 'class_ids.*' => [
@@ -193,6 +226,14 @@ class UserController extends Controller
 
         $oldCode = $user->code;
         DB::transaction(function () use ($request, $user, $school, $oldCode, $validated) {
+            if (in_array($validated['account_type'], ['encadreur', 'enseignant'], true)) {
+                $this->ensureEncadreurClassesAvailable(
+                    $request->input('class_ids', []),
+                    $school->CodeEtablissement,
+                    $oldCode
+                );
+            }
+
             $user->nom = $validated['nom'];
             $user->prenom = $validated['prenom'];
             $user->account_type = $validated['account_type'];
@@ -214,7 +255,7 @@ class UserController extends Controller
                     ->update(['code' => $user->code]);
             }
 
-            if ($validated['account_type'] === 'encadreur') {
+            if (in_array($validated['account_type'], ['encadreur', 'enseignant'], true)) {
                 $this->syncEncadreurClasses(
                     $user,
                     $school->CodeEtablissement,
@@ -262,9 +303,41 @@ class UserController extends Controller
                 'updated_at' => now(),
             ];
         }
-
         if ($newAssignments) {
             DB::table('encadreur_classes')->insert($newAssignments);
+        }
+    }
+
+    private function ensureEncadreurClassesAvailable(
+        array $classCodes,
+        string $schoolCode,
+        ?string $exceptEncadreurCode = null
+    ): void {
+        foreach (array_unique($classCodes) as $classCode) {
+            $owner = DB::table('encadreur_classes as ec')
+                ->join('classes as c', 'c.CodeClasse', '=', 'ec.CodeClasse')
+                ->join('users as u', 'u.code', '=', 'ec.code')
+                ->where('ec.CodeEtablissement', $schoolCode)
+                ->where('c.CodeEtablissement', $schoolCode)
+                ->where('ec.CodeClasse', $classCode)
+                ->when($exceptEncadreurCode !== null, function ($query) use ($exceptEncadreurCode) {
+                    $query->where('ec.code', '<>', $exceptEncadreurCode);
+                })
+                ->orderBy('u.nom')
+                ->orderBy('u.prenom')
+                ->first([
+                    'c.LibelleClasse',
+                    'u.nom',
+                    'u.prenom',
+                ]);
+
+            if ($owner) {
+                $className = trim((string) $owner->LibelleClasse);
+                $encadreurName = trim($owner->nom . ' ' . $owner->prenom);
+                throw ValidationException::withMessages([
+                    'class_ids' => "Classe déjà attribuée. La classe {$className} est déjà attribuée à {$encadreurName}.",
+                ]);
+            }
         }
     }
 
@@ -343,14 +416,28 @@ class UserController extends Controller
 
     public function import_users(Request $request)
     {
-        $rows = $this->validateLegacyCsvRows($this->readLegacyCsvRows($request, 32, 32, [
+        $expectedHeader = [
             'code', 'nom', 'prenom', 'DateDeNaissance', 'LieuDeNaissance', 'nationalite',
             'sex', 'DatePriseService', 'login', 'contacts', 'cdegrade', 'nbrand',
             'matricule', 'reserve1', 'reserve2', 'reserve3', 'reserve4', 'reserve5',
             'reserve6', 'cat', 'echel', 'statut', 'reserve7', 'reserve8', 'reserve9',
             'CodeBank', 'numcpt', 'ribcpt', 'TauhH', 'syndicat', 'NumAssure',
             'CodeEtablissement',
-        ]), [
+        ];
+        $request->validate([
+            'csv_file' => ['required', 'file'],
+        ]);
+        $uploadedFile = $request->file('csv_file');
+        $extension = strtolower($uploadedFile->getClientOriginalExtension());
+        if (!in_array($extension, ['csv', 'txt'], true)) {
+            return back()->withErrors([
+                'csv_file' => __('csv_import.errors.csv_or_txt_extension'),
+            ]);
+        }
+
+        $rows = $this->readLegacyCsvRows($request, 32, 32, $expectedHeader, false);
+
+        $rows = $this->validateLegacyCsvRows($rows, [
             0 => 'required|string|max:255',
             1 => 'required|string|max:255',
             2 => 'required|string|max:255',
@@ -387,11 +474,12 @@ class UserController extends Controller
 
         foreach ($rows as $index => $row) {
             if ($row[31] !== '' && !Etablissement::where('CodeEtablissement', $row[31])->exists()) {
-                return redirect('add_user')
+                return redirect()->route('add_user', [
+                    'CodeEtablissement' => $request->input('CodeEtablissement'),
+                ])
                     ->withErrors(['csv_file' => 'L’établissement de la ligne '.($index + 1).' n’existe pas.']);
             }
         }
-
         DB::transaction(function () use ($rows): void {
             foreach ($rows as $data) {
                 $user = User::firstOrNew(['code' => $data[0]]);
@@ -434,7 +522,11 @@ class UserController extends Controller
             }
         });
 
-        return redirect('add_user')->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
+        $selectedSchoolCode = $request->input('CodeEtablissement');
+
+        return redirect()->route('add_user', [
+            'CodeEtablissement' => $selectedSchoolCode,
+        ])->with(['message'=>"L'importation a été effectuée avec succès",'alert'=>'border-success']);
     }
 
 }

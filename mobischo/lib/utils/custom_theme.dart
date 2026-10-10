@@ -42,7 +42,7 @@ class CustomTheme {
                 fontSize: fontSize['lg'],
                 fontWeight: FontWeight.bold,
                 letterSpacing: 4)),
-        tabBarTheme: const TabBarTheme(
+        tabBarTheme: const TabBarThemeData(
             labelColor: CustomTheme.blue, unselectedLabelColor: Colors.white),
         textTheme: TextTheme(
           headlineLarge: TextStyle(
@@ -78,3 +78,4 @@ class CustomTheme {
         ));
   }
 }
+

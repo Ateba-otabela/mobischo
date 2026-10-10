@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:mobischo/l10n/app_localizations.dart';
 
 String uiText(
   BuildContext context,
@@ -1031,6 +1031,8 @@ String uiText(
       return l10n.convocationSaved;
     case 'convocationSaveFailed':
       return l10n.convocationSaveFailed;
+    case 'convocationNetworkError':
+      return l10n.convocationNetworkError;
     case 'noConvocationForClass':
       return l10n.noConvocationForClass;
     case 'createConvocationWithButton':

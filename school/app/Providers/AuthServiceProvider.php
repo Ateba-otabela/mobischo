@@ -41,7 +41,7 @@ class AuthServiceProvider extends ServiceProvider
 
         Gate::define('ai:chat', function ($user) {
             return $user instanceof \App\Models\User
-                && app(PrincipalContextService::class)->canUseAi($user);
+                && app(PrincipalContextService::class)->canUsePrincipalAi($user);
         });
     }
 }

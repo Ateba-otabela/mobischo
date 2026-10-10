@@ -1,7 +1,7 @@
 // ignore_for_file: implementation_imports, unnecessary_import
 
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:mobischo/l10n/app_localizations.dart';
 import 'package:flutter/src/foundation/key.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:mobischo/utils/custom_button.dart';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobischo/l10n/ui_text.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobischo/utils/custom_button.dart';
 import 'package:mobischo/components/screens/teachers.dart/absences_list.dart';

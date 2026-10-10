@@ -126,6 +126,14 @@ class PrincipalContextService
         return true;
     }
 
+    public function canUsePrincipalAi(User $user): bool
+    {
+        $accountType = strtolower(trim((string) ($user->account_type ?? '')));
+
+        return in_array($accountType, ['principal', 'principal_encadreur'], true)
+            && trim((string) ($user->CodeEtablissement ?? '')) !== '';
+    }
+
     private function aiRole(User $user): ?string
     {
         $accountType = strtolower(trim((string) ($user->account_type ?? '')));

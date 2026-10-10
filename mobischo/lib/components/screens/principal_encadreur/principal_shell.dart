@@ -28,11 +28,14 @@ class PrincipalShell extends StatefulWidget {
 }
 
 class _PrincipalShellState extends State<PrincipalShell> {
+  bool get _hasPrincipalAi => const {'principal', 'principal_encadreur'}
+      .contains(widget.user.account_type.trim().toLowerCase());
+
   List<String> _titles(BuildContext context) => [
         'MOBISCHO',
         uiText(context, 'classes'),
         uiText(context, 'presence'),
-        uiText(context, 'ai'),
+        if (_hasPrincipalAi) uiText(context, 'ai'),
       ];
 
   List<String> _secondaryTitles(BuildContext context) => [
@@ -81,13 +84,13 @@ class _PrincipalShellState extends State<PrincipalShell> {
           ).dispatch(context),
         ),
         PrincipalAttendancePage(user: widget.user),
-        MobischoAiScreen(user: widget.user),
+        if (_hasPrincipalAi) MobischoAiScreen(user: widget.user),
       ],
-      principalIcons: const [
-        Icon(Icons.home),
-        Icon(Icons.class_outlined),
-        Icon(Icons.fact_check_outlined),
-        Icon(Icons.smart_toy_outlined),
+      principalIcons: [
+        const Icon(Icons.home),
+        const Icon(Icons.class_outlined),
+        const Icon(Icons.fact_check_outlined),
+        if (_hasPrincipalAi) const Icon(Icons.smart_toy_outlined),
       ],
       principalSecondaryTitles: _secondaryTitles(context),
       principalSecondaryScreens: [

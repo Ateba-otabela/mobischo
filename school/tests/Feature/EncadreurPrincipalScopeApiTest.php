@@ -358,7 +358,7 @@ class EncadreurPrincipalScopeApiTest extends TestCase
             'Prenom' => 'School Two',
         ]);
 
-        $response = $this->postJson('/api/school_manager', [
+        $response = $this->post('/api/school_manager', [
             'action' => 'INSERT_CONVOCATION',
             'code' => 'PR-CONV',
             'CodeEleves' => json_encode(['ELE-B']),

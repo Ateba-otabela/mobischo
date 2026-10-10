@@ -77,7 +77,7 @@ class AiChatEndpointTest extends TestCase
         $this->deleteJson('/api/ai/conversations/1')->assertUnauthorized();
     }
 
-    public function test_parent_and_teacher_can_use_the_ai_gateway(): void
+    public function test_only_principal_roles_can_use_the_ai_gateway(): void
     {
         config([
             'services.google_ai.api_key' => 'test-only-key',
@@ -91,17 +91,32 @@ class AiChatEndpointTest extends TestCase
             ], 200),
         ]);
 
-        foreach ([['parent', 'test-parent'], ['enseignant', 'test-teacher']] as [$role, $code]) {
+        foreach ([
+            ['parent', 'test-parent'],
+            ['enseignant', 'test-teacher'],
+            ['encadreur', 'test-encadreur'],
+            ['administrateur', 'test-admin'],
+        ] as [$role, $code]) {
             $user = $this->principal($code)->forceFill(['account_type' => $role]);
             Sanctum::actingAs($user, ['ai:chat']);
 
             $this->postJson('/api/ai/chat', ['message' => 'Bonjour'])
-                ->assertOk()
-                ->assertJson(['success' => true, 'message' => 'Bonjour']);
+                ->assertForbidden()
+                ->assertJson(['success' => false]);
         }
+        Http::assertNothingSent();
+
+        $principal = $this->principal('test-principal-only')->forceFill([
+            'account_type' => 'principal',
+        ]);
+        Sanctum::actingAs($principal, ['ai:chat']);
+
+        $this->postJson('/api/ai/chat', ['message' => 'Bonjour'])
+            ->assertOk()
+            ->assertJson(['success' => true, 'message' => 'Bonjour']);
     }
 
-    public function test_navigation_only_question_uses_confirmed_parent_path_without_calling_gemini(): void
+    public function test_parent_cannot_use_ai_navigation_answers(): void
     {
         $parent = $this->principal('test-parent-navigation')->forceFill([
             'account_type' => 'parent',
@@ -111,36 +126,45 @@ class AiChatEndpointTest extends TestCase
 
         $this->postJson('/api/ai/chat', [
             'message' => 'Où voir les absences de mon enfant ?',
-        ])->assertOk()->assertJson([
-            'success' => true,
-            'message' => 'Depuis le tableau de bord parent, ouvrez RETARD ET ABSENCE.',
-        ]);
+        ])->assertForbidden()->assertJson(['success' => false]);
+
+        $this->getJson('/api/ai/conversations')->assertForbidden();
+        $this->postJson('/api/ai/conversations')->assertForbidden();
+        $this->getJson('/api/ai/conversations/1')->assertForbidden();
+        $this->postJson('/api/ai/conversations/1/messages', [
+            'message' => 'Bonjour',
+        ])->assertForbidden();
+        $this->deleteJson('/api/ai/conversations/1')->assertForbidden();
 
         Http::assertNothingSent();
     }
 
-    public function test_navigation_answers_are_role_specific_for_parent_teacher_encadreur_principal_and_admin(): void
+    public function test_navigation_answers_remain_available_to_principals_only(): void
     {
         Http::fake();
-        $cases = [
-            ['parent', '0', 'Où trouver les notes de mon enfant ?', 'Ouvrez NOTES depuis le tableau de bord parent'],
-            ['enseignant', '0', 'Where can I see attendance?', "Ouvrez REGISTRE D'APPEL"],
-            ['encadreur', '0', 'Where do I find class information?', 'Ouvrez Classes dans la navigation principale'],
-            ['principal', '0', 'Where can I find my classes?', 'Ouvrez Classes dans la navigation principale'],
-            ['parent', '1', 'Where do I find users?', 'Ouvrez UTILISATEURS'],
-        ];
+        $user = $this->principal('navigation-principal')->forceFill([
+            'account_type' => 'principal',
+        ]);
+        Sanctum::actingAs($user, ['ai:chat']);
 
-        foreach ($cases as $index => [$role, $admin, $question, $expected]) {
-            $user = $this->principal('navigation-user-'.$index)->forceFill([
+        $response = $this->postJson('/api/ai/chat', [
+            'message' => 'Where can I find my classes?',
+        ]);
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertStringContainsString(
+            'Ouvrez Classes dans la navigation principale',
+            $response->json('message')
+        );
+
+        foreach ([['parent', '0'], ['enseignant', '0'], ['encadreur', '0'], ['parent', '1']] as $index => [$role, $admin]) {
+            $nonPrincipal = $this->principal('navigation-nonprincipal-'.$index)->forceFill([
                 'account_type' => $role,
                 'admin' => $admin,
             ]);
-            Sanctum::actingAs($user, ['ai:chat']);
+            Sanctum::actingAs($nonPrincipal, ['ai:chat']);
 
-            $response = $this->postJson('/api/ai/chat', ['message' => $question]);
-            $this->assertSame(200, $response->status(), $role.' admin='.$admin.' response='.$response->getContent());
-            $response->assertJsonPath('success', true);
-            $this->assertStringContainsString($expected, $response->json('message'));
+            $this->postJson('/api/ai/chat', ['message' => 'Where can I find classes?'])
+                ->assertForbidden();
         }
 
         Http::assertNothingSent();

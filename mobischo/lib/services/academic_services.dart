@@ -1,13 +1,28 @@
 // ignore_for_file: import_of_legacy_library_into_null_safe, constant_identifier_names, avoid_print, unnecessary_null_comparison, non_constant_identifier_names
 
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:mobischo/models/class.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobischo/models/convocation.dart';
 import 'package:mobischo/services/mobile_api_service.dart';
 import 'package:mobischo/models/sequence_evaluation.dart';
 import 'package:mobischo/models/year.dart';
+
+class ConvocationRequestException implements Exception {
+  final int? statusCode;
+  final String? safeMessage;
+  final bool isNetworkError;
+
+  const ConvocationRequestException({
+    this.statusCode,
+    this.safeMessage,
+    this.isNetworkError = false,
+  });
+}
 
 class AcademicServices {
   static const ROOT = 'https://mobischo.com/api/school_manager';
@@ -22,6 +37,28 @@ class AcademicServices {
   static const INSERT_CONVOCATION_ACTION = 'INSERT_CONVOCATION';
   static const GET_TEACHER_CONVOCATIONS_ACTION = 'GET_TEACHER_CONVOCATIONS';
   static const GET_PARENT_CONVOCATIONS_ACTION = 'GET_PARENT_CONVOCATIONS';
+
+  static String? _safeConvocationError(http.Response response) {
+    if (response.statusCode != 403 && response.statusCode != 422) return null;
+
+    try {
+      final decoded = jsonDecode(response.body);
+      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
+      const safeMessages = {
+        'Les champs de convocation sont obligatoires.',
+        'La date de convocation est invalide.',
+        'Enseignant non autorisé.',
+        'Établissement non autorisé.',
+        'Cette matière ne fait pas partie de vos classes.',
+        'Cette matière n’appartient pas à votre établissement.',
+        'La classe sélectionnée n’est pas autorisée.',
+        'Un ou plusieurs élèves ne correspondent pas à la classe.',
+      };
+      return message is String && safeMessages.contains(message) ? message : null;
+    } on FormatException {
+      return null;
+    }
+  }
 
   static Future<List<Year>> getYears() async {
     try {
@@ -192,30 +229,30 @@ class AcademicServices {
       String dateConvocation,
       {String? codeClasse,
       Uint8List? documentBytes,
-      String? documentName}) async {
+      String? documentName,
+      http.Client? client}) async {
+    final map = <String, String>{};
+    map['action'] = INSERT_CONVOCATION_ACTION;
+    map['code'] = code;
+    map['CodeEleves'] = jsonEncode(studentCodes);
+    if (codeClasse != null) {
+      map['CodeClasse'] = codeClasse;
+    }
+    map['motif'] = motif;
+    map['description'] = description;
+    map['CodeEnseignement'] = CodeEnseignement;
+    map['dateConvocation'] = dateConvocation;
+
+    if ((documentBytes == null) != (documentName == null)) {
+      throw ArgumentError('Both document bytes and name are required.');
+    }
+
+    final uri = Uri.parse(ROOT);
+    http.Response response;
     try {
-      final map = <String, String>{};
-      map['action'] = INSERT_CONVOCATION_ACTION;
-      map['code'] = code;
-      map['CodeEleves'] = jsonEncode(studentCodes);
-      if (codeClasse != null) {
-        map['CodeClasse'] = codeClasse;
-      }
-      map['motif'] = motif;
-      map['description'] = description;
-      map['CodeEnseignement'] = CodeEnseignement;
-      map['dateConvocation'] = dateConvocation;
-
-      final uri = Uri.parse(ROOT);
-      print('CONVOCATION URL: $uri');
-      print('CONVOCATION METHOD: POST');
-      print('CONVOCATION PAYLOAD: $map');
-
-      if ((documentBytes == null) != (documentName == null)) {
-        throw ArgumentError('Both document bytes and name are required.');
-      }
-      final response = documentBytes == null
-          ? await http.post(uri, body: map)
+      response = documentBytes == null
+          ? await (client?.post(uri, body: map) ?? http.post(uri, body: map))
+              .timeout(_notesRequestTimeout)
           : await MobileApiService.postMultipart(
               '/school_manager',
               fields: map,
@@ -225,41 +262,40 @@ class AcademicServices {
                 filename: documentName,
               ),
               headers: const {'Accept': 'application/json'},
-            );
-      final contentType = response.headers['content-type'] ?? '(missing)';
-      final responsePreview = response.body.length > 1000
-          ? response.body.substring(0, 1000)
-          : response.body;
-      print('CONVOCATION STATUS: ${response.statusCode}');
-      print('CONVOCATION CONTENT-TYPE: $contentType');
-
-      final isJson = contentType.toLowerCase().contains('application/json');
-      if (isJson) {
-        try {
-          final decoded = jsonDecode(response.body);
-          print('CONVOCATION DECODED JSON: $decoded');
-        } catch (error) {
-          print('CONVOCATION JSON DECODE ERROR: $error');
-          print('CONVOCATION RESPONSE: $responsePreview');
-        }
-      } else {
-        print('CONVOCATION HTML/NON-JSON RESPONSE: $responsePreview');
-      }
-
-      if (200 == response.statusCode) {
-        try {
-          return response.body;
-        } catch (e) {
-          print(e.toString());
-          return "Error";
-        }
-      } else {
-        return "Error";
-      }
-    } catch (e) {
-      print(e.toString());
-      return "Error";
+            ).timeout(_notesRequestTimeout);
+    } on SocketException {
+      throw const ConvocationRequestException(isNetworkError: true);
+    } on TimeoutException {
+      throw const ConvocationRequestException(isNetworkError: true);
+    } on http.ClientException {
+      throw const ConvocationRequestException(isNetworkError: true);
     }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint(
+        'Convocation request rejected: HTTP ${response.statusCode}; '
+        'content-type=${response.headers['content-type'] ?? 'missing'}.',
+      );
+      throw ConvocationRequestException(
+        statusCode: response.statusCode,
+        safeMessage: _safeConvocationError(response),
+      );
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['status'] == 'success') {
+        return response.body;
+      }
+    } on FormatException {
+      // Treat an unexpected success response as a server failure below.
+    }
+
+    debugPrint(
+      'Convocation request returned an unexpected success response '
+      '(HTTP ${response.statusCode}).',
+    );
+    throw ConvocationRequestException(statusCode: response.statusCode);
   }
 
   static Future<String> insertConvocation(

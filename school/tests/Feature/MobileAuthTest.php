@@ -119,18 +119,15 @@ class MobileAuthTest extends TestCase
 
         $this->assertNotNull($storedToken);
         $this->assertTrue($storedToken->can('mobischo:mobile'));
-        $aiToken = PersonalAccessToken::findToken($payload[0]['ai_token']);
-        $this->assertNotNull($aiToken);
-        $this->assertTrue($aiToken->can('ai:chat'));
+        $this->assertNull($payload[0]['ai_token']);
 
         $this->assertDatabaseHas('personal_access_tokens', [
             'name' => 'mobischo-mobile',
         ]);
 
-        $this->withToken($payload[0]['ai_token'])
+        $this->withToken($token)
             ->postJson('/api/ai/chat', ['message' => 'Où voir les absences de mon enfant ?'])
-            ->assertOk()
-            ->assertJsonPath('success', true);
+            ->assertForbidden();
     }
 
     public function test_mobile_login_diagnostic_is_secret_gated_and_returns_only_checkpoints(): void
@@ -173,7 +170,7 @@ class MobileAuthTest extends TestCase
                 'legacy_password_match' => true,
                 'hash_password_match' => true,
                 'mobile_eligible' => true,
-                'ai_eligible' => true,
+                'ai_eligible' => false,
             ]);
     }
 
@@ -223,9 +220,7 @@ class MobileAuthTest extends TestCase
         $teacherToken = PersonalAccessToken::findToken($teacherResponse->json('0.token'));
         $this->assertNotNull($teacherToken);
         $this->assertTrue($teacherToken->can('mobischo:mobile'));
-        $teacherAiToken = PersonalAccessToken::findToken($teacherResponse->json('0.ai_token'));
-        $this->assertNotNull($teacherAiToken);
-        $this->assertTrue($teacherAiToken->can('ai:chat'));
+        $this->assertNull($teacherResponse->json('0.ai_token'));
 
         $principalResponse = $this->postJson('/api/mobile/login', [
             'action' => 'LOGIN',
@@ -249,9 +244,7 @@ class MobileAuthTest extends TestCase
         $adminToken = PersonalAccessToken::findToken($adminResponse->json('0.token'));
         $this->assertNotNull($adminToken);
         $this->assertTrue($adminToken->can('mobischo:mobile'));
-        $adminAiToken = PersonalAccessToken::findToken($adminResponse->json('0.ai_token'));
-        $this->assertNotNull($adminAiToken);
-        $this->assertTrue($adminAiToken->can('ai:chat'));
+        $this->assertNull($adminResponse->json('0.ai_token'));
 
         $encadreurResponse = $this->postJson('/api/mobile/login', [
             'action' => 'LOGIN',
@@ -260,20 +253,13 @@ class MobileAuthTest extends TestCase
         ]);
         $encadreurResponse->assertOk();
         $encadreurMobileToken = PersonalAccessToken::findToken($encadreurResponse->json('0.token'));
-        $encadreurAiToken = PersonalAccessToken::findToken($encadreurResponse->json('0.ai_token'));
         $this->assertNotNull($encadreurMobileToken);
         $this->assertTrue($encadreurMobileToken->can('mobischo:mobile'));
         $this->assertFalse($encadreurMobileToken->can('ai:chat'));
-        $this->assertNotNull($encadreurAiToken);
-        $this->assertTrue($encadreurAiToken->can('ai:chat'));
-
-        $this->withToken($encadreurResponse->json('0.ai_token'))
-            ->postJson('/api/ai/chat', ['message' => 'Where do I find class information?'])
-            ->assertOk()
-            ->assertJsonPath('success', true);
+        $this->assertNull($encadreurResponse->json('0.ai_token'));
     }
 
-    public function test_legacy_admin_flag_gets_only_school_scoped_ai_token(): void
+    public function test_legacy_admin_flag_does_not_get_an_ai_token(): void
     {
         $this->createUser([
             'code' => 'legacy-admin-001',
@@ -291,9 +277,7 @@ class MobileAuthTest extends TestCase
             'text_password' => 'secret-admin-flag',
         ])->assertOk();
 
-        $aiToken = PersonalAccessToken::findToken($response->json('0.ai_token'));
-        $this->assertNotNull($aiToken);
-        $this->assertTrue($aiToken->can('ai:chat'));
+        $this->assertNull($response->json('0.ai_token'));
     }
 
     public function test_logout_revokes_current_token_and_requires_authentication(): void

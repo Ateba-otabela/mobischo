@@ -172,215 +172,161 @@ class _CreateAbsenceScreenState extends State<CreateAbsenceScreen> {
   Widget build(BuildContext context) {
     final attendanceDate = selectedAttendanceDate!;
 
-    // absence_list();
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
         leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back_ios,
-              color: CustomTheme.blue,
-            )),
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            color: CustomTheme.blue,
+          ),
+        ),
         title: FutureBuilder<String>(
           future: CourseServices.getMainCourse(widget.course.CodeMatiere),
-          builder: (
-            BuildContext context,
-            AsyncSnapshot<String> snapshot,
-          ) {
+          builder: (context, snapshot) {
             if (snapshot.data == null) {
               return Text(uiText(context, 'loadingEllipsis'));
-            } else {
-              return Text(snapshot.data!.toUpperCase(),
-                  style: Theme.of(context).textTheme.headlineMedium);
             }
+            return Text(
+              snapshot.data!.toUpperCase(),
+              style: Theme.of(context).textTheme.headlineMedium,
+            );
           },
         ),
         bottom: PreferredSize(
-            preferredSize: Size.zero,
+          preferredSize: const Size.fromHeight(24),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 10),
             child: Text(
               "Enregistrer l'appel pour ${_displayDate(attendanceDate)}",
               style: const TextStyle(color: CustomTheme.blue),
-            )),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: CustomTheme.grey,
-            // decoration: CustomTheme.getCardDecoration(),
-            height: 80,
-            width: double.infinity,
-            // color: CustomTheme.blue,
-            child: Column(
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Center(
-                        child: SizedBox(
-                      width: double.infinity,
-                      height: 80,
-                      // padding: const EdgeInsets.all(2.0),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15.0),
-                        ),
-                        elevation: 10,
-                        child: InkWell(
-                          onTap: () {},
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: <Widget>[
-                              ListTile(
-                                title: Text(
-                                    "Enregistrer l'appel pour ${_displayDate(attendanceDate)}"),
-                                subtitle: Text(
-                                  "Ne cochez que les eleves absents",
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                trailing: const Image(
-                                  image: AssetImage('assets/images/menu4.png'),
-                                ),
-                                onTap: () {
-                                  // BottomForm(context);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ))
-                  ],
-                ),
-              ],
             ),
           ),
-          // const Divider(
-          //   height: 10,
-          //   color: CustomTheme.grey,
-          // ),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : student_list.isEmpty
-                    ? Center(
-                        child: Text(uiText(context, 'noStudentsForSubject')),
-                      )
-                    : ListView.builder(
-                        itemCount: student_list.length,
-                        itemBuilder: (context, index) {
-                          final student = student_list[index];
-                          final status = statuses[student.CodeEleve] ?? 'P';
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      '${student.Nom} ${student.Prenom}'.trim(),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Card(
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15.0),
+                ),
+                elevation: 10,
+                child: InkWell(
+                  onTap: () {},
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
+                      title: Text(
+                        "Enregistrer l'appel pour ${_displayDate(attendanceDate)}",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      subtitle: Text(
+                        "Ne cochez que les eleves absents",
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      trailing: const SizedBox(
+                        width: 28,
+                        child: Image(
+                          image: AssetImage('assets/images/menu4.png'),
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      onTap: () {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : student_list.isEmpty
+                      ? Center(
+                          child: Text(uiText(context, 'noStudentsForSubject')),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(
+                            left: 8,
+                            right: 8,
+                            bottom: 88,
+                          ),
+                          itemCount: student_list.length,
+                          itemBuilder: (context, index) {
+                            final student = student_list[index];
+                            final status = statuses[student.CodeEleve] ?? 'P';
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 0,
+                                vertical: 3,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        '${student.Nom} ${student.Prenom}'
+                                            .trim(),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        _statusChoice(
-                                          student.CodeEleve,
-                                          status,
-                                          'P',
-                                          uiText(context, 'present'),
-                                        ),
-                                        _statusChoice(
-                                          student.CodeEleve,
-                                          status,
-                                          'A',
-                                          uiText(context, 'absentStatusLabel'),
-                                        ),
-                                        _statusChoice(
-                                          student.CodeEleve,
-                                          status,
-                                          'R',
-                                          uiText(context, 'lateStatusLabel'),
-                                        ),
-                                      ],
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          _statusChoice(
+                                            student.CodeEleve,
+                                            status,
+                                            'P',
+                                            uiText(context, 'present'),
+                                          ),
+                                          _statusChoice(
+                                            student.CodeEleve,
+                                            status,
+                                            'A',
+                                            uiText(
+                                                context, 'absentStatusLabel'),
+                                          ),
+                                          _statusChoice(
+                                            student.CodeEleve,
+                                            status,
+                                            'R',
+                                            uiText(context, 'lateStatusLabel'),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-
-          //         FutureBuilder(
-          //   future: StudentServices.getCourseStudents(widget.course.CodeClasse),
-          //   builder: (BuildContext context, AsyncSnapshot snapshot) {
-          //         if (snapshot.data == null) {
-          //           return const Center(child: CircularProgressIndicator());
-          //         } else {
-          //           return Container(
-          //             color: CustomTheme.grey,
-          //             child: ListView.builder(
-          //                 shrinkWrap: true,
-          //                 itemCount: snapshot.data.length,
-          //                 itemBuilder: (BuildContext context, int index) {
-          //                   return Padding(
-          //                     padding: const EdgeInsets.all(3),
-          //                     child: Container(
-          //                         decoration: BoxDecoration(
-          //                             borderRadius: BorderRadius.circular(10),
-          //                             color: Colors.white),
-          //                         child: CheckboxListTile(
-          //                           value: false,
-          //                           onChanged: null,
-          //                           controlAffinity:
-          //                               ListTileControlAffinity.trailing,
-          //                           title: FutureBuilder<String>(
-          //                               future: StudentServices.getMainStudent(
-          //                                   snapshot.data[index].CodeEleve),
-          //                               builder: (
-          //                                 BuildContext context,
-          //                                 AsyncSnapshot<String> snapshot,
-          //                               ) {
-          //                                 if (snapshot.data == null) {
-          //                                   return const Text('loading ...');
-          //                                 } else {
-          //                                   return Text(
-          //                                     snapshot.data ?? "",
-          //                                     style: const TextStyle(
-          //                                         color: Colors.black,
-          //                                         fontSize: 13),
-          //                                   );
-          //                                 }
-          //                               }),
-          //                           subtitle:
-          //                               Text(getGender(snapshot.data[index].Sex)),
-          //                         )),
-          //                   );
-          //                 }),
-          //           );
-          //         }
-          //   },
-          // ),
-        ],
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

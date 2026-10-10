@@ -252,7 +252,7 @@ class API extends Controller
             ->plainTextToken;
 
         $aiToken = null;
-        if ((new \App\Services\PrincipalContextService())->canUseAi($user)) {
+        if ((new \App\Services\PrincipalContextService())->canUsePrincipalAi($user)) {
             $aiToken = $user->createToken('mobischo-principal-ai', ['ai:chat'])
                 ->plainTextToken;
         }
@@ -308,7 +308,7 @@ class API extends Controller
             'legacy_password_match' => $legacyPasswordMatch,
             'hash_password_match' => $hashPasswordMatch,
             'mobile_eligible' => $user !== null && $this->isMobileEligibleUser($user),
-            'ai_eligible' => $user !== null && (new \App\Services\PrincipalContextService())->canUseAi($user),
+            'ai_eligible' => $user !== null && (new \App\Services\PrincipalContextService())->canUsePrincipalAi($user),
         ]);
     }
 

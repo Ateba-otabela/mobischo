@@ -637,7 +637,7 @@ class AiReadOnlyToolServiceTest extends TestCase
         });
     }
 
-    public function test_combined_parent_question_gets_navigation_and_authorized_live_absence_data(): void
+    public function test_parent_cannot_use_ai_chat_for_live_absence_data(): void
     {
         $parent = (new User())->forceFill([
             'code' => 'parent-a',
@@ -646,61 +646,11 @@ class AiReadOnlyToolServiceTest extends TestCase
             'CodeEtablissement' => 'school-a',
         ]);
         Sanctum::actingAs($parent, ['ai:chat']);
-        config([
-            'services.google_ai.api_key' => 'test-only-key',
-            'services.google_ai.model' => 'test-model',
-        ]);
-
-        $providerRequests = [];
-        Http::fake(function (ClientRequest $request) use (&$providerRequests) {
-            $providerRequests[] = $request;
-            if (count($providerRequests) === 1) {
-                return Http::response([
-                    'candidates' => [[
-                        'content' => [
-                            'role' => 'model',
-                            'parts' => [[
-                                'functionCall' => [
-                                    'name' => 'get_child_absences',
-                                    'args' => [
-                                        'childCode' => 'student-a1',
-                                        'dateFrom' => $this->today,
-                                        'dateTo' => $this->today,
-                                    ],
-                                ],
-                            ]],
-                        ],
-                    ]],
-                ], 200);
-            }
-
-            return Http::response([
-                'candidates' => [[
-                    'content' => [
-                        'role' => 'model',
-                        'parts' => [[
-                            'text' => 'Ouvrez RETARD ET ABSENCE. Pour la période demandée, une absence est enregistrée.',
-                        ]],
-                    ],
-                ]],
-            ], 200);
-        });
-
         $this->postJson('/api/ai/chat', [
             'message' => 'Where can I see my child absences and how many are recorded?',
-        ])->assertOk()->assertJsonPath(
-            'message',
-            'Ouvrez RETARD ET ABSENCE. Pour la période demandée, une absence est enregistrée.'
-        );
+        ])->assertForbidden()->assertJson(['success' => false]);
 
-        $this->assertCount(2, $providerRequests);
-        $this->assertStringContainsString(
-            'RETARD ET ABSENCE',
-            $providerRequests[1]['systemInstruction']['parts'][0]['text']
-        );
-        $toolResult = $providerRequests[1]['contents'][2]['parts'][0]['functionResponse']['response'] ?? [];
-        $this->assertSame(1, $toolResult['totals']['absent'] ?? null);
-        $this->assertSame('student-a1', $toolResult['student']['CodeEleve'] ?? null);
+        Http::assertNothingSent();
     }
 
     public function test_tool_audit_log_contains_only_safe_call_metadata(): void

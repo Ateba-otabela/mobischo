@@ -1,8 +1,6 @@
 // ignore_for_file: file_names, non_constant_identifier_names, prefer_const_constructors, import_of_legacy_library_into_null_safe, prefer_typing_uninitialized_variables, avoid_print
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:intl/intl.dart';
@@ -84,29 +82,32 @@ class _CreateConvocationState extends State<CreateConvocation> {
   var motif;
   final Set<String> _selectedStudentCodes = <String>{};
   bool _isSaving = false;
-  bool _isPickingAttachment = false;
-  Uint8List? _attachmentBytes;
-  String? _attachmentName;
-
-  static const _maxAttachmentSize = 10 * 1024 * 1024;
 
   List<DropdownMenuItem<String>> ListCourses = [];
   List<DropdownMenuItem<String>> ListMotifs = [];
   TextEditingController description = TextEditingController();
 
-  List<DropdownMenuItem> motifs() {
-    ListMotifs.clear();
-    ListMotifs.add(DropdownMenuItem(
+  void _populateMotifs() {
+    if (ListMotifs.isNotEmpty) return;
+
+    ListMotifs = [
+      DropdownMenuItem(
         value: "Insubordination",
-        child: Text(uiText(context, 'insubordination'))));
-    ListMotifs.add(DropdownMenuItem(
+        child: Text(uiText(context, 'insubordination')),
+      ),
+      DropdownMenuItem(
         value: "Retards Abusive",
-        child: Text(uiText(context, 'excessiveLateness'))));
-    ListMotifs.add(DropdownMenuItem(
-        value: "Indiscipline", child: Text(uiText(context, 'indiscipline'))));
-    ListMotifs.add(DropdownMenuItem(
-        value: "Autre", child: Text(uiText(context, 'otherReason'))));
-    return ListMotifs;
+        child: Text(uiText(context, 'excessiveLateness')),
+      ),
+      DropdownMenuItem(
+        value: "Indiscipline",
+        child: Text(uiText(context, 'indiscipline')),
+      ),
+      DropdownMenuItem(
+        value: "Autre",
+        child: Text(uiText(context, 'otherReason')),
+      ),
+    ];
   }
 
   Future<List<DropdownMenuItem>> courses() {
@@ -152,49 +153,6 @@ class _CreateConvocationState extends State<CreateConvocation> {
     return all_class_courses;
   }
 
-  Future<void> _pickAttachment() async {
-    setState(() => _isPickingAttachment = true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-        allowMultiple: false,
-        withData: true,
-      );
-      if (!mounted || result == null) return;
-
-      final file = result.files.single;
-      if (file.bytes == null) {
-        _showMessage(uiText(context, 'documentReadError'));
-        return;
-      }
-      if (file.size > _maxAttachmentSize) {
-        _showMessage(uiText(context, 'documentTooLarge'));
-        return;
-      }
-
-      setState(() {
-        _attachmentBytes = file.bytes;
-        _attachmentName = file.name;
-      });
-    } on PlatformException catch (error) {
-      debugPrint('Picking convocation attachment failed (${error.code}).');
-      if (mounted) _showMessage(uiText(context, 'documentSelectError'));
-    } on Exception catch (error) {
-      debugPrint(
-          'Picking convocation attachment failed (${error.runtimeType}).');
-      if (mounted) _showMessage(uiText(context, 'documentSelectError'));
-    } finally {
-      if (mounted) setState(() => _isPickingAttachment = false);
-    }
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
   _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -224,7 +182,6 @@ class _CreateConvocationState extends State<CreateConvocation> {
         setState(() {});
       }
     });
-    motifs();
   }
 
   List<Student> get _availableStudents =>
@@ -348,6 +305,8 @@ class _CreateConvocationState extends State<CreateConvocation> {
 
   @override
   Widget build(BuildContext context) {
+    _populateMotifs();
+
     return Scaffold(
       backgroundColor: CustomTheme.grey,
       appBar: AppBar(
@@ -472,56 +431,6 @@ class _CreateConvocationState extends State<CreateConvocation> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(17, 16, 17, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(uiText(context, 'optionalSupportingDocument')),
-                          const SizedBox(height: 6),
-                          if (_attachmentBytes == null)
-                            OutlinedButton.icon(
-                              onPressed:
-                                  _isPickingAttachment ? null : _pickAttachment,
-                              icon: _isPickingAttachment
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.attach_file),
-                              label:
-                                  Text(uiText(context, 'addDocumentOrPhoto')),
-                            )
-                          else
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.description_outlined),
-                              title: Text(
-                                _attachmentName ??
-                                    uiText(context, 'selectedDocument'),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: IconButton(
-                                tooltip: uiText(context, 'deleteDocument'),
-                                onPressed: () => setState(() {
-                                  _attachmentBytes = null;
-                                  _attachmentName = null;
-                                }),
-                                icon: const Icon(Icons.close),
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(
-                            uiText(context, 'fileSizeLimit'),
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
                       padding:
                           const EdgeInsets.only(left: 17, right: 17, top: 30),
                       child: CustomButton(
@@ -530,19 +439,20 @@ class _CreateConvocationState extends State<CreateConvocation> {
                         onPress: () {
                           if (motif == null ||
                               course == null ||
-                              description.text == '' ||
+                              description.text.trim().isEmpty ||
                               date.isEmpty ||
                               _selectedStudentCodes.isEmpty) {
-                            Fluttertoast.showToast(
-                              msg: uiText(
-                                  context, 'selectStudentAndCompleteFields'),
-                              toastLength: Toast.LENGTH_LONG,
-                              gravity: ToastGravity.BOTTOM,
-                              fontSize: 16.0,
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  uiText(context, 'selectStudentAndCompleteFields'),
+                                ),
+                              ),
                             );
-                          } else {
-                            _saveConvocation();
+                            return;
                           }
+
+                          _saveConvocation();
                         },
                       ),
                     ),
@@ -560,44 +470,82 @@ class _CreateConvocationState extends State<CreateConvocation> {
     if (_isSaving || _selectedStudentCodes.isEmpty) return;
     final studentCodes = List<String>.from(_selectedStudentCodes);
     if (studentCodes.isEmpty) return;
+
     setState(() {
       _isSaving = true;
     });
-    final result = await AcademicServices.insertConvocations(
-      widget.user.code,
-      studentCodes,
-      motif,
-      description.text,
-      course,
-      date,
-      codeClasse: widget.codeClasse ?? _availableStudents.first.CodeClasse,
-      documentBytes: _attachmentBytes,
-      documentName: _attachmentName,
-    );
-    if (!mounted) return;
-    final success = result.toLowerCase().contains('success');
-    setState(() {
-      _isSaving = false;
-    });
-    if (widget.returnToList && success) {
-      Fluttertoast.showToast(msg: uiText(context, 'convocationSaved'));
-      Navigator.pop(context, true);
-      return;
-    }
-    if (!success) {
-      Fluttertoast.showToast(
-        msg: uiText(context, 'convocationSaveFailed'),
-        toastLength: Toast.LENGTH_LONG,
+
+    try {
+      final result = await AcademicServices.insertConvocations(
+        widget.user.code,
+        studentCodes,
+        motif,
+        description.text.trim(),
+        course,
+        date,
+        codeClasse: widget.codeClasse ??
+          widget.student?.CodeClasse ??
+          (_availableStudents.isNotEmpty
+            ? _availableStudents.first.CodeClasse
+            : null),
       );
-      return;
-    }
-    if (!widget.returnToList) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ConvocationSuccess(user: widget.user),
+
+      if (!mounted) return;
+
+      final success = result.toLowerCase().contains('success');
+      if (success) {
+        if (widget.returnToList) {
+          Fluttertoast.showToast(msg: uiText(context, 'convocationSaved'));
+          Navigator.pop(context, true);
+          return;
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConvocationSuccess(user: widget.user),
+          ),
+        );
+        return;
+      }
+
+      debugPrint('Convocation creation failed: $result');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(uiText(context, 'convocationSaveFailed')),
         ),
       );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is ConvocationRequestException
+          ? error.safeMessage ??
+              uiText(
+                context,
+                error.isNetworkError
+                    ? 'convocationNetworkError'
+                    : 'convocationSaveFailed',
+              )
+          : uiText(context, 'convocationSaveFailed');
+      if (error is ConvocationRequestException) {
+        debugPrint(
+          'Convocation save failed: '
+          'status=${error.statusCode ?? 'network'}; '
+          'network=${error.isNetworkError}.',
+        );
+      } else {
+        debugPrint(
+          'Convocation save failed: unexpected ${error.runtimeType}.',
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 

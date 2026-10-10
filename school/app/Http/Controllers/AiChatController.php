@@ -393,6 +393,7 @@ class AiChatController extends Controller
 
     private function canAccessAi(User $user): bool
     {
-        return $this->principalContext->resolveForAi($user) !== null;
+        return $this->principalContext->canUsePrincipalAi($user)
+            && $user->tokenCan('ai:chat');
     }
 }

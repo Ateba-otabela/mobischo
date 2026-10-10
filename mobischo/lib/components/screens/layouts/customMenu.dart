@@ -9,10 +9,9 @@ import 'package:mobischo/components/screens/encardreur/StudentClassList.dart';
 import 'package:mobischo/components/screens/encardreur/classList.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:mobischo/l10n/app_localizations.dart';
 import 'package:mobischo/components/screens/notifications/notification_bell.dart';
 import 'package:mobischo/components/screens/notifications/notification_list_screen.dart';
-import 'package:mobischo/components/screens/mobischo_ai.dart';
 import 'package:mobischo/components/screens/layouts/sidebar.dart';
 import 'package:mobischo/components/screens/parent/MyChildren.dart';
 import 'package:mobischo/components/screens/parent/MyChildrenAbsences.dart';
@@ -78,14 +77,12 @@ class _CustomMenuState extends State<CustomMenu>
     "MOBISCHO",
     "UTILISATEURS",
     "NOTES",
-    "AI"
   ];
   final List<String> teachertitleList = [
     "MOBISCHO",
     "REGISTRE D'APPEL",
     "NOTES",
     "MATIERES",
-    "AI",
   ];
 
   final List<String> parenttitleList = [
@@ -208,7 +205,6 @@ class _CustomMenuState extends State<CustomMenu>
             l10n.appName.toUpperCase(),
             l10n.users.toUpperCase(),
             l10n.notes.toUpperCase(),
-            l10n.ai.toUpperCase()
           ]
         : widget.user.account_type == 'parent'
             ? [
@@ -229,7 +225,6 @@ class _CustomMenuState extends State<CustomMenu>
                     l10n.registerCall.toUpperCase(),
                     l10n.notes.toUpperCase(),
                     l10n.subjects.toUpperCase(),
-                    l10n.ai.toUpperCase()
                   ];
     return titles[index];
   }
@@ -242,7 +237,6 @@ class _CustomMenuState extends State<CustomMenu>
         const Icon(Icons.home),
         const Icon(Icons.person_outlined),
         const Icon(Icons.list_alt),
-        const Icon(Icons.smart_toy_outlined),
       ];
       return items;
     } else {
@@ -269,7 +263,6 @@ class _CustomMenuState extends State<CustomMenu>
             const Icon(Icons.timer),
             const Icon(Icons.note_add_outlined),
             const Icon(Icons.menu_book),
-            const Icon(Icons.smart_toy_outlined),
           ];
           return items;
         }
@@ -351,7 +344,6 @@ class _CustomMenuState extends State<CustomMenu>
           MarkScreen(
             user: widget.user,
           ),
-          MobischoAiScreen(user: widget.user),
         ];
       });
     } else {
@@ -391,7 +383,6 @@ class _CustomMenuState extends State<CustomMenu>
                 user: widget.user,
               ),
               CoursesScreen(user: widget.user),
-              MobischoAiScreen(user: widget.user),
             ];
           });
         }
